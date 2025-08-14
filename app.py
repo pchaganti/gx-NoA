@@ -43,7 +43,10 @@ except Exception as e:
 
 def get_input_spanner_chain(prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
-Create a generalist agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory is a log of your previous proposed solutions and reasonings from past epochs. You will use this to learn from your past attempts and refine your approach. Initially, your memory will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. Each agent should format its answer as a JSON with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
+Create the system prompt of an agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory is a log of your previous proposed solutions and reasonings from past epochs. You will use this to learn from your past attempts and refine your approach. Initially, your memory will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
+
+Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
+
 MBTI Type: {{mbti_type}}
 Guiding Words: {{guiding_words}}
 Prompt: {{prompt}}
@@ -68,13 +71,13 @@ Agent System Prompt to analyze:
 
 def get_dense_spanner_chain(prompt_alignment, density, learning_rate):
     prompt = ChatPromptTemplate.from_template(f"""
-You are a 'dense_spanner'. Your task is to create a new agent based on the attributes of a previous agent and a 'hard_request'.
+You are a 'dense_spanner'. Your task is to create the system prompt of new agent based on the attributes of a previous agent and a 'hard_request'.
 This new agent will be part of a multi-layered graph of agents working to solve a problem.
 The new agent's system prompt should be based on the identified attributes from the previous layer's agents and the 'hard_request'.
 The influence of the hard_request on the new agent's career is modulated by 'prompt_alignment' ({prompt_alignment}).
 The influence of the attributes on the new agent's skills is modulated by 'density' ({density}).
 The 'learning_rate' ({learning_rate}) will determine how much the agent's attributes, career, and skills are modified based on the critique from the reflection pass.
-The agent should have the same JSON output format as the input agents.
+Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
 Attributes: {{attributes}}
 Hard Request: {{hard_request}}
 Critique: {{critique}}
@@ -430,7 +433,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "problem": user_prompt,
             "word_count": total_verbs_to_generate
         })
+
         all_verbs = list(set(generated_verbs_str.split())) # Ensure uniqueness
+
+        await log_stream.put(all_verbs)
         
         if len(all_verbs) < total_verbs_to_generate:
             await log_stream.put(f"Warning: LLM generated {len(all_verbs)} unique verbs, required {total_verbs_to_generate}. Padding with repeats.")
@@ -463,6 +469,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         for _ in range(num_agents_per_principality):
             agent_prompt = await input_spanner_chain.ainvoke({"mbti_type": mbti_type, "guiding_words": guiding_words, "prompt": user_prompt})
             layer_0_prompts.append(agent_prompt)
+            await log_stream.put(f"Created agent for Layer 0: {agent_prompt}...")
     all_layers_prompts.append(layer_0_prompts)
     await log_stream.put(f"Created {len(layer_0_prompts)} agents for Layer 0.")
 
@@ -474,8 +481,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
         await log_stream.put(f"--- Creating Layer {i} Agents ---")
         prev_layer_prompts = all_layers_prompts[i-1]
         current_layer_prompts = []
-        for agent_prompt in prev_layer_prompts:
+        for idx, agent_prompt in enumerate(prev_layer_prompts):
             analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
+
+            await log_stream.put(f"Analysis on agent {idx}: {analysis_str}...")
+
             try:
                 analysis = json.loads(analysis_str)
                 attributes = analysis.get("attributes")
