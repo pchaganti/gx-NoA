@@ -31,6 +31,7 @@ class GraphState(TypedDict):
     params: dict
     all_layers_prompts: List[List[str]]
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
+    memory: dict # Node ID -> List of past JSON outputs
     final_solution: dict
 
 # --- LangChain Setup ---
@@ -42,7 +43,7 @@ except Exception as e:
 
 def get_input_spanner_chain(prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
-Create a generalist agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory will be empty, and attributes and skills will be derived from the guiding words and the prompt alignment. Each agent should format its answer as a JSON with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
+Create a generalist agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory is a log of your previous proposed solutions and reasonings from past epochs. You will use this to learn from your past attempts and refine your approach. Initially, your memory will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. Each agent should format its answer as a JSON with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
 MBTI Type: {{mbti_type}}
 Guiding Words: {{guiding_words}}
 Prompt: {{prompt}}
@@ -107,6 +108,14 @@ Generate your critique for this specific agent:
 """)
     return prompt | llm | StrOutputParser()
 
+def get_seed_generation_chain():
+    prompt = ChatPromptTemplate.from_template("""
+Given the following problem, generate exactly {word_count} verbs that are related to the problem, but also connect the problem with different semantic fields of knowledge. The verbs should be abstract and linguistically loaded. Output them as a single space-separated string of unique verbs.
+
+Problem: "{problem}"
+""")
+    return prompt | llm | StrOutputParser()
+
 
 def create_agent_node(agent_prompt, node_id):
     """
@@ -140,18 +149,24 @@ def create_agent_node(agent_prompt, node_id):
             
             input_data = json.dumps(prev_layer_outputs, indent=2)
 
+        # Retrieve the agent's memory from previous epochs
+        agent_memory_history = state.get("memory", {}).get(node_id, [])
+        memory_str = "\n".join([f"- Epoch {i}: {json.dumps(mem)}" for i, mem in enumerate(agent_memory_history)])
+
         # Construct the full prompt for the LLM
         full_prompt = f"""
 System Prompt (Your Persona & Task):
 ---
 {agent_prompt}
 ---
-
+Your Memory (Your Past Actions from Previous Epochs):
+---
+{memory_str if memory_str else "You have no past actions in memory."}
+---
 Input Data to Process:
 ---
 {input_data}
 ---
-
 Your JSON formatted response:
 """
         
@@ -170,9 +185,17 @@ Your JSON formatted response:
                 "skills_used": []
             }
             
-        # The output is a dictionary with the node's ID as the key.
-        # This allows LangGraph to correctly route and store the output.
-        return {"agent_outputs": {node_id: response_json}}
+        # Update the memory for this node
+        current_memory = state.get("memory", {}).copy()
+        if node_id not in current_memory:
+            current_memory[node_id] = []
+        # Append the new output to this agent's memory log
+        current_memory[node_id].append(response_json)
+
+        return {
+            "agent_outputs": {node_id: response_json},
+            "memory": current_memory
+        }
 
     return agent_node
 
@@ -243,7 +266,7 @@ async def update_agent_prompts_node(state: GraphState):
     if not critiques:
         await log_stream.put("No critiques available. Skipping reflection.")
         new_epoch = state["epoch"] + 1
-        return {"epoch": new_epoch, "agent_outputs": {}}
+        return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
 
     all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
     
@@ -259,7 +282,7 @@ async def update_agent_prompts_node(state: GraphState):
     if penultimate_layer_idx < 0:
         await log_stream.put("Not enough layers to reflect upon. Skipping.")
         new_epoch = state["epoch"] + 1
-        return {"epoch": new_epoch, "agent_outputs": {}}
+        return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
 
     # --- Reflection on Penultimate Layer ---
     await log_stream.put(f"--- Reflecting on Layer {penultimate_layer_idx} ---")
@@ -368,7 +391,8 @@ async def update_agent_prompts_node(state: GraphState):
     return {
         "all_layers_prompts": all_prompts_copy,
         "epoch": new_epoch,
-        "agent_outputs": {} # Reset outputs for the next epoch
+        "agent_outputs": {}, # Reset outputs for the next epoch
+        "memory": state.get("memory", {}) # Preserve memory across epochs
     }
 
 # --- FastAPI Endpoints ---
@@ -383,13 +407,50 @@ async def build_and_run_graph(payload: dict = Body(...)):
         return JSONResponse(content={"message": "LLM not initialized. Please check your API key."}, status_code=500)
 
     params = payload.get("params")
-    seeds = payload.get("seeds")
     user_prompt = params.get("prompt")
+    word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 4))
     num_agents_per_principality = 1
 
     await log_stream.put("--- Starting Graph Build and Run Process ---")
     await log_stream.put(f"Parameters: {params}")
+
+    # --- Seed Verb Generation ---
+    mbti_types = [
+        "ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP",
+        "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"
+    ]
+    num_mbti_types = len(mbti_types)
+    total_verbs_to_generate = word_vector_size * num_mbti_types
+
+    await log_stream.put(f"--- Generating {total_verbs_to_generate} Seed Verbs ---")
+    seed_generation_chain = get_seed_generation_chain()
+    try:
+        generated_verbs_str = await seed_generation_chain.ainvoke({
+            "problem": user_prompt,
+            "word_count": total_verbs_to_generate
+        })
+        all_verbs = list(set(generated_verbs_str.split())) # Ensure uniqueness
+        
+        if len(all_verbs) < total_verbs_to_generate:
+            await log_stream.put(f"Warning: LLM generated {len(all_verbs)} unique verbs, required {total_verbs_to_generate}. Padding with repeats.")
+            repeats_needed = total_verbs_to_generate - len(all_verbs)
+            all_verbs.extend((all_verbs * (repeats_needed // len(all_verbs) + 1))[:repeats_needed])
+        
+        all_verbs = all_verbs[:total_verbs_to_generate] # Trim excess
+        random.shuffle(all_verbs) # Shuffle to distribute diverse verbs
+
+        seeds = {}
+        for i, mbti_type in enumerate(mbti_types):
+            start_index = i * word_vector_size
+            end_index = start_index + word_vector_size
+            seeds[mbti_type] = " ".join(all_verbs[start_index:end_index])
+        
+        await log_stream.put("Seed verbs generated successfully.")
+    except Exception as e:
+        await log_stream.put(f"Error generating seed verbs: {e}. Aborting.")
+        return JSONResponse(content={"message": f"Failed to generate seed verbs: {e}"}, status_code=500)
+
 
     # --- Agent Prompt Generation ---
     all_layers_prompts = []
@@ -488,13 +549,14 @@ async def build_and_run_graph(payload: dict = Body(...)):
         
         initial_state = {
             "original_request": user_prompt,
-            "layers": [], # This is now managed within the nodes
+            "layers": [], 
             "critiques": {},
             "epoch": 0,
             "max_epochs": int(params["num_epochs"]),
             "params": params,
             "all_layers_prompts": all_layers_prompts,
             "agent_outputs": {},
+            "memory": {},
             "final_solution": {}
         }
 
@@ -504,7 +566,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
             # output is a dictionary where keys are node names
             for key, value in output.items():
                 await log_stream.put(f"--- Node: {key} ---")
-                await log_stream.put(f"Output: {value}")
+                # Avoid printing the entire memory state every time
+                if "memory" in value:
+                    await log_stream.put(f"Output for {key} processed. Memory updated.")
+                else:
+                    await log_stream.put(f"Output: {value}")
+
         
         # After the stream is done, the final state is in the last output
         final_state = list(output.values())[-1]

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NoA - It takes a village of agents to raise an agent | Free Deep Think</title>
+    <title>NoA | Free Deep Think</title>
     <style>
         :root {
             --primary-color: #0E1117;
@@ -132,7 +132,7 @@
     </style>
 </head>
 <body>
-    <h1>Network of Agents Engine</h1>
+    <h1>It takes a village of agents to raise an agent</h1>
 
     <div class="container">
         <div id="graph-architecture" class="section">
@@ -143,10 +143,10 @@
                 <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="4" max="32" required>
 
                 <label for="num_epochs">Number of epochs:</label>
-                <input type="number" id="num_epochs" name="num_epochs" required>
+                <input type="number" id="num_epochs" name="num_epochs" value="2" required>
 
-                <label for="vector_word_size">Vector word size:</label>
-                <input type="number" id="vector_word_size" name="vector_word_size" required>
+                <label for="vector_word_size">Vector word size (Number of verbs per agent):</label>
+                <input type="number" id="vector_word_size" name="vector_word_size" value="5" required>
 
                 <label for="prompt_alignment">Prompt alignment (0.1-2.0):</label>
                 <input type="number" id="prompt_alignment" name="prompt_alignment" step="0.1" min="0.1" max="2.0" value="1.0" required>
@@ -155,23 +155,14 @@
                 <input type="number" id="density" name="density" step="0.1" min="0.1" max="2.0" value="1.0" required>
 
                 <label for="num_reflections">Number of reflections (20 - max(cot_trace_depth * 16)):</label>
-                <input type="number" id="num_reflections" name="num_reflections" min="20" required>
+                <input type="number" id="num_reflections" name="num_reflections" min="20" value="20" required>
 
                 <label for="learning_rate">Learning rate (0.1-2.0):</label>
                 <input type="number" id="learning_rate" name="learning_rate" step="0.1" min="0.1" max="2.0" value="0.1" required>
 
                 <label for="prompt">Prompt:</label>
-                <textarea id="prompt" name="prompt" required></textarea>
+                <textarea id="prompt" name="prompt" required>Design a sustainable and circular business model for urban farming.</textarea>
 
-                <button type="submit">Next</button>
-            </form>
-        </div>
-
-        <div id="seeds-section" class="section hidden">
-            <h2>Seeds for basis operators per principality</h2>
-            <p>Use only verbs as operators instead of nouns or adjectives; the more abstract and linguistically loaded the verb is, the smoother the “loss” landscape will be.</p>
-            <form id="seeds-form">
-                <div class="mbti-grid" id="mbti-inputs"></div>
                 <button type="submit">Build and Run Graph</button>
             </form>
         </div>
@@ -195,77 +186,42 @@
     </div>
 
     <script>
-        const mbtiTypes = [
-            "ISTJ", "ISFJ", "INFJ", "INTJ",
-            "ISTP", "ISFP", "INFP", "INTP",
-            "ESTP", "ESFP", "ENFP", "ENTP",
-            "ESTJ", "ESFJ", "ENFJ", "ENTJ"
-        ];
-
         const graphParamsForm = document.getElementById('graph-params-form');
-        const seedsSection = document.getElementById('seeds-section');
-        const mbtiInputs = document.getElementById('mbti-inputs');
-        const seedsForm = document.getElementById('seeds-form');
         const logContainer = document.getElementById('log-container');
         const graphContainer = document.getElementById('graph-container');
         const resultsContainer = document.getElementById('results-container');
         const finalSolutionContainer = document.getElementById('final-solution');
 
-        let vectorWordSize = 0;
-
-        graphParamsForm.addEventListener('submit', (e) => {
+        graphParamsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const formData = new FormData(graphParamsForm);
             const params = Object.fromEntries(formData.entries());
-            vectorWordSize = parseInt(params.vector_word_size);
-
+            
             const cotTraceDepth = parseInt(params.cot_trace_depth);
             const numReflectionsInput = document.getElementById('num_reflections');
             numReflectionsInput.max = cotTraceDepth * 16;
-
-            mbtiInputs.innerHTML = '';
-            mbtiTypes.forEach(type => {
-                const div = document.createElement('div');
-                const label = document.createElement('label');
-                label.textContent = type;
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.name = type;
-                input.required = true;
-                div.appendChild(label);
-                div.appendChild(input);
-                mbtiInputs.appendChild(div);
-            });
-
-            seedsSection.classList.remove('hidden');
-        });
-
-        seedsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(seedsForm);
-            const seeds = Object.fromEntries(formData.entries());
-
-            for (const type in seeds) {
-                const words = seeds[type].split(' ').filter(w => w.length > 0);
-                if (words.length > vectorWordSize) {
-                    alert(`Number of words for ${type} cannot exceed ${vectorWordSize}`);
-                    return;
-                }
-            }
-            
-            const graphParams = new FormData(graphParamsForm);
-            const params = Object.fromEntries(graphParams.entries());
             
             logContainer.innerHTML = '<p>Building and running graph... This may take some time.</p>';
             resultsContainer.classList.add('hidden');
             graphContainer.innerHTML = '<p>Graph will be displayed here...</p>';
 
+            const payload = { params };
 
             const response = await fetch('/build_and_run_graph', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ params, seeds })
+                body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                const errorResult = await response.json();
+                logContainer.innerHTML += `<p style="color:red;"><strong>Error: ${errorResult.message}</strong></p>`;
+                if(errorResult.traceback) {
+                     logContainer.innerHTML += `<pre style="color:red;">${errorResult.traceback}</pre>`;
+                }
+                return;
+            }
 
             const result = await response.json();
             logContainer.innerHTML += `<p><strong>${result.message}</strong></p>`;
