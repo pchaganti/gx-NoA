@@ -1,7 +1,7 @@
 # Network of Agents (NoA) 
 
 
-NoA is a research platform that explores the emergent problem-solving capabilities of multi-agent systems and wraps the process of collaboration as an ultra long thinking Chain of Though - similar to Deep Think for Google Ultra users. It leverages a novel metaheuristic inspired by the architecture and learning process of Artificial Neural Networks (ANNs) to dynamically create and refine a network of collaborative Large Language Model (LLM) agents. Local inference is supported 🚀
+NoA is a research platform that explores the emergent problem-solving capabilities of multi-agent systems and wraps the process of collaboration as an ultra long thinking Chain of Thought (CoT) - similar to Deep Think for Google Ultra users. It leverages a novel metaheuristic inspired by the architecture and learning process of Artificial Neural Networks (ANNs) to dynamically create and refine a network of collaborative Large Language Model (LLM) agents. Local inference is supported 🚀
 
 ## The NoA Algorithm: Simulating Neural Networks with LLM Agents
 
