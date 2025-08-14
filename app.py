@@ -41,10 +41,12 @@ class GraphState(TypedDict):
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
-Create the system prompt of an agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory is a log of your previous proposed solutions and reasonings from past epochs. You will use this to learn from your past attempts and refine your approach. Initially, your memory will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
-
+Create the system prompt of an agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
+When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
+Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
+Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
+Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
 Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
-
 MBTI Type: {{mbti_type}}
 Guiding Words: {{guiding_words}}
 Prompt: {{prompt}}
@@ -70,11 +72,16 @@ Agent System Prompt to analyze:
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     prompt = ChatPromptTemplate.from_template(f"""
 You are a 'dense_spanner'. Your task is to create the system prompt of new agent based on the attributes of a previous agent and a 'hard_request'.
-This new agent will be part of a multi-layered graph of agents working to solve a problem.
-The new agent's system prompt should be based on the identified attributes from the previous layer's agents and the 'hard_request'.
-The influence of the hard_request on the new agent's career is modulated by 'prompt_alignment' ({prompt_alignment}).
-The influence of the attributes on the new agent's skills is modulated by 'density' ({density}).
-The 'learning_rate' ({learning_rate}) will determine how much the agent's attributes, career, and skills are modified based on the critique from the reflection pass.
+This new agent will be part of a multi-layered graph of antropocentric agents working together to solve a problem.
+When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
+The new agent's personality, identity and skills as defined in the system prompt should be based on the identified attributes from the previous layer's agents and the 'hard_request'.
+The influence of the hard_request on the new agent's career is modulated by 'prompt_alignment' ({prompt_alignment}). Min 0.0, Max 2.0
+Each generated system prompt for an agent must contain in markdown the sections: memory, attributes, skills. 
+Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. 
+Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
+Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
+The influence of the attributes on the new agent's skills is modulated by 'density' ({density}). Min 0.0, Max 2.0
+The 'learning_rate' ({learning_rate}) (Min 0.0, Max 2.0) will determine how much the agent's attributes, career, and skills are modified based on the critique from the reflection pass.
 Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
 Attributes: {{attributes}}
 Hard Request: {{hard_request}}

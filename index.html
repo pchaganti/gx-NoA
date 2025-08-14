@@ -92,6 +92,10 @@
         button:hover {
             background-color: #E03C3C;
         }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
         #log-container {
             height: 400px;
             background-color: #000;
@@ -170,7 +174,7 @@
                 </div>
 
                 <label for="cot_trace_depth">CoT trace depth (max 32):</label>
-                <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="2" max="32" required>
+                <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="3" max="32" min="3" required>
 
                 <label for="num_epochs">Number of epochs:</label>
                 <input type="number" id="num_epochs" name="num_epochs" value="1" required>
@@ -213,7 +217,8 @@
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>Is there a singular, all-encompassing, coherent theoretical framework of physics that fully explains and links together all physical aspects of the universe? Design one.</textarea>
 
-                <button type="submit">Build and Run Graph</button>
+                <!-- FIX: Removed the onclick="this.disabled = true" attribute -->
+                <button type="submit" id="run-button">Build and Run Graph</button>
             </form>
         </div>
     </div>
@@ -234,9 +239,16 @@
         <h2>Final Result</h2>
         <div id="final-solution"></div>
     </div>
+   <script type="module">
+        // Import mermaid at the top of the module.
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        // Initialize mermaid right away.
+        mermaid.initialize({ startOnLoad: true });
 
-    <script>
+        // Get all DOM elements
         const graphParamsForm = document.getElementById('graph-params-form');
+        const runButton = document.getElementById('run-button');
         const logContainer = document.getElementById('log-container');
         const graphContainer = document.getElementById('graph-container');
         const resultsContainer = document.getElementById('results-container');
@@ -257,80 +269,82 @@
             
             const formData = new FormData(graphParamsForm);
             
-            // Special handling for multi-select checkboxes
             const params = {};
-            // Iterate over all form entries
             for (const [key, value] of formData.entries()) {
-                // If the key is for our checkboxes, we need to collect all values
                 if (key === 'mbti_archetypes') {
                     if (!params[key]) {
-                        params[key] = []; // Initialize the array if it doesn't exist
+                        params[key] = [];
                     }
                     params[key].push(value);
                 } else {
-                    // For all other inputs, just assign the value
                     params[key] = value;
                 }
             }
-             // Ensure mbti_archetypes is an empty array if no checkboxes are checked
             if (!params.mbti_archetypes) {
                 params.mbti_archetypes = [];
             }
 
-
-            // Validation for MBTI archetypes
             if (params.mbti_archetypes.length < 2) {
                 alert('Please select at least 2 MBTI archetypes.');
                 logContainer.innerHTML += `<p style="color:orange;"><strong>Validation Error:</strong> Please select at least 2 MBTI archetypes to build the graph.</p>`;
-                return; // Stop the submission
+                return;
             }
 
             const cotTraceDepth = parseInt(params.cot_trace_depth);
             const numReflectionsInput = document.getElementById('num_reflections');
             numReflectionsInput.max = cotTraceDepth * 16;
             
+            // --- Improved Button and UI Handling ---
+            runButton.disabled = true;
+            runButton.textContent = 'Processing...';
             logContainer.innerHTML = '<p>Building and running graph... This may take some time.</p>';
             resultsContainer.classList.add('hidden');
             graphContainer.innerHTML = '<p>Graph will be displayed here...</p>';
 
-            const payload = { params };
+            try {
+                const payload = { params };
 
-            const response = await fetch('/build_and_run_graph', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+                const response = await fetch('/build_and_run_graph', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-            if (!response.ok) {
-                const errorResult = await response.json();
-                logContainer.innerHTML += `<p style="color:red;"><strong>Error: ${errorResult.message}</strong></p>`;
-                if(errorResult.traceback) {
-                     logContainer.innerHTML += `<pre style="color:red;">${errorResult.traceback}</pre>`;
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    logContainer.innerHTML += `<p style="color:red;"><strong>Error: ${errorResult.message}</strong></p>`;
+                    if(errorResult.traceback) {
+                        logContainer.innerHTML += `<pre style="color:red;">${errorResult.traceback}</pre>`;
+                    }
+                    // The finally block will handle re-enabling the button
+                    return;
                 }
-                return;
-            }
 
-            const result = await response.json();
-            logContainer.innerHTML += `<p><strong>${result.message}</strong></p>`;
-            
-            // Fallback rendering in case the SSE message was missed
-            if(result.mermaid_graph && graphContainer.querySelector('pre.mermaid') === null){
-                graphContainer.innerHTML = result.mermaid_graph;
-                 if (window.mermaid) {
-                    window.mermaid.run();
+                const result = await response.json();
+                logContainer.innerHTML += `<p><strong>${result.message}</strong></p>`;
+                
+                if(result.mermaid_graph && graphContainer.querySelector('pre.mermaid') === null){
+                    graphContainer.innerHTML = result.mermaid_graph;
+                    mermaid.run();
                 }
-            }
 
-            if(result.final_solution) {
-                finalSolutionContainer.innerHTML = `
-                    <h3>Proposed Solution</h3>
-                    <pre><code>${result.final_solution.proposed_solution || 'N/A'}</code></pre>
-                    <h3>Reasoning</h3>
-                    <pre><code>${result.final_solution.reasoning || 'N/A'}</code></pre>
-                    <h3>Skills Used</h3>
-                    <p>${(result.final_solution.skills_used || []).join(', ')}</p>
-                `;
-                resultsContainer.classList.remove('hidden');
+                if(result.final_solution) {
+                    finalSolutionContainer.innerHTML = `
+                        <h3>Proposed Solution</h3>
+                        <pre><code>${result.final_solution.proposed_solution || 'N/A'}</code></pre>
+                        <h3>Reasoning</h3>
+                        <pre><code>${result.final_solution.reasoning || 'N/A'}</code></pre>
+                        <h3>Skills Used</h3>
+                        <p>${(result.final_solution.skills_used || []).join(', ')}</p>
+                    `;
+                    resultsContainer.classList.remove('hidden');
+                }
+            } catch (error) {
+                logContainer.innerHTML += `<p style="color:red;"><strong>A client-side error occurred: ${error.message}</strong></p>`;
+            } finally {
+                // This block ensures the button is always re-enabled
+                runButton.disabled = false;
+                runButton.textContent = 'Build and Run Graph';
             }
         });
 
@@ -339,34 +353,22 @@
             if (event.data.startsWith('{')) {
                 try {
                     const message = JSON.parse(event.data);
-                    // Check if it's our special graph message
                     if (message && message.type === 'graph_viz') {
                         graphContainer.innerHTML = message.payload;
-                        if (window.mermaid) {
-                           // This tells mermaid to find and render the new diagram
-                           window.mermaid.run();
-                        }
+                        // Because mermaid is imported and initialized at the top of this module,
+                        // this call will now work reliably.
+                        mermaid.run();
                     } else {
-                        // It's some other JSON message, just log it as a string
                         logContainer.innerHTML += `<p>${event.data}</p>`;
                     }
                 } catch (e) {
-                     // Malformed JSON, treat as a plain text log message
                      logContainer.innerHTML += `<p>${event.data}</p>`;
                 }
             } else {
-                // It's a plain text log message
                 logContainer.innerHTML += `<p>${event.data}</p>`;
             }
             logContainer.scrollTop = logContainer.scrollHeight;
         };
-
-    </script>
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.js';
-        // Make mermaid globally available so our other scripts can call it
-        window.mermaid = mermaid;
-        mermaid.initialize({ startOnLoad: true });
     </script>
 </body>
 </html>
