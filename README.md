@@ -1,4 +1,4 @@
-# Network of Agents (NoA) - "Worlds of Agents" Engine
+# Network of Agents (NoA) 
 
 **WoA: An Engine for the Simulation of Meta-Agent Ensembles as Worlds**
 
