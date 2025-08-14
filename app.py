@@ -224,48 +224,77 @@ async def critique_node(state: GraphState):
 
 
 async def update_agent_prompts_node(state: GraphState):
-    await log_stream.put("--- Entering Agent Prompt Update Node (Reflection) ---")
+    await log_stream.put("--- Entering Agent Prompt Update Node (Reflection) with Backward Connections ---")
     params = state["params"]
     critique = state["critique"]
     
-    # The prompt says to update the penultimate layer based on the critique.
     if len(state["all_layers_prompts"]) < 2:
         await log_stream.put("Not enough layers to perform prompt updates. Skipping.")
         new_epoch = state["epoch"] + 1
         return {"epoch": new_epoch, "agent_outputs": {}}
 
-    layer_to_update_idx = len(state["all_layers_prompts"]) - 2
-    prompts_to_update = state["all_layers_prompts"][layer_to_update_idx]
-
-    await log_stream.put(f"Updating {len(prompts_to_update)} agent prompts in layer {layer_to_update_idx} based on critique.")
-
+    all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
+    
     dense_spanner_chain = get_dense_spanner_chain(params['prompt_alignment'], params['density'], params['learning_rate'])
     attribute_chain = get_attribute_and_hard_request_generator_chain(params['vector_word_size'])
 
-    new_prompts_for_layer = []
-    for i, agent_prompt in enumerate(prompts_to_update):
-        await log_stream.put(f"Updating prompt for agent {layer_to_update_idx}_{i}...")
-        
-        analysis_result_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
-        try:
-            analysis_result = json.loads(analysis_result_str)
-            attributes = analysis_result.get("attributes", "")
-        except json.JSONDecodeError:
-            await log_stream.put(f"Could not decode attributes for agent {i}. Using empty attributes.")
-            attributes = ""
+    # For the first step (penultimate layer), the critique is a single string for all agents.
+    critiques_for_current_layer = [critique] * len(all_prompts_copy[len(all_prompts_copy) - 2])
 
-        new_agent_prompt = await dense_spanner_chain.ainvoke({
-            "attributes": attributes,
-            "hard_request": "Based on the following critique, refine your approach and capabilities.",
-            "critique": critique
-        })
+    # Loop backwards from the penultimate layer down to the first layer (index 0)
+    for layer_idx in range(len(all_prompts_copy) - 2, -1, -1):
+        await log_stream.put(f"--- Reflecting on Layer {layer_idx} ---")
+        prompts_to_update = all_prompts_copy[layer_idx]
         
-        new_prompts_for_layer.append(new_agent_prompt)
-        await log_stream.put(f"Prompt for agent {layer_to_update_idx}_{i} updated.")
+        if len(critiques_for_current_layer) != len(prompts_to_update):
+            await log_stream.put(f"Warning: Mismatch in critique count ({len(critiques_for_current_layer)}) and agent count ({len(prompts_to_update)}) for layer {layer_idx}. Using first critique for all.")
+            if critiques_for_current_layer:
+                critiques_for_current_layer = [critiques_for_current_layer[0]] * len(prompts_to_update)
+            else:
+                await log_stream.put(f"No critiques available for layer {layer_idx}. Stopping backward propagation.")
+                break
 
-    all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
-    all_prompts_copy[layer_to_update_idx] = new_prompts_for_layer
-    
+        new_prompts_for_layer = []
+        critiques_for_next_layer = [] # These will be the hard_requests for layer layer_idx - 1
+
+        for i, agent_prompt in enumerate(prompts_to_update):
+            await log_stream.put(f"Updating prompt for agent {layer_idx}_{i}...")
+            
+            analysis_result_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
+            try:
+                analysis_result = json.loads(analysis_result_str)
+                attributes = analysis_result.get("attributes", "")
+            except json.JSONDecodeError:
+                await log_stream.put(f"Could not decode attributes for agent {i}. Using empty attributes.")
+                attributes = ""
+
+            new_agent_prompt = await dense_spanner_chain.ainvoke({
+                "attributes": attributes,
+                "hard_request": "Based on the following critique, refine your approach and capabilities.",
+                "critique": critiques_for_current_layer[i]
+            })
+            
+            new_prompts_for_layer.append(new_agent_prompt)
+            await log_stream.put(f"Prompt for agent {layer_idx}_{i} updated.")
+
+            # Generate a new "hard_request" from the newly created prompt to be used as critique for the previous layer.
+            new_analysis_str = await attribute_chain.ainvoke({"agent_prompt": new_agent_prompt})
+            try:
+                new_analysis = json.loads(new_analysis_str)
+                new_hard_request = new_analysis.get("hard_request", "")
+                if new_hard_request:
+                    critiques_for_next_layer.append(new_hard_request)
+            except json.JSONDecodeError:
+                await log_stream.put(f"Could not decode new hard_request for updated agent {layer_idx}_{i}.")
+                critiques_for_next_layer.append("") # Append empty string to maintain list size
+
+        all_prompts_copy[layer_idx] = new_prompts_for_layer
+        critiques_for_current_layer = critiques_for_next_layer
+
+        if not any(critiques_for_current_layer):
+            await log_stream.put(f"No new critiques generated from layer {layer_idx}. Stopping backward propagation.")
+            break
+
     new_epoch = state["epoch"] + 1
     await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch} ---")
 
