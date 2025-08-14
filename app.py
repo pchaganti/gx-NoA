@@ -424,30 +424,35 @@ async def build_and_run_graph(payload: dict = Body(...)):
             await log_stream.put("--- Initializing Google Gemini LLM ---")
             if not os.getenv("GEMINI_API_KEY"):
                 raise ValueError("GEMINI_API_KEY not found in environment variables.")
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
 
     except Exception as e:
         error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly. If using Ollama, make sure the Ollama server is running."
         await log_stream.put(error_message)
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
+    # Get parameters from payload
+    mbti_archetypes = params.get("mbti_archetypes")
     user_prompt = params.get("prompt")
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 4))
     num_agents_per_principality = 1
 
+    # Backend validation for mbti_archetypes
+    if not mbti_archetypes or len(mbti_archetypes) < 2:
+        error_message = "Validation failed: You must select at least 2 MBTI archetypes."
+        await log_stream.put(error_message)
+        return JSONResponse(content={"message": error_message, "traceback": "User did not select enough archetypes from the GUI."}, status_code=400)
+
+
     await log_stream.put("--- Starting Graph Build and Run Process ---")
     await log_stream.put(f"Parameters: {params}")
 
     # --- Seed Verb Generation ---
-    mbti_types = [
-        "ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP",
-        "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"
-    ]
-    num_mbti_types = len(mbti_types)
+    num_mbti_types = len(mbti_archetypes)
     total_verbs_to_generate = word_vector_size * num_mbti_types
 
-    await log_stream.put(f"--- Generating {total_verbs_to_generate} Seed Verbs ---")
+    await log_stream.put(f"--- Generating {total_verbs_to_generate} Seed Verbs for {num_mbti_types} selected archetypes ---")
     seed_generation_chain = get_seed_generation_chain(llm)
     try:
         generated_verbs_str = await seed_generation_chain.ainvoke({
@@ -468,7 +473,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         random.shuffle(all_verbs) # Shuffle to distribute diverse verbs
 
         seeds = {}
-        for i, mbti_type in enumerate(mbti_types):
+        for i, mbti_type in enumerate(mbti_archetypes):
             start_index = i * word_vector_size
             end_index = start_index + word_vector_size
             seeds[mbti_type] = " ".join(all_verbs[start_index:end_index])
@@ -503,8 +508,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
         current_layer_prompts = []
         for idx, agent_prompt in enumerate(prev_layer_prompts):
             analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
-
+            
             await log_stream.put(f"Analysis on agent {idx}: {analysis_str}...")
+            await log_stream.put(f"Prompt: {agent_prompt}")
 
             try:
                 analysis = json.loads(analysis_str)

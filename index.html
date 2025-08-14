@@ -119,8 +119,27 @@
         }
         .mbti-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 1rem;
+            background-color: #1C1E25;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+        .mbti-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        /* Override default 100% width for checkboxes */
+        .mbti-option input[type="checkbox"] {
+            width: auto;
+            margin-bottom: 0;
+        }
+        /* Override default label styles within the grid */
+        .mbti-option label {
+            margin-bottom: 0;
+            font-weight: normal;
         }
         #results-container pre {
             background-color: #000;
@@ -147,17 +166,17 @@
 
                 <div id="ollama-model-section" class="hidden">
                     <label for="ollama_model">Ollama Model Name:</label>
-                    <input type="text" id="ollama_model" name="ollama_model" value="Qwen3-30B-A3B-Instruct-2507:latest">
+                    <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
                 </div>
 
                 <label for="cot_trace_depth">CoT trace depth (max 32):</label>
-                <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="4" max="32" required>
+                <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="2" max="32" required>
 
                 <label for="num_epochs">Number of epochs:</label>
-                <input type="number" id="num_epochs" name="num_epochs" value="2" required>
+                <input type="number" id="num_epochs" name="num_epochs" value="1" required>
 
                 <label for="vector_word_size">Vector word size (Number of verbs per agent):</label>
-                <input type="number" id="vector_word_size" name="vector_word_size" value="5" required>
+                <input type="number" id="vector_word_size" name="vector_word_size" value="1" required>
 
                 <label for="prompt_alignment">Prompt alignment (0.1-2.0):</label>
                 <input type="number" id="prompt_alignment" name="prompt_alignment" step="0.1" min="0.1" max="2.0" value="1.0" required>
@@ -165,11 +184,31 @@
                 <label for="density">Density (0.1-2.0):</label>
                 <input type="number" id="density" name="density" step="0.1" min="0.1" max="2.0" value="1.0" required>
 
-                <label for="num_reflections">Number of reflections (20 - max(cot_trace_depth * 16)):</label>
-                <input type="number" id="num_reflections" name="num_reflections" min="20" value="20" required>
+                <label for="num_reflections">Number of reflections</label>
+                <input type="number" id="num_reflections" name="num_reflections" min="4" value="4" required>
 
                 <label for="learning_rate">Learning rate (0.1-2.0):</label>
                 <input type="number" id="learning_rate" name="learning_rate" step="0.1" min="0.1" max="2.0" value="0.1" required>
+
+                <label>MBTI Archetypes (select at least 2):</label>
+                <div class="mbti-grid">
+                    <div class="mbti-option"><input type="checkbox" id="mbti-istj" name="mbti_archetypes" value="ISTJ" checked><label for="mbti-istj">ISTJ (Inspector)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-isfj" name="mbti_archetypes" value="ISFJ" checked><label for="mbti-isfj">ISFJ (Protector)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-infj" name="mbti_archetypes" value="INFJ"><label for="mbti-infj">INFJ (Advocate)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-intj" name="mbti_archetypes" value="INTJ"><label for="mbti-intj">INTJ (Architect)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-istp" name="mbti_archetypes" value="ISTP"><label for="mbti-istp">ISTP (Virtuoso)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-isfp" name="mbti_archetypes" value="ISFP"><label for="mbti-isfp">ISFP (Adventurer)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-infp" name="mbti_archetypes" value="INFP"><label for="mbti-infp">INFP (Mediator)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-intp" name="mbti_archetypes" value="INTP"><label for="mbti-intp">INTP (Logician)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-estp" name="mbti_archetypes" value="ESTP"><label for="mbti-estp">ESTP (Entrepreneur)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-esfp" name="mbti_archetypes" value="ESFP"><label for="mbti-esfp">ESFP (Entertainer)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-enfp" name="mbti_archetypes" value="ENFP"><label for="mbti-enfp">ENFP (Campaigner)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-entp" name="mbti_archetypes" value="ENTP"><label for="mbti-entp">ENTP (Debater)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-estj" name="mbti_archetypes" value="ESTJ"><label for="mbti-estj">ESTJ (Executive)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-esfj" name="mbti_archetypes" value="ESFJ"><label for="mbti-esfj">ESFJ (Consul)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-enfj" name="mbti_archetypes" value="ENFJ"><label for="mbti-enfj">ENFJ (Protagonist)</label></div>
+                    <div class="mbti-option"><input type="checkbox" id="mbti-entj" name="mbti_archetypes" value="ENTJ"><label for="mbti-entj">ENTJ (Commander)</label></div>
+                </div>
 
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>Is there a singular, all-encompassing, coherent theoretical framework of physics that fully explains and links together all physical aspects of the universe? Design one.</textarea>
@@ -217,8 +256,35 @@
             e.preventDefault();
             
             const formData = new FormData(graphParamsForm);
-            const params = Object.fromEntries(formData.entries());
             
+            // Special handling for multi-select checkboxes
+            const params = {};
+            // Iterate over all form entries
+            for (const [key, value] of formData.entries()) {
+                // If the key is for our checkboxes, we need to collect all values
+                if (key === 'mbti_archetypes') {
+                    if (!params[key]) {
+                        params[key] = []; // Initialize the array if it doesn't exist
+                    }
+                    params[key].push(value);
+                } else {
+                    // For all other inputs, just assign the value
+                    params[key] = value;
+                }
+            }
+             // Ensure mbti_archetypes is an empty array if no checkboxes are checked
+            if (!params.mbti_archetypes) {
+                params.mbti_archetypes = [];
+            }
+
+
+            // Validation for MBTI archetypes
+            if (params.mbti_archetypes.length < 2) {
+                alert('Please select at least 2 MBTI archetypes.');
+                logContainer.innerHTML += `<p style="color:orange;"><strong>Validation Error:</strong> Please select at least 2 MBTI archetypes to build the graph.</p>`;
+                return; // Stop the submission
+            }
+
             const cotTraceDepth = parseInt(params.cot_trace_depth);
             const numReflectionsInput = document.getElementById('num_reflections');
             numReflectionsInput.max = cotTraceDepth * 16;
