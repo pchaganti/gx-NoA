@@ -60,7 +60,7 @@
             margin-bottom: 0.5rem;
             font-weight: 500;
         }
-        input, textarea, button {
+        input, textarea, button, select {
             width: 100%;
             padding: 0.75rem;
             margin-bottom: 1rem;
@@ -72,7 +72,7 @@
             font-family: inherit;
             font-size: 1rem;
         }
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             outline: none;
             border-color: var(--accent-color);
             box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.3);
@@ -139,6 +139,17 @@
             <h2>Graph Architecture</h2>
             <form id="graph-params-form">
 
+                <label for="llm_provider">LLM Provider:</label>
+                <select id="llm_provider" name="llm_provider">
+                    <option value="Gemini">Google Gemini</option>
+                    <option value="Ollama">Local Ollama</option>
+                </select>
+
+                <div id="ollama-model-section" class="hidden">
+                    <label for="ollama_model">Ollama Model Name:</label>
+                    <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
+                </div>
+
                 <label for="cot_trace_depth">CoT trace depth (max 32):</label>
                 <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="4" max="32" required>
 
@@ -191,6 +202,16 @@
         const graphContainer = document.getElementById('graph-container');
         const resultsContainer = document.getElementById('results-container');
         const finalSolutionContainer = document.getElementById('final-solution');
+        const llmProviderSelect = document.getElementById('llm_provider');
+        const ollamaModelSection = document.getElementById('ollama-model-section');
+
+        llmProviderSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Ollama') {
+                ollamaModelSection.classList.remove('hidden');
+            } else {
+                ollamaModelSection.classList.add('hidden');
+            }
+        });
 
         graphParamsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -228,6 +249,13 @@
             
             if(result.mermaid_graph){
                 graphContainer.innerHTML = result.mermaid_graph;
+                 // We need to re-run the mermaid render script after inserting the content
+                if (window.mermaid) {
+                    // Remove the old graph if it exists
+                    const oldSvg = graphContainer.querySelector('svg');
+                    if(oldSvg) oldSvg.remove();
+                    window.mermaid.run();
+                }
             }
 
             if(result.final_solution) {

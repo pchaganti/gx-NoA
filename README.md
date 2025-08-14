@@ -34,7 +34,7 @@ This entire cycle of forward pass and reflection pass constitutes one "epoch." B
 
 The application is built with a Python backend and a vanilla HTML/CSS/JS frontend.
 
-*   **Backend**: FastAPI, LangChain, LangGraph, Google Gemini
+*   **Backend**: FastAPI, LangChain, LangGraph, Google Gemini / Ollama
 *   **Frontend**: HTML, CSS, JavaScript, Mermaid.js
 
 ### Installation and Execution
@@ -55,15 +55,22 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
     ```
 
 3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
+    Create a `requirements.txt` file with the following content and run `pip install -r requirements.txt`.
+    ```
+    fastapi
+    uvicorn
+    python-dotenv
+    langchain-google-genai
+    langgraph
+    sse-starlette
+    ollama
+    langchain-community
     ```
 
 4.  **Set up your environment variables:**
     *   Create a file named `.env` in the project root.
-    *   Add your Google Gemini API key to the file:
-        ```
-        GEMINI_API_KEY="YOUR_API_KEY_HERE"
+    *   If using Google Gemini, add your API key to the file:
+        ```        GEMINI_API_KEY="YOUR_API_KEY_HERE"
         ```
 
 5.  **Run the application:**
@@ -72,12 +79,25 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
     ```
 
 6.  **Access the GUI:**
-    Open your web browser and navigate to `http://127.0.0.1:8000`.
+    Open your web browser and navigate to `http://122.0.0.1:8000`.
+
+### Using Local Inference with Ollama
+
+This application supports running inference locally using an Ollama server, allowing you to use open-source models without needing a cloud API key.
+
+1.  **Install Ollama**: Follow the official instructions to install Ollama on your system.
+2.  **Download a Model**: Pull the desired model from the Ollama library. The default model for this application is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`. You can pull it by running:
+    ```bash
+    ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
+    ```
+3.  **Run Ollama Server**: Make sure the Ollama application is running in the background. It will serve the models locally.
+4.  **Select in GUI**: In the web interface, use the "LLM Provider" dropdown and select "Local Ollama". You can change the model name from the default if you have other models pulled.
 
 ## How It Works
 
-1.  **Define Graph Architecture**: Use the GUI to set parameters like the number of layers (`CoT trace depth`), agents per personality type, learning rate, and the number of training epochs.
-2.  **Provide Seed Operators**: In the "Seeds" section, input verbs for each of the 16 MBTI types. These words guide the creation of the initial agent skill sets.
-3.  **Build and Run**: Click the "Build and Run Graph" button.
-4.  **Observe**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward passes, and reflection passes—in the real-time log viewer.
-5.  **Get Results**: Once all epochs are complete, the final synthesized answer is displayed, along with a Mermaid.js diagram visualizing the structure of the generated agent network.
+1.  **Choose your LLM**: Select between Google Gemini or Local Ollama. If using Ollama, ensure the server is running.
+2.  **Define Graph Architecture**: Use the GUI to set parameters like the number of layers (`CoT trace depth`), agents per personality type, learning rate, and the number of training epochs.
+3.  **Provide a Prompt**: Enter the main problem or question you want the agent network to solve.
+4.  **Build and Run**: Click the "Build and Run Graph" button.
+5.  **Observe**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward passes, and reflection passes—in the real-time log viewer.
+6.  **Get Results**: Once all epochs are complete, the final synthesized answer is displayed, along with a Mermaid.js diagram visualizing the structure of the generated agent network.

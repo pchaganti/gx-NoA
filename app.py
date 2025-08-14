@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from langgraph.graph import StateGraph, END
@@ -13,6 +14,7 @@ from typing import TypedDict, Annotated, List
 import asyncio
 from sse_starlette.sse import EventSourceResponse
 import random
+import traceback
 
 load_dotenv()
 
@@ -35,13 +37,9 @@ class GraphState(TypedDict):
     final_solution: dict
 
 # --- LangChain Setup ---
-try:
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
-except Exception as e:
-    print(f"Error initializing LLM: {e}")
-    llm = None
+# LLM is now initialized within the endpoint based on user selection
 
-def get_input_spanner_chain(prompt_alignment, density):
+def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
 Create the system prompt of an agent meant to collaborate in a team that will try to tackle any kind of problem that gets thrown at them, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached. Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}). You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment})  Each generated agent must contain in markdown the sections: memory, attributes, skills. Memory is a log of your previous proposed solutions and reasonings from past epochs. You will use this to learn from your past attempts and refine your approach. Initially, your memory will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
 
@@ -53,7 +51,7 @@ Prompt: {{prompt}}
 """)
     return prompt | llm | StrOutputParser()
 
-def get_attribute_and_hard_request_generator_chain(vector_word_size):
+def get_attribute_and_hard_request_generator_chain(llm, vector_word_size):
     prompt = ChatPromptTemplate.from_template(f"""
 You are an analyst of AI agents. Your task is to analyze the system prompt of an agent and perform two things:
 1.  Detect a set of attributes (verbs and nouns) that describe the agent's capabilities and personality. The number of attributes should be {vector_word_size}.
@@ -69,7 +67,7 @@ Agent System Prompt to analyze:
     return prompt | llm | StrOutputParser()
 
 
-def get_dense_spanner_chain(prompt_alignment, density, learning_rate):
+def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     prompt = ChatPromptTemplate.from_template(f"""
 You are a 'dense_spanner'. Your task is to create the system prompt of new agent based on the attributes of a previous agent and a 'hard_request'.
 This new agent will be part of a multi-layered graph of agents working to solve a problem.
@@ -84,7 +82,7 @@ Critique: {{critique}}
 """)
     return prompt | llm | StrOutputParser()
 
-def get_synthesis_chain():
+def get_synthesis_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 You are a synthesis agent. Your role is to combine the solutions from multiple agents into a single, coherent, and comprehensive answer.
 You will receive a list of JSON objects, each representing a solution from a different agent.
@@ -98,7 +96,7 @@ Synthesize the final solution:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_critique_chain():
+def get_critique_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 You are a critique agent. Your role is to assess the veracity, precision, usability, and truthfulness of a proposed solution from a single agent in relation to the original request.
 Based on your assessment, you will generate a constructive critique that can be used to improve the agent's solution in the next iteration.
@@ -111,7 +109,7 @@ Generate your critique for this specific agent:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_seed_generation_chain():
+def get_seed_generation_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 Given the following problem, generate exactly {word_count} verbs that are related to the problem, but also connect the problem with different semantic fields of knowledge. The verbs should be abstract and linguistically loaded. Output them as a single space-separated string of unique verbs.
 
@@ -120,7 +118,7 @@ Problem: "{problem}"
     return prompt | llm | StrOutputParser()
 
 
-def create_agent_node(agent_prompt, node_id):
+def create_agent_node(llm, agent_prompt, node_id):
     """
     Creates a node in the graph that represents an agent.
     Each agent is powered by an LLM and has a specific system prompt.
@@ -202,170 +200,123 @@ Your JSON formatted response:
 
     return agent_node
 
-async def synthesis_node(state: GraphState):
-    await log_stream.put("--- Entering Synthesis Node ---")
-    synthesis_chain = get_synthesis_chain()
+def create_synthesis_node(llm):
+    async def synthesis_node(state: GraphState):
+        await log_stream.put("--- Entering Synthesis Node ---")
+        synthesis_chain = get_synthesis_chain(llm)
 
-    # The synthesis node is connected to the last layer of agents.
-    last_agent_layer_idx = len(state['all_layers_prompts']) - 1
-    num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
-    
-    last_layer_outputs = []
-    for i in range(num_agents_last_layer):
-        node_id = f"agent_{last_agent_layer_idx}_{i}"
-        if node_id in state["agent_outputs"]:
-            last_layer_outputs.append(state["agent_outputs"][node_id])
-
-    await log_stream.put(f"Synthesizing {len(last_layer_outputs)} outputs from layer {last_agent_layer_idx}.")
-
-    if not last_layer_outputs:
-        await log_stream.put("Warning: Synthesis node received no inputs.")
-        return {"final_solution": {"error": "Synthesis node received no inputs."}}
-
-    final_solution_str = await synthesis_chain.ainvoke({
-        "original_request": state["original_request"],
-        "agent_solutions": json.dumps(last_layer_outputs, indent=2)
-    })
-    
-    try:
-        final_solution = json.loads(final_solution_str)
-        await log_stream.put(f"Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
-    except json.JSONDecodeError:
-        await log_stream.put(f"Error: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
-        final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
+        # The synthesis node is connected to the last layer of agents.
+        last_agent_layer_idx = len(state['all_layers_prompts']) - 1
+        num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
         
-    return {"final_solution": final_solution}
+        last_layer_outputs = []
+        for i in range(num_agents_last_layer):
+            node_id = f"agent_{last_agent_layer_idx}_{i}"
+            if node_id in state["agent_outputs"]:
+                last_layer_outputs.append(state["agent_outputs"][node_id])
 
+        await log_stream.put(f"Synthesizing {len(last_layer_outputs)} outputs from layer {last_agent_layer_idx}.")
 
-async def critique_node(state: GraphState):
-    await log_stream.put("--- Entering Critique Node ---")
-    critique_chain = get_critique_chain()
-    
-    last_agent_layer_idx = len(state['all_layers_prompts']) - 1
-    num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
-    
-    critiques = {}
-    for i in range(num_agents_last_layer):
-        node_id = f"agent_{last_agent_layer_idx}_{i}"
-        if node_id in state["agent_outputs"]:
-            agent_solution = state["agent_outputs"][node_id]
-            critique_text = await critique_chain.ainvoke({
-                "original_request": state["original_request"],
-                "agent_id": node_id,
-                "proposed_solution": json.dumps(agent_solution, indent=2)
-            })
-            critiques[node_id] = critique_text
-            await log_stream.put(f"Critique generated for {node_id}: {critique_text[:100]}...")
-            
-    return {"critiques": critiques}
+        if not last_layer_outputs:
+            await log_stream.put("Warning: Synthesis node received no inputs.")
+            return {"final_solution": {"error": "Synthesis node received no inputs."}}
 
-
-async def update_agent_prompts_node(state: GraphState):
-    await log_stream.put("--- Entering Agent Prompt Update Node (Reflection) ---")
-    params = state["params"]
-    critiques = state["critiques"]
-    num_reflections = int(params.get('num_reflections', 1))
-
-    if not critiques:
-        await log_stream.put("No critiques available. Skipping reflection.")
-        new_epoch = state["epoch"] + 1
-        return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
-
-    all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
-    
-    dense_spanner_chain = get_dense_spanner_chain(params['prompt_alignment'], params['density'], params['learning_rate'])
-    attribute_chain = get_attribute_and_hard_request_generator_chain(params['vector_word_size'])
-
-    last_layer_idx = len(all_prompts_copy) - 1
-    
-    # The critiques are for the last layer agents, which were generated by the penultimate layer agents.
-    # So, we update the penultimate layer prompts based on the critiques of the last layer.
-    penultimate_layer_idx = last_layer_idx - 1
-
-    if penultimate_layer_idx < 0:
-        await log_stream.put("Not enough layers to reflect upon. Skipping.")
-        new_epoch = state["epoch"] + 1
-        return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
-
-    # --- Reflection on Penultimate Layer ---
-    await log_stream.put(f"--- Reflecting on Layer {penultimate_layer_idx} ---")
-    prompts_to_update = all_prompts_copy[penultimate_layer_idx]
-    
-    # Determine which agent prompts to update based on num_reflections
-    num_agents_in_layer = len(prompts_to_update)
-    agent_indices_to_update = random.sample(range(num_agents_in_layer), min(num_reflections, num_agents_in_layer))
-    
-    await log_stream.put(f"Selected {len(agent_indices_to_update)} out of {num_agents_in_layer} agents in layer {penultimate_layer_idx} for reflection.")
-
-    critiques_for_next_layer = {} # agent_index -> new_hard_request
-
-    for i in agent_indices_to_update:
-        agent_prompt = prompts_to_update[i]
-        critique_key = f"agent_{last_layer_idx}_{i}"
-        
-        if critique_key not in critiques:
-            await log_stream.put(f"Warning: No critique found for {critique_key}. Skipping update for agent {penultimate_layer_idx}_{i}.")
-            continue
-
-        critique = critiques[critique_key]
-        await log_stream.put(f"Updating prompt for agent {penultimate_layer_idx}_{i} with critique from {critique_key}...")
-        
-        analysis_result_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
-        try:
-            analysis_result = json.loads(analysis_result_str)
-            attributes = analysis_result.get("attributes", "")
-        except json.JSONDecodeError:
-            await log_stream.put(f"Could not decode attributes for agent {i}. Using empty attributes.")
-            attributes = ""
-
-        new_agent_prompt = await dense_spanner_chain.ainvoke({
-            "attributes": attributes,
-            "hard_request": "Based on the following critique, refine your approach and capabilities.",
-            "critique": critique
+        final_solution_str = await synthesis_chain.ainvoke({
+            "original_request": state["original_request"],
+            "agent_solutions": json.dumps(last_layer_outputs, indent=2)
         })
         
-        all_prompts_copy[penultimate_layer_idx][i] = new_agent_prompt
-        await log_stream.put(f"Prompt for agent {penultimate_layer_idx}_{i} updated.")
-
-        # Generate a new "hard_request" from the newly created prompt to be used as critique for the previous layer.
-        new_analysis_str = await attribute_chain.ainvoke({"agent_prompt": new_agent_prompt})
         try:
-            new_analysis = json.loads(new_analysis_str)
-            new_hard_request = new_analysis.get("hard_request", "")
-            if new_hard_request:
-                critiques_for_next_layer[i] = new_hard_request
+            final_solution = json.loads(final_solution_str)
+            await log_stream.put(f"Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
         except json.JSONDecodeError:
-            await log_stream.put(f"Could not decode new hard_request for updated agent {penultimate_layer_idx}_{i}.")
+            await log_stream.put(f"Error: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
+            final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
+            
+        return {"final_solution": final_solution}
+    return synthesis_node
 
-    # --- Backward Propagation to Earlier Layers ---
-    for layer_idx in range(penultimate_layer_idx - 1, -1, -1):
-        if not critiques_for_next_layer:
-            await log_stream.put(f"No new critiques generated from layer {layer_idx + 1}. Stopping backward propagation.")
-            break
+def create_critique_node(llm):
+    async def critique_node(state: GraphState):
+        await log_stream.put("--- Entering Critique Node ---")
+        critique_chain = get_critique_chain(llm)
         
-        await log_stream.put(f"--- Reflecting on Layer {layer_idx} ---")
+        last_agent_layer_idx = len(state['all_layers_prompts']) - 1
+        num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
         
-        prompts_to_update = all_prompts_copy[layer_idx]
-        # The critiques are now sparse, keyed by the agent index from the layer above.
-        agent_indices_to_update = list(critiques_for_next_layer.keys())
+        critiques = {}
+        for i in range(num_agents_last_layer):
+            node_id = f"agent_{last_agent_layer_idx}_{i}"
+            if node_id in state["agent_outputs"]:
+                agent_solution = state["agent_outputs"][node_id]
+                critique_text = await critique_chain.ainvoke({
+                    "original_request": state["original_request"],
+                    "agent_id": node_id,
+                    "proposed_solution": json.dumps(agent_solution, indent=2)
+                })
+                critiques[node_id] = critique_text
+                await log_stream.put(f"Critique generated for {node_id}: {critique_text[:100]}...")
+                
+        return {"critiques": critiques}
+    return critique_node
+
+def create_update_agent_prompts_node(llm):
+    async def update_agent_prompts_node(state: GraphState):
+        await log_stream.put("--- Entering Agent Prompt Update Node (Reflection) ---")
+        params = state["params"]
+        critiques = state["critiques"]
+        num_reflections = int(params.get('num_reflections', 1))
+
+        if not critiques:
+            await log_stream.put("No critiques available. Skipping reflection.")
+            new_epoch = state["epoch"] + 1
+            return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
+
+        all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
         
-        new_critiques_for_next_layer = {}
+        dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
+        attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
+
+        last_layer_idx = len(all_prompts_copy) - 1
+        
+        # The critiques are for the last layer agents, which were generated by the penultimate layer agents.
+        # So, we update the penultimate layer prompts based on the critiques of the last layer.
+        penultimate_layer_idx = last_layer_idx - 1
+
+        if penultimate_layer_idx < 0:
+            await log_stream.put("Not enough layers to reflect upon. Skipping.")
+            new_epoch = state["epoch"] + 1
+            return {"epoch": new_epoch, "agent_outputs": {}, "memory": state.get("memory", {})} # Preserve memory
+
+        # --- Reflection on Penultimate Layer ---
+        await log_stream.put(f"--- Reflecting on Layer {penultimate_layer_idx} ---")
+        prompts_to_update = all_prompts_copy[penultimate_layer_idx]
+        
+        # Determine which agent prompts to update based on num_reflections
+        num_agents_in_layer = len(prompts_to_update)
+        agent_indices_to_update = random.sample(range(num_agents_in_layer), min(num_reflections, num_agents_in_layer))
+        
+        await log_stream.put(f"Selected {len(agent_indices_to_update)} out of {num_agents_in_layer} agents in layer {penultimate_layer_idx} for reflection.")
+
+        critiques_for_next_layer = {} # agent_index -> new_hard_request
 
         for i in agent_indices_to_update:
-            if i >= len(prompts_to_update):
-                await log_stream.put(f"Warning: Index {i} from previous layer's reflection is out of bounds for layer {layer_idx}. Skipping.")
+            agent_prompt = prompts_to_update[i]
+            critique_key = f"agent_{last_layer_idx}_{i}"
+            
+            if critique_key not in critiques:
+                await log_stream.put(f"Warning: No critique found for {critique_key}. Skipping update for agent {penultimate_layer_idx}_{i}.")
                 continue
 
-            agent_prompt = prompts_to_update[i]
-            critique = critiques_for_next_layer[i]
-            
-            await log_stream.put(f"Updating prompt for agent {layer_idx}_{i} with hard_request from updated agent {layer_idx+1}_{i}...")
+            critique = critiques[critique_key]
+            await log_stream.put(f"Updating prompt for agent {penultimate_layer_idx}_{i} with critique from {critique_key}...")
             
             analysis_result_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
             try:
                 analysis_result = json.loads(analysis_result_str)
                 attributes = analysis_result.get("attributes", "")
             except json.JSONDecodeError:
+                await log_stream.put(f"Could not decode attributes for agent {i}. Using empty attributes.")
                 attributes = ""
 
             new_agent_prompt = await dense_spanner_chain.ainvoke({
@@ -374,29 +325,80 @@ async def update_agent_prompts_node(state: GraphState):
                 "critique": critique
             })
             
-            all_prompts_copy[layer_idx][i] = new_agent_prompt
-            await log_stream.put(f"Prompt for agent {layer_idx}_{i} updated.")
+            all_prompts_copy[penultimate_layer_idx][i] = new_agent_prompt
+            await log_stream.put(f"Prompt for agent {penultimate_layer_idx}_{i} updated.")
 
+            # Generate a new "hard_request" from the newly created prompt to be used as critique for the previous layer.
             new_analysis_str = await attribute_chain.ainvoke({"agent_prompt": new_agent_prompt})
             try:
                 new_analysis = json.loads(new_analysis_str)
                 new_hard_request = new_analysis.get("hard_request", "")
                 if new_hard_request:
-                    new_critiques_for_next_layer[i] = new_hard_request
+                    critiques_for_next_layer[i] = new_hard_request
             except json.JSONDecodeError:
-                pass
-        
-        critiques_for_next_layer = new_critiques_for_next_layer
+                await log_stream.put(f"Could not decode new hard_request for updated agent {penultimate_layer_idx}_{i}.")
 
-    new_epoch = state["epoch"] + 1
-    await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch} ---")
+        # --- Backward Propagation to Earlier Layers ---
+        for layer_idx in range(penultimate_layer_idx - 1, -1, -1):
+            if not critiques_for_next_layer:
+                await log_stream.put(f"No new critiques generated from layer {layer_idx + 1}. Stopping backward propagation.")
+                break
+            
+            await log_stream.put(f"--- Reflecting on Layer {layer_idx} ---")
+            
+            prompts_to_update = all_prompts_copy[layer_idx]
+            # The critiques are now sparse, keyed by the agent index from the layer above.
+            agent_indices_to_update = list(critiques_for_next_layer.keys())
+            
+            new_critiques_for_next_layer = {}
 
-    return {
-        "all_layers_prompts": all_prompts_copy,
-        "epoch": new_epoch,
-        "agent_outputs": {}, # Reset outputs for the next epoch
-        "memory": state.get("memory", {}) # Preserve memory across epochs
-    }
+            for i in agent_indices_to_update:
+                if i >= len(prompts_to_update):
+                    await log_stream.put(f"Warning: Index {i} from previous layer's reflection is out of bounds for layer {layer_idx}. Skipping.")
+                    continue
+
+                agent_prompt = prompts_to_update[i]
+                critique = critiques_for_next_layer[i]
+                
+                await log_stream.put(f"Updating prompt for agent {layer_idx}_{i} with hard_request from updated agent {layer_idx+1}_{i}...")
+                
+                analysis_result_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
+                try:
+                    analysis_result = json.loads(analysis_result_str)
+                    attributes = analysis_result.get("attributes", "")
+                except json.JSONDecodeError:
+                    attributes = ""
+
+                new_agent_prompt = await dense_spanner_chain.ainvoke({
+                    "attributes": attributes,
+                    "hard_request": "Based on the following critique, refine your approach and capabilities.",
+                    "critique": critique
+                })
+                
+                all_prompts_copy[layer_idx][i] = new_agent_prompt
+                await log_stream.put(f"Prompt for agent {layer_idx}_{i} updated.")
+
+                new_analysis_str = await attribute_chain.ainvoke({"agent_prompt": new_agent_prompt})
+                try:
+                    new_analysis = json.loads(new_analysis_str)
+                    new_hard_request = new_analysis.get("hard_request", "")
+                    if new_hard_request:
+                        new_critiques_for_next_layer[i] = new_hard_request
+                except json.JSONDecodeError:
+                    pass
+            
+            critiques_for_next_layer = new_critiques_for_next_layer
+
+        new_epoch = state["epoch"] + 1
+        await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch} ---")
+
+        return {
+            "all_layers_prompts": all_prompts_copy,
+            "epoch": new_epoch,
+            "agent_outputs": {}, # Reset outputs for the next epoch
+            "memory": state.get("memory", {}) # Preserve memory across epochs
+        }
+    return update_agent_prompts_node
 
 # --- FastAPI Endpoints ---
 @app.get("/", response_class=HTMLResponse)
@@ -406,10 +408,29 @@ def get_index():
 
 @app.post("/build_and_run_graph")
 async def build_and_run_graph(payload: dict = Body(...)):
-    if not llm:
-        return JSONResponse(content={"message": "LLM not initialized. Please check your API key."}, status_code=500)
+    llm = None
+    try:
+        params = payload.get("params")
+        llm_provider = params.get("llm_provider", "Gemini")
 
-    params = payload.get("params")
+        if llm_provider == "Ollama":
+            model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
+            await log_stream.put(f"--- Initializing Local LLM: Ollama ({model_name}) ---")
+            llm = ChatOllama(model=model_name)
+            # A quick check to see if Ollama is running
+            await llm.ainvoke("Hi")
+            await log_stream.put("--- Ollama Connection Successful ---")
+        else:
+            await log_stream.put("--- Initializing Google Gemini LLM ---")
+            if not os.getenv("GEMINI_API_KEY"):
+                raise ValueError("GEMINI_API_KEY not found in environment variables.")
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+
+    except Exception as e:
+        error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly. If using Ollama, make sure the Ollama server is running."
+        await log_stream.put(error_message)
+        return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
+
     user_prompt = params.get("prompt")
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 4))
@@ -427,7 +448,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
     total_verbs_to_generate = word_vector_size * num_mbti_types
 
     await log_stream.put(f"--- Generating {total_verbs_to_generate} Seed Verbs ---")
-    seed_generation_chain = get_seed_generation_chain()
+    seed_generation_chain = get_seed_generation_chain(llm)
     try:
         generated_verbs_str = await seed_generation_chain.ainvoke({
             "problem": user_prompt,
@@ -455,12 +476,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
         await log_stream.put("Seed verbs generated successfully.")
     except Exception as e:
         await log_stream.put(f"Error generating seed verbs: {e}. Aborting.")
-        return JSONResponse(content={"message": f"Failed to generate seed verbs: {e}"}, status_code=500)
+        return JSONResponse(content={"message": f"Failed to generate seed verbs: {e}", "traceback": traceback.format_exc()}, status_code=500)
 
 
     # --- Agent Prompt Generation ---
     all_layers_prompts = []
-    input_spanner_chain = get_input_spanner_chain(params['prompt_alignment'], params['density'])
+    input_spanner_chain = get_input_spanner_chain(llm, params['prompt_alignment'], params['density'])
     
     # Layer 0 (Input Layer)
     await log_stream.put("--- Creating Layer 0 Agents ---")
@@ -469,13 +490,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
         for _ in range(num_agents_per_principality):
             agent_prompt = await input_spanner_chain.ainvoke({"mbti_type": mbti_type, "guiding_words": guiding_words, "prompt": user_prompt})
             layer_0_prompts.append(agent_prompt)
-            await log_stream.put(f"Created agent for Layer 0: {agent_prompt}...")
     all_layers_prompts.append(layer_0_prompts)
     await log_stream.put(f"Created {len(layer_0_prompts)} agents for Layer 0.")
 
     # Subsequent Dense Layers
-    attribute_chain = get_attribute_and_hard_request_generator_chain(params['vector_word_size'])
-    dense_spanner_chain = get_dense_spanner_chain(params['prompt_alignment'], params['density'], params['learning_rate'])
+    attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
+    dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
 
     for i in range(1, cot_trace_depth):
         await log_stream.put(f"--- Creating Layer {i} Agents ---")
@@ -491,7 +511,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 attributes = analysis.get("attributes")
                 hard_request = analysis.get("hard_request")
             except json.JSONDecodeError:
-                await log_stream.put(f"Could not decode attributes/request. Using defaults.")
                 attributes, hard_request = "", "Solve the problem."
 
             new_agent_prompt = await dense_spanner_chain.ainvoke({
@@ -510,12 +529,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
     for i, layer_prompts in enumerate(all_layers_prompts):
         for j, _ in enumerate(layer_prompts):
             node_id = f"agent_{i}_{j}"
-            workflow.add_node(node_id, create_agent_node(all_layers_prompts[i][j], node_id))
+            workflow.add_node(node_id, create_agent_node(llm, all_layers_prompts[i][j], node_id))
 
     # Add synthesis, critique, and update nodes
-    workflow.add_node("synthesis", synthesis_node)
-    workflow.add_node("critique", critique_node)
-    workflow.add_node("update_prompts", update_agent_prompts_node)
+    workflow.add_node("synthesis", create_synthesis_node(llm))
+    workflow.add_node("critique", create_critique_node(llm))
+    workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
 
     # --- Graph Connections ---
     # Set the entry point to the first agent of the first layer
@@ -610,9 +629,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
         })
 
     except Exception as e:
-        error_message = f"An error occurred: {e}"
+        error_message = f"An error occurred during graph execution: {e}"
         await log_stream.put(error_message)
-        import traceback
         await log_stream.put(traceback.format_exc())
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
