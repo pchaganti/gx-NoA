@@ -1,0 +1,83 @@
+# Network of Agents (NoA) - "Worlds of Agents" Engine
+
+**WoA: An Engine for the Simulation of Meta-Agent Ensembles as Worlds**
+
+NoA is a research platform that explores the emergent problem-solving capabilities of multi-agent systems. It leverages a novel metaheuristic inspired by the architecture and learning process of Artificial Neural Networks (ANNs) to dynamically create and refine a network of collaborative Large Language Model (LLM) agents.
+
+## The NoA Algorithm: Simulating Neural Networks with LLM Agents
+
+The core of NoA is an algorithm that treats individual LLM agents as "neurons" and organizes them into a layered network. This network processes information in a "forward pass" and refines itself through a "reflection pass," which is conceptually similar to backpropagation in traditional ANNs.
+
+### The Forward Pass: Inference Through a Network of Specialists
+
+Unlike a monolithic ANN where weights are numerical, the "weights" and "biases" of a NoA agent are its persona, skills, and attributes, all defined within its natural language system prompt.
+
+1.  **Input Layer Creation**: The process begins when the user provides a high-level problem and a set of "seed verbs" for 16 MBTI personality archetypes. An `input-spanner` chain uses these inputs to generate the system prompts for the first layer of agents. Each agent is a unique specialist, combining a personality archetype with skills derived from the seed words and a profession aligned with the user's problem.
+
+2.  **Dense Layer Generation**: To create deeper, more specialized layers, a `dense-spanner` chain analyzes the agents of the preceding layer. It identifies their core attributes and generates a "hard request"—a problem designed to challenge that agent's specific skill set. It then creates a new agent in the next layer specifically designed to tackle this hard request, effectively increasing the network's cognitive diversity and specialization depth.
+
+3.  **Information Flow**: When the user submits a prompt, it's passed to the input layer. Each agent processes the information and generates a structured JSON output. This output is then broadcast as the input for all agents in the subsequent layer. This process continues through the network, from layer to layer, constituting a "forward pass" of inference.
+
+### The Reflection Pass: A Metaheuristic for "Backpropagation"
+
+True backpropagation relies on calculating mathematical gradients to adjust numerical weights. Since our agent "weights" are descriptive texts (system prompts), we use a metaheuristic process to simulate this learning loop.
+
+1.  **Critique as Loss Function**: After the forward pass completes, a final `synthesis_node` aggregates the outputs from the last layer into a single, comprehensive solution. This solution is then evaluated by a `critique_chain`, which acts as our "loss function." It assesses the final answer's veracity, precision, and usefulness concerning the original problem and generates a constructive critique.
+
+2.  **Propagating the Critique**: This critique is then "propagated" backward to the agents in the penultimate layer of the network.
+
+3.  **Updating Agent "Weights"**: An `update_agent_prompts_node` takes the critique and uses it to modify the system prompts of the receiving agents. It refines their attributes, skills, and even their assigned careers to better address the shortcomings identified in the critique. The `learning_rate` parameter, set by the user, controls the magnitude of these adjustments, analogous to how learning rates work in ANNs.
+
+This entire cycle of forward pass and reflection pass constitutes one "epoch." By running this process for multiple epochs, the network iteratively refines its collective problem-solving approach, adapting its agent personas to generate progressively better solutions.
+
+## Technical Setup
+
+The application is built with a Python backend and a vanilla HTML/CSS/JS frontend.
+
+*   **Backend**: FastAPI, LangChain, LangGraph, Google Gemini
+*   **Frontend**: HTML, CSS, JavaScript, Mermaid.js
+
+### Installation and Execution
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd NoA
+    ```
+
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv venv
+    # On Windows
+    .\venv\Scripts\activate
+    # On macOS/Linux
+    source venv/bin/activate
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Set up your environment variables:**
+    *   Create a file named `.env` in the project root.
+    *   Add your Google Gemini API key to the file:
+        ```
+        GEMINI_API_KEY="YOUR_API_KEY_HERE"
+        ```
+
+5.  **Run the application:**
+    ```bash
+    uvicorn app:app --reload
+    ```
+
+6.  **Access the GUI:**
+    Open your web browser and navigate to `http://127.0.0.1:8000`.
+
+## How It Works
+
+1.  **Define Graph Architecture**: Use the GUI to set parameters like the number of layers (`CoT trace depth`), agents per personality type, learning rate, and the number of training epochs.
+2.  **Provide Seed Operators**: In the "Seeds" section, input verbs for each of the 16 MBTI types. These words guide the creation of the initial agent skill sets.
+3.  **Build and Run**: Click the "Build and Run Graph" button.
+4.  **Observe**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward passes, and reflection passes—in the real-time log viewer.
+5.  **Get Results**: Once all epochs are complete, the final synthesized answer is displayed, along with a Mermaid.js diagram visualizing the structure of the generated agent network.
