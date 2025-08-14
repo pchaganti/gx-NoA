@@ -35,7 +35,7 @@ class GraphState(TypedDict):
 
 # --- LangChain Setup ---
 try:
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=os.getenv("GEMINI_API_KEY"))
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
 except Exception as e:
     print(f"Error initializing LLM: {e}")
     llm = None
