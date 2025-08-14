@@ -1,6 +1,5 @@
 # Network of Agents (NoA) 
 
-**WoA: An Engine for the Simulation of Meta-Agent Ensembles as Worlds**
 
 NoA is a research platform that explores the emergent problem-solving capabilities of multi-agent systems. It leverages a novel metaheuristic inspired by the architecture and learning process of Artificial Neural Networks (ANNs) to dynamically create and refine a network of collaborative Large Language Model (LLM) agents.
 
