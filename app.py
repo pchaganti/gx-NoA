@@ -457,7 +457,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         all_verbs = list(set(generated_verbs_str.split())) # Ensure uniqueness
 
-        await log_stream.put(all_verbs)
+        await log_stream.put(str(all_verbs))
         
         if len(all_verbs) < total_verbs_to_generate:
             await log_stream.put(f"Warning: LLM generated {len(all_verbs)} unique verbs, required {total_verbs_to_generate}. Padding with repeats.")
@@ -576,6 +576,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.")
         
+        # --- Generate and send Mermaid graph immediately ---
+        mermaid_code = graph.get_graph().draw_mermaid()
+        mermaid_pre_block = f'<pre class="mermaid">{mermaid_code}</pre>'
+        
+        # Send as a structured message via SSE
+        await log_stream.put(json.dumps({"type": "graph_viz", "payload": mermaid_pre_block}))
+
         initial_state = {
             "original_request": user_prompt,
             "layers": [], 
@@ -591,6 +598,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
         # The stream method is good for observing the flow state by state
+        final_state = {}
         async for output in graph.astream(initial_state):
             # output is a dictionary where keys are node names
             for key, value in output.items():
@@ -599,29 +607,20 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 if "memory" in value:
                     await log_stream.put(f"Output for {key} processed. Memory updated.")
                 else:
-                    await log_stream.put(f"Output: {value}")
+                    await log_stream.put(f"Output: {json.dumps(value, indent=2)}")
+            final_state = output
 
         
         # After the stream is done, the final state is in the last output
-        final_state = list(output.values())[-1]
+        final_state_value = list(final_state.values())[-1]
         await log_stream.put("--- Execution Finished ---")
         
-        final_solution = final_state.get("final_solution", {"error": "No final solution found."})
+        final_solution = final_state_value.get("final_solution", {"error": "No final solution found."})
 
-        mermaid_graph = f"""
-        <pre class="mermaid">
-            {graph.get_graph().draw_mermaid()}
-        </pre>
-        <script type="module">
-            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-            mermaid.initialize({{ startOnLoad: true }});
-        </script>
-        """
-        
         return JSONResponse(content={
             "message": "Graph execution complete.", 
             "final_solution": final_solution,
-            "mermaid_graph": mermaid_graph,
+            "mermaid_graph": mermaid_pre_block, # Include for fallback
             "graph_structure": {
                 "nodes": list(graph.nodes.keys()),
                 "edges": [{"source": s, "target": t} for s, t in graph.edges]

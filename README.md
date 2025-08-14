@@ -100,4 +100,4 @@ This application supports running inference locally using an Ollama server, allo
 3.  **Provide a Prompt**: Enter the main problem or question you want the agent network to solve.
 4.  **Build and Run**: Click the "Build and Run Graph" button.
 5.  **Observe**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward passes, and reflection passes—in the real-time log viewer.
-6.  **Get Results**: Once all epochs are complete, the final synthesized answer is displayed, along with a Mermaid.js diagram visualizing the structure of the generated agent network.
+6.  **Get Results**: Once all epochs are complete, the final synthesized answer is displayed

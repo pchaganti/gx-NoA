@@ -147,7 +147,7 @@
 
                 <div id="ollama-model-section" class="hidden">
                     <label for="ollama_model">Ollama Model Name:</label>
-                    <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
+                    <input type="text" id="ollama_model" name="ollama_model" value="Qwen3-30B-A3B-Instruct-2507:latest">
                 </div>
 
                 <label for="cot_trace_depth">CoT trace depth (max 32):</label>
@@ -247,13 +247,10 @@
             const result = await response.json();
             logContainer.innerHTML += `<p><strong>${result.message}</strong></p>`;
             
-            if(result.mermaid_graph){
+            // Fallback rendering in case the SSE message was missed
+            if(result.mermaid_graph && graphContainer.querySelector('pre.mermaid') === null){
                 graphContainer.innerHTML = result.mermaid_graph;
-                 // We need to re-run the mermaid render script after inserting the content
-                if (window.mermaid) {
-                    // Remove the old graph if it exists
-                    const oldSvg = graphContainer.querySelector('svg');
-                    if(oldSvg) oldSvg.remove();
+                 if (window.mermaid) {
                     window.mermaid.run();
                 }
             }
@@ -273,10 +270,37 @@
 
         const eventSource = new EventSource('/stream_log');
         eventSource.onmessage = function(event) {
-            logContainer.innerHTML += `<p>${event.data}</p>`;
+            if (event.data.startsWith('{')) {
+                try {
+                    const message = JSON.parse(event.data);
+                    // Check if it's our special graph message
+                    if (message && message.type === 'graph_viz') {
+                        graphContainer.innerHTML = message.payload;
+                        if (window.mermaid) {
+                           // This tells mermaid to find and render the new diagram
+                           window.mermaid.run();
+                        }
+                    } else {
+                        // It's some other JSON message, just log it as a string
+                        logContainer.innerHTML += `<p>${event.data}</p>`;
+                    }
+                } catch (e) {
+                     // Malformed JSON, treat as a plain text log message
+                     logContainer.innerHTML += `<p>${event.data}</p>`;
+                }
+            } else {
+                // It's a plain text log message
+                logContainer.innerHTML += `<p>${event.data}</p>`;
+            }
             logContainer.scrollTop = logContainer.scrollHeight;
         };
 
+    </script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.js';
+        // Make mermaid globally available so our other scripts can call it
+        window.mermaid = mermaid;
+        mermaid.initialize({ startOnLoad: true });
     </script>
 </body>
 </html>
