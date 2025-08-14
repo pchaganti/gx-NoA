@@ -386,8 +386,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
     seeds = payload.get("seeds")
     user_prompt = params.get("prompt")
     cot_trace_depth = int(params.get('cot_trace_depth', 4))
-    num_agents_per_principality = int(params.get('num_agents_per_principality', 1))
-    num_reflections = int(params.get('number_of_reflections', 20))
+    num_agents_per_principality = 1
 
     await log_stream.put("--- Starting Graph Build and Run Process ---")
     await log_stream.put(f"Parameters: {params}")
