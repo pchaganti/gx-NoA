@@ -32,38 +32,51 @@ Traditional backpropagation adjusts numerical weights based on a calculated erro
 
 This entire cycle of a forward and reflection pass is one "epoch." By running multiple epochs, the network engages in a process of collective sense-making, iteratively refining its agent personas to generate progressively more insightful and robust solutions.
 
+## Vision & Long-Term Roadmap: Training a World Language Model
+
+Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of thought. It includes the initial agent personas, the layer-by-layer Chain-of-Thought (CoT) traces from each agent, the synthesized solutions, the generated critiques, and—most importantly—the diff of how each agent's core prompts evolved in response to feedback across multiple epochs.
+
+We conceptualize these collected traces as a new form of data: **powerful, multi-factorial, and multi-dimensional data for training next-generation reasoning models.** Unlike traditional datasets which capture static information, this data captures the *dynamics* of reasoning. It shows how diverse viewpoints (the agents) clash, converge, and synthesize a solution. It contains explicit signals for error correction (the critiques) and adaptation (the prompt updates).
+
+Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**.
+
+A WLM, as we envision it, moves beyond predicting the next token in a sequence. It would be a model trained on the fundamental patterns of collaboration, critique, and collective intelligence. It would learn the implicit "language" of how diverse agents interact to build something greater than the sum of their parts. By training a foundation model on thousands of these solution-mining runs across countless domains, we hypothesize it could develop a more robust, generalized reasoning capability—one that intrinsically understands context, causality, and problem decomposition from a systemic perspective.
+
+This represents the grand ambition of the NoA project: to not only solve hard problems but to create a data flywheel that can be used to forge a new paradigm of reasoning AI.
+
+## Mid-Term Research Goals
+
+These are the core research avenues we are actively exploring to enhance the network's capabilities.
+
+*   **Implement Cyclical Hierarchical Sparse Connections:** The current model uses a densely connected structure. We plan to explore a more sophisticated and efficient architecture. By creating sparse, hierarchical connections, we hope to see the **emergence of "leader" agents and specialized "micro-teams,"** improving scalability and mirroring real-world collaboration more closely.
+
+*   **Scale to a "World-of-Agents"**: On more powerful hardware, the current metaheuristic could be scaled significantly. We aim to move beyond using simple "seed verbs" for initial agent creation. The next step is to use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
+
+
+*   **Enhance Combinatorial Heuristics**: The philosophical underpinning of NoA is that complex human solutions emerge from the combinatorial power of language and symbols. We plan to research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically and generate novel solutions.
+
+## Immediate Development Goals (Short-Term TODO)
+
+These are the immediate, actionable goals we are focused on for the next development cycle:
+
+*   **Dynamic Memory Summarization:** To support long-running epochs and LLMs with small context windows, an agent's memory can grow too large. We will implement a dynamic summarization layer that automatically condenses an agent's memory history when it approaches a token limit, preserving key insights while preventing context overflow.
+
+*   **Live Graph Terminal Visualization:** The current log provides a linear stream of events. We will build a second, parallel terminal interface that renders the agent network as a graph using live-updating text. This will allow users to visualize the flow of data and the backpropagation of critiques in real-time.
+
+*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
+
+*   **Conduct High-VRAM Scalability Tests:** We will benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic by dramatically increasing the number of agents and network depth.
+
 ## Hyperparameters Explained: Tuning Your Solution Mining Rig ⚙️
 
 The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
 
-*   **`CoT trace depth`**: This is the number of layers in your agent network. A deeper network allows for more steps of abstraction and refinement, similar to how deeper neural networks can model more complex functions. Each layer builds upon the insights of the last.
-*   **`Number of epochs`**: An epoch is one full cycle of a forward pass (inference) and a reflection pass (learning). This is the key to "solution mining." Running more epochs allows the agents to iteratively refine their personas and collective strategy based on feedback, leading to more sophisticated solutions over time. Set it high and let your laptop mine for a breakthrough overnight! 🌙
-*   **`Vector word size`**: This determines the number of "seed verbs" that form the initial skill set for each agent in the first layer. A larger size provides a richer, more diverse starting point for the agents' abilities.
-*   **`Prompt alignment` (0.1 - 2.0)**: This parameter controls how strongly an agent's assigned "career" is influenced by the user's prompt. A higher value means agents will be more narrowly specialized to the problem domain, while lower value allows for more creative, tangential, and potentially innovative professional roles.
-*   **`Density` (0.1 - 2.0)**: Density modulates the influence of the previous layer's attributes when creating a new, deeper layer of agents. High density means new agents will be very similar to their predecessors, leading to specialized refinement. Low density encourages more novelty and exploration in the agent creation process.
-*   **`Learning rate` (0.1 - 2.0)**: Analogous to its counterpart in ANNs, this parameter controls the magnitude of change an agent makes to its system prompt in response to critique during the reflection pass. A higher learning rate leads to more drastic and rapid evolution, while a lower rate results in more subtle, gradual refinement.
-
-## Roadmap and Future Directions (TODO)
-
-NoA is in its early stages of development, and this README represents a research vision as much as a finished product. We are actively exploring several key areas to enhance the network's capabilities and efficiency. Community involvement and testing are crucial for making progress on these frontiers.
-
-*   **Implement Cyclical Hierarchical Sparse Connections:** The current model uses a densely connected structure where every agent in a layer receives input from all agents in the previous layer. We plan to explore a more sophisticated and efficient architecture. By creating sparse, hierarchical connections, we hope to see the **emergence of "leader" agents and specialized "micro-teams,"** improving scalability and mirroring real-world collaboration more closely.
-
-*   **Scale to a "World-of-Agents"**: On more powerful hardware, the current metaheuristic could be scaled significantly. We aim to move beyond using simple "seed verbs" for initial agent creation. The next step is to use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
-
-*   **Enhance Combinatorial Heuristics**: The philosophical underpinning of NoA is that complex human solutions emerge from the combinatorial power of language and symbols. We plan to research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically and generate novel solutions through the synthesis of diverse concepts.
-
-## Immediate Roadmap (Short-Term TODO)
-
-These are the immediate, actionable goals we are focused on for the next development cycle:
-
-*   **Dynamic Memory Summarization:** To support long-running epochs and LLMs with small context windows, an agent's memory (list of its past JSON outputs) can grow too large. We will implement a dynamic summarization layer that automatically condenses an agent's memory history when it approaches a token limit, preserving key insights while preventing context overflow.
-
-*   **Live Graph Terminal Visualization:** The current log provides a linear stream of events. We will build a second, parallel terminal interface that renders the agent network as a graph using live-updating text. This will allow users to visualize the flow of data during the forward pass and the backpropagation of critiques during the reflection pass in real-time, preserving the graph's shape for intuitive monitoring.
-
-*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines. This enables a group to pool their resources and "mine" a solution to a very hard problem collectively.
-
-*   **Conduct High-VRAM Scalability Tests:** We will benchmark the system on a high-end machine with at least 128GB of VRAM. The goal is to test the upper limits of the metaheuristic by dramatically increasing the number of agents, the `CoT trace depth`, and the complexity of the "institutional directives" to understand its scaling properties.
+*   **`CoT trace depth`**: The number of layers in your agent network. Deeper networks allow for more steps of abstraction.
+*   **`Number of epochs`**: One full cycle of a forward pass (inference) and a reflection pass (learning). More epochs allow the network more time to "mine" a solution.
+*   **`Vector word size`**: The number of "seed verbs" for initial agent creation. A larger size provides a richer starting point.
+*   **`Prompt alignment` (0.1 - 2.0)**: Controls how strongly an agent's career is influenced by the user's prompt. Higher values lead to more specialization.
+*   **`Density` (0.1 - 2.0)**: Modulates the influence of the previous layer when creating new agents. High density leads to refinement; low density encourages novelty.
+*   **`Learning rate` (0.1 - 2.0)**: Controls the magnitude of change an agent makes to its prompt in response to critique.
 
 ## Technical Setup
 
