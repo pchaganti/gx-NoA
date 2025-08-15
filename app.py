@@ -639,7 +639,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         final_state = None
         # Corrected epoch counting
         initial_state["epoch"] = 0
-        async for output in graph.astream(initial_state):
+        async for output in graph.astream(initial_state, {'recursion_limit': 100000000000}):
             # This now correctly streams outputs from parallel nodes as they finish
             for key, value in output.items():
                 await log_stream.put(f"--- Node Finished Processing: {key} ---")
