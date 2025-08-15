@@ -73,7 +73,8 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
                 "reasoning": "This answer was synthesized from multiple mock agent outputs during a debug run.",
                 "skills_used": ["synthesis", "mocking", "debugging"]
             })
-        elif "you are a critique agent" in prompt:
+        elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
+            # Covers both global and individual critique prompts
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
@@ -85,6 +86,7 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
                 "skills_used": ["mocking", "debugging", f"skill_{random.randint(1,10)}"]
             })
 
+
 class GraphState(TypedDict):
     original_request: str
     layers: List[dict]
@@ -94,17 +96,17 @@ class GraphState(TypedDict):
     params: dict
     all_layers_prompts: List[List[str]]
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
-    memory: dict # Node ID -> List of past JSON outputs
+    memory: Annotated[dict, lambda a, b: {**a, **b}] # Node ID -> List of past JSON outputs
     final_solution: dict
 
-# --- LangChain Setup ---
-# LLM is now initialized within the endpoint based on user selection
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
 Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
 When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
-Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. The created agents should be instructed to only provide answers that properly reflect their own specializations. You will balance how much influence the guiding words have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
+Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
+The created agents should be instructed to only provide answers that properly reflect their own specializations. 
+You will balance how much influence the previosu agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
 Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
 Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
 Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
@@ -143,7 +145,7 @@ Memory section in the system prompt is a log of your previous proposed solutions
 Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words while the career overriding the agent disposition is modulated by prompt alignment. 
 The influence of the attributes on the new agent's skills is modulated by 'density' ({density}). Min 0.0, Max 2.0
 The 'learning_rate' ({learning_rate}) (Min 0.0, Max 2.0) will determine how much the agent's attributes, career, and skills are modified based on the critique from the reflection pass.
-Each agent you generate should have an answer format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
+Each agent you generate should have an answser format in its system prompt with the following keys: “original_problem”: “”, “proposed_solution”: “”, “reasoning”: “”,  “skills_used”: “”.
 Attributes: {{attributes}}
 Hard Request: {{hard_request}}
 Critique: {{critique}}
@@ -164,15 +166,34 @@ Synthesize the final solution:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_critique_chain(llm):
+def get_global_critique_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of a proposed solution from a single agent in relation to the original request and brainstorm all the posbile ways in which the agents solution is incoherent.
-Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agent and steer into change. 
+You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
 Original Request: {original_request}
-Proposed Solution from Agent {agent_id}:
+Proposed Final Solution:
 {proposed_solution}
 
-Generate your critique for this specific agent:
+Generate your global critique for the team:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_individual_critique_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team.
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning and the final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+
+Original Request: {original_request}
+Final Synthesized Solution from the Team:
+{final_synthesized_solution}
+---
+This Specific Agent's Output (Agent {agent_id}):
+{agent_output}
+---
+
+Generate your targeted critique for this specific agent:
 """)
     return prompt | llm | StrOutputParser()
 
@@ -196,13 +217,17 @@ def create_agent_node(llm, agent_prompt, node_id):
         """
         The function that will be executed when the node is called in the graph.
         """
-        await log_stream.put(f"--- Invoking Agent: {node_id} ---")
+        await log_stream.put(f"--- [FORWARD PASS] Invoking Agent: {node_id} ---")
+        
+        # INCREASED VERBOSITY
+        await log_stream.put(f"VERBOSE LOG: System Prompt for {node_id}:\n---\n{agent_prompt}\n---")
 
         # Determine the input for the agent based on its layer
         layer_index = int(node_id.split('_')[1])
         
         if layer_index == 0:
             # First layer agents receive the original user request
+            await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing the original user request.")
             input_data = state["original_request"]
         else:
             # Subsequent layers receive the outputs from all agents in the previous layer
@@ -215,6 +240,7 @@ def create_agent_node(llm, agent_prompt, node_id):
                 if prev_node_id in state["agent_outputs"]:
                     prev_layer_outputs.append(state["agent_outputs"][prev_node_id])
             
+            await log_stream.put(f"LOG: Agent {node_id} (Layer {layer_index}) is processing {len(prev_layer_outputs)} outputs from Layer {prev_layer_index}.")
             input_data = json.dumps(prev_layer_outputs, indent=2)
 
         # Retrieve the agent's memory from previous epochs
@@ -243,9 +269,11 @@ Your JSON formatted response:
         try:
             # The agent is expected to return a JSON string.
             response_json = json.loads(response_str)
-            await log_stream.put(f"Agent {node_id} finished. Solution snippet: {str(response_json.get('proposed_solution'))[:80]}...")
+            await log_stream.put(f"SUCCESS: Agent {node_id} finished. Solution snippet: {str(response_json.get('proposed_solution'))[:80]}...")
+            # INCREASED VERBOSITY
+            await log_stream.put(f"VERBOSE LOG: Full JSON Response from {node_id}:\n---\n{json.dumps(response_json, indent=2)}\n---")
         except json.JSONDecodeError:
-            await log_stream.put(f"Error: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
+            await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
             response_json = {
                 "original_problem": state["original_request"],
                 "proposed_solution": "Error: Agent produced malformed JSON output.",
@@ -269,7 +297,7 @@ Your JSON formatted response:
 
 def create_synthesis_node(llm):
     async def synthesis_node(state: GraphState):
-        await log_stream.put("--- Entering Synthesis Node ---")
+        await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
         synthesis_chain = get_synthesis_chain(llm)
 
         # The synthesis node is connected to the last layer of agents.
@@ -282,10 +310,10 @@ def create_synthesis_node(llm):
             if node_id in state["agent_outputs"]:
                 last_layer_outputs.append(state["agent_outputs"][node_id])
 
-        await log_stream.put(f"Synthesizing {len(last_layer_outputs)} outputs from layer {last_agent_layer_idx}.")
+        await log_stream.put(f"LOG: Synthesizing {len(last_layer_outputs)} outputs from the final agent layer (Layer {last_agent_layer_idx}).")
 
         if not last_layer_outputs:
-            await log_stream.put("Warning: Synthesis node received no inputs.")
+            await log_stream.put("WARNING: Synthesis node received no inputs.")
             return {"final_solution": {"error": "Synthesis node received no inputs."}}
 
         final_solution_str = await synthesis_chain.ainvoke({
@@ -295,9 +323,9 @@ def create_synthesis_node(llm):
         
         try:
             final_solution = json.loads(final_solution_str)
-            await log_stream.put(f"Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
+            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
         except json.JSONDecodeError:
-            await log_stream.put(f"Error: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
+            await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
             
         return {"final_solution": final_solution}
@@ -305,29 +333,49 @@ def create_synthesis_node(llm):
 
 def create_critique_node(llm):
     async def critique_node(state: GraphState):
-        await log_stream.put("--- Entering Critique Node ---")
-        critique_chain = get_critique_chain(llm)
+        await log_stream.put("--- [REFLECTION PASS] Entering Critique Node (Two-Tiered) ---")
         
-        last_agent_layer_idx = len(state['all_layers_prompts']) - 1
-        num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
-        
+        final_solution = state.get("final_solution")
+        if not final_solution or final_solution.get("error"):
+            await log_stream.put("WARNING: No valid final solution to critique. Skipping critique phase.")
+            return {"critiques": {}}
+
         critiques = {}
         tasks = []
-        for i in range(num_agents_last_layer):
-            node_id = f"agent_{last_agent_layer_idx}_{i}"
-            if node_id in state["agent_outputs"]:
-                agent_solution = state["agent_outputs"][node_id]
-                
-                async def get_critique(node_id, agent_solution):
-                    critique_text = await critique_chain.ainvoke({
-                        "original_request": state["original_request"],
-                        "agent_id": node_id,
-                        "proposed_solution": json.dumps(agent_solution, indent=2)
-                    })
-                    critiques[node_id] = critique_text
-                    await log_stream.put(f"Critique generated for {node_id}: {critique_text[:100]}...")
+        
+        # 1. Generate Global Critique for the penultimate layer
+        await log_stream.put("LOG: Generating GLOBAL critique for final solution.")
+        global_critique_chain = get_global_critique_chain(llm)
+        global_critique_text = await global_critique_chain.ainvoke({
+            "original_request": state["original_request"],
+            "proposed_solution": json.dumps(final_solution, indent=2)
+        })
+        critiques["global_critique"] = global_critique_text
+        await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text[:150]}...")
 
-                tasks.append(get_critique(node_id, agent_solution))
+        # 2. Generate Individual Critiques for all other agents (layers 0 to n-2)
+        await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
+        individual_critique_chain = get_individual_critique_chain(llm)
+        num_layers = len(state['all_layers_prompts'])
+        
+        for i in range(num_layers - 1): # Loop through all layers except the last one
+            for j in range(len(state['all_layers_prompts'][i])):
+                agent_id = f"agent_{i}_{j}"
+                if agent_id in state["agent_outputs"]:
+                    agent_output = state["agent_outputs"][agent_id]
+                    
+                    async def get_individual_critique(agent_id, agent_output):
+                        await log_stream.put(f"LOG: Generating individual critique for {agent_id}...")
+                        critique_text = await individual_critique_chain.ainvoke({
+                            "original_request": state["original_request"],
+                            "final_synthesized_solution": json.dumps(final_solution, indent=2),
+                            "agent_id": agent_id,
+                            "agent_output": json.dumps(agent_output, indent=2)
+                        })
+                        critiques[agent_id] = critique_text
+                        await log_stream.put(f"SUCCESS: Individual critique for {agent_id} generated: {critique_text[:100]}...")
+
+                    tasks.append(get_individual_critique(agent_id, agent_output))
         
         await asyncio.gather(*tasks)
 
@@ -336,50 +384,74 @@ def create_critique_node(llm):
 
 def create_update_agent_prompts_node(llm):
     async def update_agent_prompts_node(state: GraphState):
-        await log_stream.put("--- Entering Agent Prompt Update Node (Reflection) ---")
+        await log_stream.put("--- [REFLECTION PASS] Entering Agent Prompt Update Node (Targeted Backpropagation) ---")
         params = state["params"]
         critiques = state["critiques"]
-        num_reflections = int(params.get('num_reflections', 1))
-
+        
         if not critiques:
-            await log_stream.put("No critiques available. Skipping reflection.")
+            await log_stream.put("LOG: No critiques available. Skipping reflection pass.")
             new_epoch = state["epoch"] + 1
-            return {
-                "epoch": new_epoch,
-                "agent_outputs": {},
-                "memory": state.get("memory", {}),
-                "final_solution": state.get("final_solution") # Preserve solution
-            }
+            return {"epoch": new_epoch, "agent_outputs": {}}
 
         all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
         
         dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
 
-        last_layer_idx = len(all_prompts_copy) - 1
-        penultimate_layer_idx = last_layer_idx - 1
+        penultimate_layer_idx = len(all_prompts_copy) - 2
 
         if penultimate_layer_idx < 0:
-            await log_stream.put("Not enough layers to reflect upon. Skipping.")
+            await log_stream.put("WARNING: Not enough layers to perform reflection (need at least 2). Skipping.")
             new_epoch = state["epoch"] + 1
-            return {
-                "epoch": new_epoch,
-                "agent_outputs": {},
-                "memory": state.get("memory", {}),
-                "final_solution": state.get("final_solution") # Preserve solution
-            }
+            return {"epoch": new_epoch, "agent_outputs": {}}
 
-        # --- Reflection Logic ---
-        # This part of the logic remains the same
+        # Start backpropagation from the penultimate layer up to the input layer
+        for i in range(penultimate_layer_idx, -1, -1):
+            await log_stream.put(f"LOG: [BACKPROP] Reflecting on Layer {i}...")
+            
+            for j, agent_prompt in enumerate(all_prompts_copy[i]):
+                agent_id = f"agent_{i}_{j}"
+                
+                # Determine the correct critique for the current agent based on its layer
+                critique_for_this_agent = None
+                if i == penultimate_layer_idx:
+                    critique_for_this_agent = critiques.get("global_critique")
+                    await log_stream.put(f"LOG: [BACKPROP] Applying GLOBAL critique to {agent_id} in penultimate layer.")
+                else:
+                    critique_for_this_agent = critiques.get(agent_id)
+                    await log_stream.put(f"LOG: [BACKPROP] Applying INDIVIDUAL critique to {agent_id}.")
+
+                if not critique_for_this_agent:
+                    await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
+                    continue
+                
+                # Get the agent's old attributes to anchor the update
+                analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
+                try:
+                    analysis = json.loads(analysis_str)
+                except json.JSONDecodeError:
+                    analysis = {"attributes": "", "hard_request": ""} # Fallback
+
+                # Generate the new, refined prompt
+                new_prompt = await dense_spanner_chain.ainvoke({
+                    "attributes": analysis.get("attributes"),
+                    "hard_request": critique_for_this_agent, # The critique acts as the new "hard request"
+                    "critique": critique_for_this_agent  # Also pass it as the formal critique
+                })
+                
+                # Update the prompt in our temporary copy
+                all_prompts_copy[i][j] = new_prompt
+                await log_stream.put(f"SUCCESS: [BACKPROP] System prompt for {agent_id} has been updated.")
         
         new_epoch = state["epoch"] + 1
-        await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch} ---")
+        await log_stream.put(f"--- Epoch {state['epoch']+1} Finished. Starting Epoch {new_epoch+1} ---")
 
-        # *** BUG FIX: Preserve final_solution across epochs ***
+        # Reset agent outputs and critiques for the new epoch
         return {
             "all_layers_prompts": all_prompts_copy,
             "epoch": new_epoch,
             "agent_outputs": {},
+            "critiques": {},
             "memory": state.get("memory", {}),
             "final_solution": state.get("final_solution")
         }
@@ -481,6 +553,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
         # --- Graph Definition ---
         workflow = StateGraph(GraphState)
 
+        # Add a gateway node to fan-out at the start of each epoch
+        workflow.add_node("epoch_gateway", lambda state: {"epoch": state["epoch"] + 1})
+
+
         for i, layer_prompts in enumerate(all_layers_prompts):
             for j, prompt in enumerate(layer_prompts):
                 node_id = f"agent_{i}_{j}"
@@ -490,35 +566,62 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
 
-        # --- Graph Connections ---
-        workflow.set_entry_point(f"agent_0_0")
-        for j in range(len(all_layers_prompts[0])):
-            workflow.add_edge(f"agent_0_{j}", f"agent_1_0")
-
-        for i in range(1, cot_trace_depth - 1):
-            for j in range(len(all_layers_prompts[i])):
-                workflow.add_edge(f"agent_{i}_{j}", f"agent_{i+1}_0")
+        # --- Graph Connections (MODIFIED FOR MLP STRUCTURE & CORRECT EPOCH LOOP) ---
+        await log_stream.put("--- Connecting Graph Nodes ---")
         
+        # 1. Set the entry point to the gateway for parallel execution
+        workflow.set_entry_point("epoch_gateway")
+        await log_stream.put("LOG: Entry point set to 'epoch_gateway'.")
+        
+        # 2. Connect gateway to all agents in the first layer
+        first_layer_nodes = [f"agent_0_{j}" for j in range(len(all_layers_prompts[0]))]
+        for node in first_layer_nodes:
+            workflow.add_edge("epoch_gateway", node)
+            await log_stream.put(f"CONNECT: epoch_gateway -> {node}")
+
+        # 3. Create dense, bipartite connections between consecutive layers
+        for i in range(cot_trace_depth - 1):
+            current_layer_nodes = [f"agent_{i}_{j}" for j in range(len(all_layers_prompts[i]))]
+            next_layer_nodes = [f"agent_{i+1}_{k}" for k in range(len(all_layers_prompts[i+1]))]
+            for current_node in current_layer_nodes:
+                for next_node in next_layer_nodes:
+                    workflow.add_edge(current_node, next_node)
+                    await log_stream.put(f"CONNECT: {current_node} -> {next_node}")
+        
+        # 4. Connect all agents in the last layer to the synthesis node
         last_layer_idx = cot_trace_depth - 1
-        for j in range(len(all_layers_prompts[last_layer_idx])):
-            workflow.add_edge(f"agent_{last_layer_idx}_{j}", "synthesis")
+        last_layer_nodes = [f"agent_{last_layer_idx}_{j}" for j in range(len(all_layers_prompts[last_layer_idx]))]
+        for node in last_layer_nodes:
+            workflow.add_edge(node, "synthesis")
+            await log_stream.put(f"CONNECT: {node} -> synthesis")
 
+        # 5. Define the forward-pass to reflection-pass loop
         workflow.add_edge("synthesis", "critique")
+        await log_stream.put("CONNECT: synthesis -> critique")
         workflow.add_edge("critique", "update_prompts")
+        await log_stream.put("CONNECT: critique -> update_prompts")
         
+        # 6. Define the conditional edge for continuing epochs or ending
         async def should_continue(state: GraphState):
-            if state["epoch"] >= state["max_epochs"] - 1:
+            if state["epoch"] >= state["max_epochs"]:
+                await log_stream.put("LOG: Max epochs reached. Ending execution.")
                 return END
-            return "agent_0_0"
+            await log_stream.put(f"LOG: Epoch {state['epoch']} of {state['max_epochs']} complete. Continuing to next epoch.")
+            return "continue_epoch"
         
-        workflow.add_conditional_edges("update_prompts", should_continue, {
-            "agent_0_0": "agent_0_0",
-            END: END
-        })
+        workflow.add_conditional_edges(
+            "update_prompts",
+            should_continue,
+            {
+                "continue_epoch": "epoch_gateway", # Loop back to the gateway for the next parallel run
+                END: END
+            }
+        )
+        await log_stream.put("LOG: Conditional edge set: update_prompts will loop to epoch_gateway or end.")
         
         # --- Graph Execution ---
         graph = workflow.compile()
-        await log_stream.put("Graph compiled successfully.")
+        await log_stream.put("Graph compiled successfully.") 
         
         # --- Generate and send ASCII graph ---
         ascii_art = graph.get_graph().draw_ascii()
@@ -534,9 +637,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
         final_state = None
+        # Corrected epoch counting
+        initial_state["epoch"] = 0
         async for output in graph.astream(initial_state):
+            # This now correctly streams outputs from parallel nodes as they finish
             for key, value in output.items():
-                await log_stream.put(f"--- Node Finished: {key} ---")
+                await log_stream.put(f"--- Node Finished Processing: {key} ---")
             final_state = output
         
         final_state_value = list(final_state.values())[0] if final_state else {}
