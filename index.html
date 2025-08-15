@@ -87,7 +87,7 @@
             color: var(--text-color);
             font-weight: bold;
             border: none;
-            transition: background-color 0.3s ease;
+            transition: background-color: 0.3s ease;
         }
         button:hover {
             background-color: #E03C3C;
@@ -106,20 +106,24 @@
             font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
             font-size: 0.9em;
             color: #C0C0C0;
+            white-space: pre-wrap;
         }
+        /* MODIFIED: Terminal-like style for ASCII graph display */
         #graph-container {
             min-height: 400px;
-            background-color: var(--secondary-color);
-            border: 1px dashed #444;
+            background-color: #000;
+            border: 1px solid var(--secondary-color);
             border-radius: var(--border-radius);
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 1rem;
-            overflow: auto;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #C0C0C0;
+            white-space: pre;
         }
         #graph-container p {
             color: #888;
+            white-space: pre-wrap; /* Allow placeholder text to wrap */
         }
         .mbti-grid {
             display: grid;
@@ -135,12 +139,10 @@
             align-items: center;
             gap: 0.5rem;
         }
-        /* Override default 100% width for checkboxes */
         .mbti-option input[type="checkbox"] {
             width: auto;
             margin-bottom: 0;
         }
-        /* Override default label styles within the grid */
         .mbti-option label {
             margin-bottom: 0;
             font-weight: normal;
@@ -161,39 +163,33 @@
         <div id="graph-architecture" class="section">
             <h2>Graph Architecture</h2>
             <form id="graph-params-form">
-
                 <label for="llm_provider">LLM Provider:</label>
                 <select id="llm_provider" name="llm_provider">
                     <option value="Gemini">Google Gemini</option>
                     <option value="Ollama">Local Ollama</option>
                 </select>
-
+                <div class="mbti-option" style="margin-bottom: 1rem; margin-top: 0.5rem;">
+                    <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
+                    <label for="debug_mode">🚀 Enable Debug Mode (Uses Instant Mock LLM)</label>
+                </div>
                 <div id="ollama-model-section" class="hidden">
                     <label for="ollama_model">Ollama Model Name:</label>
                     <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
                 </div>
-
                 <label for="cot_trace_depth">CoT trace depth (max 32):</label>
                 <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="3" max="32" min="3" required>
-
                 <label for="num_epochs">Number of epochs:</label>
                 <input type="number" id="num_epochs" name="num_epochs" value="1" required>
-
                 <label for="vector_word_size">Vector word size (Number of verbs per agent):</label>
                 <input type="number" id="vector_word_size" name="vector_word_size" value="1" required>
-
                 <label for="prompt_alignment">Prompt alignment (0.1-2.0):</label>
                 <input type="number" id="prompt_alignment" name="prompt_alignment" step="0.1" min="0.1" max="2.0" value="1.0" required>
-
                 <label for="density">Density (0.1-2.0):</label>
                 <input type="number" id="density" name="density" step="0.1" min="0.1" max="2.0" value="1.0" required>
-
                 <label for="num_reflections">Number of reflections</label>
-                <input type="number" id="num_reflections" name="num_reflections" min="4" value="4" required>
-
+                <input type="number" id="num_reflections" name="num_reflections" min="1" value="4" required>
                 <label for="learning_rate">Learning rate (0.1-2.0):</label>
                 <input type="number" id="learning_rate" name="learning_rate" step="0.1" min="0.1" max="2.0" value="0.1" required>
-
                 <label>MBTI Archetypes (select at least 2):</label>
                 <div class="mbti-grid">
                     <div class="mbti-option"><input type="checkbox" id="mbti-istj" name="mbti_archetypes" value="ISTJ" checked><label for="mbti-istj">ISTJ (Inspector)</label></div>
@@ -213,162 +209,152 @@
                     <div class="mbti-option"><input type="checkbox" id="mbti-enfj" name="mbti_archetypes" value="ENFJ"><label for="mbti-enfj">ENFJ (Protagonist)</label></div>
                     <div class="mbti-option"><input type="checkbox" id="mbti-entj" name="mbti_archetypes" value="ENTJ"><label for="mbti-entj">ENTJ (Commander)</label></div>
                 </div>
-
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>Is there a singular, all-encompassing, coherent theoretical framework of physics that fully explains and links together all physical aspects of the universe? Design one.</textarea>
-
-                <!-- FIX: Removed the onclick="this.disabled = true" attribute -->
                 <button type="submit" id="run-button">Build and Run Graph</button>
             </form>
         </div>
     </div>
-
     <div class="container">
         <h2>Real-time Graph Activity</h2>
         <div id="log-container"></div>
     </div>
-
     <div class="container">
         <h2>Graph Visualization</h2>
+        <!-- MODIFIED: Updated placeholder text -->
         <div id="graph-container">
-            <p>Graph will be displayed here...</p>
+            <p>ASCII graph will be displayed here after the process starts...</p>
         </div>
     </div>
-
     <div class="container hidden" id="results-container">
         <h2>Final Result</h2>
         <div id="final-solution"></div>
     </div>
-   <script type="module">
-        // Import mermaid at the top of the module.
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        
-        // Initialize mermaid right away.
-        mermaid.initialize({ startOnLoad: true });
 
-        // Get all DOM elements
-        const graphParamsForm = document.getElementById('graph-params-form');
-        const runButton = document.getElementById('run-button');
-        const logContainer = document.getElementById('log-container');
-        const graphContainer = document.getElementById('graph-container');
-        const resultsContainer = document.getElementById('results-container');
-        const finalSolutionContainer = document.getElementById('final-solution');
-        const llmProviderSelect = document.getElementById('llm_provider');
-        const ollamaModelSection = document.getElementById('ollama-model-section');
+<script>
+    const graphParamsForm = document.getElementById('graph-params-form');
+    const runButton = document.getElementById('run-button');
+    const logContainer = document.getElementById('log-container');
+    const graphContainer = document.getElementById('graph-container');
+    const resultsContainer = document.getElementById('results-container');
+    const finalSolutionContainer = document.getElementById('final-solution');
+    const llmProviderSelect = document.getElementById('llm_provider');
+    const ollamaModelSection = document.getElementById('ollama-model-section');
+    const debugModeCheckbox = document.getElementById('debug_mode');
 
-        llmProviderSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'Ollama') {
-                ollamaModelSection.classList.remove('hidden');
+    llmProviderSelect.addEventListener('change', (e) => {
+        ollamaModelSection.classList.toggle('hidden', e.target.value !== 'Ollama');
+    });
+
+    debugModeCheckbox.addEventListener('change', (e) => {
+        const isDebug = e.target.checked;
+        llmProviderSelect.disabled = isDebug;
+        ollamaModelSection.classList.toggle('hidden', isDebug || llmProviderSelect.value !== 'Ollama');
+    });
+
+    const addLogMessage = (text, options = {}) => {
+        const p = document.createElement('p');
+        if (options.isHTML) p.innerHTML = text;
+        else p.textContent = text;
+        if (options.color) p.style.color = options.color;
+        logContainer.appendChild(p);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    };
+
+    graphParamsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(graphParamsForm);
+        const params = {};
+        formData.forEach((value, key) => {
+            if (key === 'mbti_archetypes') {
+                if (!params[key]) params[key] = [];
+                params[key].push(value);
             } else {
-                ollamaModelSection.classList.add('hidden');
+                params[key] = value;
             }
         });
+        
+        if (!formData.has('debug_mode')) {
+            params.debug_mode = 'false';
+        }
 
-        graphParamsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(graphParamsForm);
-            
-            const params = {};
-            for (const [key, value] of formData.entries()) {
-                if (key === 'mbti_archetypes') {
-                    if (!params[key]) {
-                        params[key] = [];
-                    }
-                    params[key].push(value);
-                } else {
-                    params[key] = value;
+        if (!params.mbti_archetypes || params.mbti_archetypes.length < 2) {
+            alert('Please select at least 2 MBTI archetypes.');
+            return;
+        }
+        runButton.disabled = true;
+        runButton.textContent = 'Processing...';
+        logContainer.innerHTML = ''; 
+        graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
+        resultsContainer.classList.add('hidden');
+        finalSolutionContainer.innerHTML = '';
+        addLogMessage('Sending request to build and run graph...');
+        try {
+            const response = await fetch('/build_and_run_graph', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ params })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                addLogMessage(`Error: ${result.message}`, { color: 'red' });
+                if(result.traceback) {
+                    const pre = document.createElement('pre');
+                    pre.style.color = '#ff8c8c';
+                    pre.textContent = result.traceback;
+                    logContainer.appendChild(pre);
                 }
-            }
-            if (!params.mbti_archetypes) {
-                params.mbti_archetypes = [];
-            }
-
-            if (params.mbti_archetypes.length < 2) {
-                alert('Please select at least 2 MBTI archetypes.');
-                logContainer.innerHTML += `<p style="color:orange;"><strong>Validation Error:</strong> Please select at least 2 MBTI archetypes to build the graph.</p>`;
                 return;
             }
-
-            const cotTraceDepth = parseInt(params.cot_trace_depth);
-            const numReflectionsInput = document.getElementById('num_reflections');
-            numReflectionsInput.max = cotTraceDepth * 16;
-            
-            // --- Improved Button and UI Handling ---
-            runButton.disabled = true;
-            runButton.textContent = 'Processing...';
-            logContainer.innerHTML = '<p>Building and running graph... This may take some time.</p>';
-            resultsContainer.classList.add('hidden');
-            graphContainer.innerHTML = '<p>Graph will be displayed here...</p>';
-
-            try {
-                const payload = { params };
-
-                const response = await fetch('/build_and_run_graph', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorResult = await response.json();
-                    logContainer.innerHTML += `<p style="color:red;"><strong>Error: ${errorResult.message}</strong></p>`;
-                    if(errorResult.traceback) {
-                        logContainer.innerHTML += `<pre style="color:red;">${errorResult.traceback}</pre>`;
-                    }
-                    // The finally block will handle re-enabling the button
-                    return;
-                }
-
-                const result = await response.json();
-                logContainer.innerHTML += `<p><strong>${result.message}</strong></p>`;
-                
-                if(result.mermaid_graph && graphContainer.querySelector('pre.mermaid') === null){
-                    graphContainer.innerHTML = result.mermaid_graph;
-                    mermaid.run();
-                }
-
-                if(result.final_solution) {
-                    finalSolutionContainer.innerHTML = `
-                        <h3>Proposed Solution</h3>
-                        <pre><code>${result.final_solution.proposed_solution || 'N/A'}</code></pre>
-                        <h3>Reasoning</h3>
-                        <pre><code>${result.final_solution.reasoning || 'N/A'}</code></pre>
-                        <h3>Skills Used</h3>
-                        <p>${(result.final_solution.skills_used || []).join(', ')}</p>
-                    `;
-                    resultsContainer.classList.remove('hidden');
-                }
-            } catch (error) {
-                logContainer.innerHTML += `<p style="color:red;"><strong>A client-side error occurred: ${error.message}</strong></p>`;
-            } finally {
-                // This block ensures the button is always re-enabled
-                runButton.disabled = false;
-                runButton.textContent = 'Build and Run Graph';
-            }
-        });
-
-        const eventSource = new EventSource('/stream_log');
-        eventSource.onmessage = function(event) {
-            if (event.data.startsWith('{')) {
-                try {
-                    const message = JSON.parse(event.data);
-                    if (message && message.type === 'graph_viz') {
-                        graphContainer.innerHTML = message.payload;
-                        // Because mermaid is imported and initialized at the top of this module,
-                        // this call will now work reliably.
-                        mermaid.run();
-                    } else {
-                        logContainer.innerHTML += `<p>${event.data}</p>`;
-                    }
-                } catch (e) {
-                     logContainer.innerHTML += `<p>${event.data}</p>`;
-                }
+            addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+            if (result.final_solution && !result.final_solution.error) {
+                const solution = result.final_solution;
+                finalSolutionContainer.innerHTML = `
+                    <h3>Proposed Solution</h3><pre><code>${solution.proposed_solution || 'N/A'}</code></pre>
+                    <h3>Reasoning</h3><pre><code>${solution.reasoning || 'N/A'}</code></pre>
+                    <h3>Skills Used</h3><p>${(solution.skills_used || []).join(', ') || 'N/A'}</p>`;
+                resultsContainer.classList.remove('hidden');
             } else {
-                logContainer.innerHTML += `<p>${event.data}</p>`;
+                 addLogMessage(`⚠️ Server finished but returned no valid solution.`, { color: 'orange' });
+                 if(result.final_solution?.error) {
+                    addLogMessage(`Error details: ${result.final_solution.error}`, { color: 'orange' });
+                 }
             }
-            logContainer.scrollTop = logContainer.scrollHeight;
-        };
-    </script>
+        } catch (error) {
+            addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
+        } finally {
+            runButton.disabled = false;
+            runButton.textContent = 'Build and Run Graph';
+        }
+    });
+
+    function tryParseJson(message) {
+        try {
+            return JSON.parse(message);
+        } catch (e) { return null; }
+    }
+
+    const eventSource = new EventSource('/stream_log');
+
+    eventSource.onmessage = async function(event) {
+        const rawMessage = event.data;
+        const messageData = tryParseJson(rawMessage);
+
+        // --- MODIFIED: Listen for 'graph_ascii' and render in terminal ---
+        if (messageData && messageData.type === 'graph_ascii') {
+            addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
+            graphContainer.textContent = messageData.payload;
+            addLogMessage('>>> Graph rendered.', { color: 'lime' });
+        } else {
+            addLogMessage(rawMessage);
+        }
+    }; 
+
+    eventSource.onerror = function(err) {
+        console.error("EventSource failed:", err);
+        addLogMessage("Error: Connection to server log stream lost. Please refresh and try again.", { color: 'red' });
+        eventSource.close();
+    };
+</script>
 </body>
 </html>

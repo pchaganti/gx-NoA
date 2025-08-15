@@ -8,4 +8,5 @@
 *.csv
 .venv/
 *.env
+*.mmd
 
