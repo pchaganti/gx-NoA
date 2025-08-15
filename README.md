@@ -135,9 +135,9 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 This application supports running inference locally using an Ollama server, allowing you to use open-source models without needing a cloud API key.
 
 1.  **Install Ollama**: Follow the official instructions to install Ollama on your system.
-2.  **Download a Model**: Pull the desired model from the Ollama library. The default model for this application is `dengcao/Qwen3-3B-A3B-Instruct-2507:latest`. You can pull it by running:
+2.  **Download a Model**: Pull the desired model from the Ollama library. The default model for this application is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`. You can pull it by running:
     ```bash
-    ollama pull dengcao/Qwen3-3B-A3B-Instruct-2507:latest
+    ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
     ```
 3.  **Run Ollama Server**: Make sure the Ollama application is running in the background. It will serve the models locally.
 4.  **Select in GUI**: In the web interface, use the "LLM Provider" dropdown and select "Local Ollama". You can change the model name from the default if you have other models pulled.
