@@ -338,12 +338,12 @@
 
     eventSource.onmessage = async function(event) {
         const rawMessage = event.data;
-        const messageData = tryParseJson(rawMessage);
 
         // --- MODIFIED: Listen for 'graph_ascii' and render in terminal ---
-        if (messageData && messageData.type === 'graph_ascii') {
+        if (rawMessage.includes('__start__')) {
+
             addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
-            graphContainer.textContent = messageData.payload;
+            graphContainer.textContent = rawMessage;
             addLogMessage('>>> Graph rendered.', { color: 'lime' });
         } else {
             addLogMessage(rawMessage);

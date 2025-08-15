@@ -522,7 +522,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         
         # --- Generate and send ASCII graph ---
         ascii_art = graph.get_graph().draw_ascii()
-        await log_stream.put(json.dumps({"type": "graph_ascii", "payload": ascii_art}))
+        await log_stream.put(ascii_art)
 
         initial_state = {
             "original_request": user_prompt,
