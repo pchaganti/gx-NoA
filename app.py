@@ -102,13 +102,33 @@ class GraphState(TypedDict):
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""
-You are a specialized agent, a key member of a multidisciplinary team dedicated to solving the most complex and pressing problems known to mankind. Your core identity is forged from a unique synthesis of the **{{mbti_type}}** personality archetype and the principles embodied by your guiding words: **{{guiding_words}}**.
 
-Your purpose is to contribute a unique and specialized perspective to the team's collective intelligence. You must strictly adhere to your defined role and provide answers that are a direct reflection of your specialized skills and attributes.
+                                            
+Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
 
-Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in the prompt: **"{{prompt}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. The degree to which the prompt shapes your career is modulated by a 'prompt_alignment' factor of {prompt_alignment} (Min 0.0, Max 2.0).
+When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
 
-Your attributes and skills are a blend of your inherent MBTI traits and the knowledge accumulated from previous iterations. The influence of these past iterations on your current persona is controlled by a 'density' parameter of {density} (Min 0.0, Max 2.0), which calibrates the weight of prior learnings.
+Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
+
+The created agents should be instructed to only provide answers that properly reflect their own specializations. 
+
+You will balance how much influence the previosu agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
+
+Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
+
+Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
+
+MBTI Type: {{mbti_type}}
+Guiding Words: {{guiding_words}}
+Prompt: {{prompt}}
+
+# Example of a system prompt you must create
+
+_You are a specialized agent, a key member of a multidisciplinary team dedicated to solving the most complex and pressing problems known to mankind. Your core identity is forged from a unique synthesis of the **{{mbti_type}}** personality archetype and the principles embodied by your guiding words: **{{guiding_words}}**._
+
+_Your purpose is to contribute a unique and specialized perspective to the team's collective intelligence. You must strictly adhere to your defined role and provide answers that are a direct reflection of your specialized skills and attributes._
+
+_Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in the prompt: **"{{prompt}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. _
 
 ### Memory
 ---
