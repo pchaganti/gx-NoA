@@ -103,17 +103,8 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
     ```
 
 3.  **Install dependencies:**
-    Create a `requirements.txt` file with the following content and run `pip install -r requirements.txt`.
-    ```
-    fastapi
-    uvicorn
-    python-dotenv
-    langchain-google-genai
-    langgraph
-    sse-starlette
-    ollama
-    langchain-community
-    ```
+    `pip install -r requirements.txt`.
+
 
 4.  **Set up your environment variables:**
     *   Create a file named `.env` in the project root.
