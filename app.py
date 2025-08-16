@@ -530,8 +530,8 @@ def create_update_agent_prompts_node(llm):
                 # Generate the new, refined prompt
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
-                    "hard_request": critique_for_this_agent, # The critique acts as the new "hard request"
-                    "critique": critique_for_this_agent  # Also pass it as the formal critique
+                    "hard_request": analysis.get("hard_request"),   
+                    "critique": critique_for_this_agent 
                 })
                 
                 # Update the prompt in our temporary copy
