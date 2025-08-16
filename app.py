@@ -581,7 +581,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 api_key = os.getenv("GEMINI_API_KEY")
                 if not api_key:
                     raise ValueError("GEMINI_API_KEY not found in environment variables.")
-                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
+                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
         error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly."
