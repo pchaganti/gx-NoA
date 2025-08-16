@@ -101,9 +101,8 @@ class GraphState(TypedDict):
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
-    prompt = ChatPromptTemplate.from_template(f"""
+    prompt = ChatPromptTemplate.from_template(f"""                     
 
-                                            
 Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
 
 When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
