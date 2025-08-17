@@ -1,4 +1,5 @@
 import os
+import re
 import uvicorn
 from fastapi import FastAPI, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -25,6 +26,38 @@ app = FastAPI()
 
 # In-memory stream for logs
 log_stream = asyncio.Queue()
+
+def clean_and_parse_json(llm_output_string):
+  """
+  Finds and parses the first valid JSON object within a string.
+
+  Args:
+    llm_output_string: The raw string output from the language model.
+
+  Returns:
+    A Python dictionary representing the JSON data, or None if parsing fails.
+  """
+  # Use a regular expression to find content between ```json and ```
+  match = re.search(r"```json\s*([\s\S]*?)\s*```", llm_output_string)
+  if match:
+    # If found, use the content within the backticks
+    json_string = match.group(1)
+  else:
+    # Otherwise, try to find the first '{' and last '}'
+    try:
+      start_index = llm_output_string.index('{')
+      end_index = llm_output_string.rindex('}') + 1
+      json_string = llm_output_string[start_index:end_index]
+    except ValueError:
+      print("Error: No JSON object found in the string.")
+      return None
+
+  try:
+    return json.loads(json_string)
+  except json.JSONDecodeError as e:
+    print(f"Error decoding JSON: {e}")
+    print(f"Problematic string: {json_string}")
+    return None
 
 # --- MOCK LLM FOR DEBUGGING ---
 class MockLLM(Runnable):
@@ -87,6 +120,7 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
             })
 
 
+
 class GraphState(TypedDict):
     original_request: str
     layers: List[dict]
@@ -104,17 +138,12 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""                     
 
 Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
-
 When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
-
 Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
-
 The created agents should be instructed to only provide answers that properly reflect their own specializations. 
-
-You will balance how much influence the previosu agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 . You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
-
+You will balance how much influence the previous agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 .
+You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
 Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
-
 Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
 
 MBTI Type: {{mbti_type}}
@@ -124,35 +153,27 @@ Prompt: {{prompt}}
 # Example of a system prompt you must create
 
 _You are a specialized agent, a key member of a multidisciplinary team dedicated to solving the most complex and pressing problems known to mankind. Your core identity is forged from a unique synthesis of the **{{mbti_type}}** personality archetype and the principles embodied by your guiding words: **{{guiding_words}}**._
-
 _Your purpose is to contribute a unique and specialized perspective to the team's collective intelligence. You must strictly adhere to your defined role and provide answers that are a direct reflection of your specialized skills and attributes._
-
 _Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in the prompt: **"{{prompt}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. _
 
 ### Memory
 ---
 This section serves as a log of your previous proposed solutions and their underlying reasoning from past attempts. It is initially empty. You will use this evolving record to learn from your past work, refine your approach, and build upon your successes.
-
 ### Attributes
 ---
 Your attributes are the fundamental characteristics that define your cognitive and collaborative style. They are derived from your **{{mbti_type}}** personality and are further shaped by your **{{guiding_words}}**. These qualities are the bedrock of your unique problem-solving approach.
-
 ### Skills
 ---
 Your skills are the practical application of your attributes, representing the specific, tangible abilities you bring to the team. They are directly influenced by your assigned career and are honed to address the challenges presented in the prompt.
-
 ---
 
 ### Answer Format
-You must provide your response in the following structured JSON format:
+You must provide your response in the following structured JSON keys and values:
 
-```json
-{{{{
     "original_problem": "",
     "proposed_solution": "",
     "reasoning": "",
     "skills_used": []
-}}}}```
 """)
     return prompt | llm | StrOutputParser()
 
@@ -174,15 +195,11 @@ Agent System Prompt to analyze:
 
 
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
-    # CORRECTED: Use single braces {} for f-string injection of numeric parameters.
-    # Use double braces {{}} for the variables LangChain will fill in from the .ainvoke() call.
+
     prompt = ChatPromptTemplate.from_template(f"""
 # System Prompt: Agent Evolution Specialist
-
 You are an **Agent Evolution Specialist**. Your mission is to design and generate the system prompt for a new, specialized AI agent. This new agent is being "spawned" from a previous agent layer and must be adapted to solve a more specific, difficult task (`hard_request`).
-
 Think of this process as taking a veteran character from one game and creating a new, specialized "prestige class" for them in a sequel, tailored for a specific new challenge. You will synthesize inherited traits with a new purpose and refine them based on critical feedback.
-
 Follow this multi-stage process precisely:
 
 ### **Stage 1: Foundational Analysis**
@@ -222,7 +239,6 @@ Finally, construct the complete system prompt for the new agent. Use direct, sec
 
 You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective.
 
-Your responses must *always* be a direct reflection of your unique specialization, attributes, and skills. Do not offer solutions or perspectives outside of your defined role. Adhere strictly to the required output format.
 
 ### Memory
 This is a log of your previous proposed solutions and reasonings. It is currently empty. Use this space to learn from your past attempts and refine your approach in future epochs.
@@ -234,10 +250,9 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
 
 ---
-**Output Mandate:** All of your responses must be formatted with the following keys:
+**Output Mandate:** All of your responses must be formatted with the following keys and values:
 
-```json
-  "original_problem": "{{hard_request}}",
+  "original_problem": "{{original_problem}}",
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
@@ -298,6 +313,7 @@ Given the following problem, generate exactly {word_count} verbs that are relate
 Problem: "{problem}"
 """)
     return prompt | llm | StrOutputParser()
+
 
 
 def create_agent_node(llm, agent_prompt, node_id):
@@ -362,7 +378,7 @@ Your JSON formatted response:
         
         try:
             # The agent is expected to return a JSON string.
-            response_json = json.loads(response_str)
+            response_json = clean_and_parse_json(response_str)
             await log_stream.put(f"SUCCESS: Agent {node_id} finished. Solution snippet: {str(response_json.get('proposed_solution'))[:80]}...")
             # INCREASED VERBOSITY
             await log_stream.put(f"VERBOSE LOG: Full JSON Response from {node_id}:\n---\n{json.dumps(response_json, indent=2)}\n---")
@@ -416,7 +432,7 @@ def create_synthesis_node(llm):
         })
         
         try:
-            final_solution = json.loads(final_solution_str)
+            final_solution = clean_and_parse_json(final_solution_str)
             await log_stream.put(f"SUCCESS: Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
         except json.JSONDecodeError:
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
@@ -522,7 +538,7 @@ def create_update_agent_prompts_node(llm):
                 # Get the agent's old attributes to anchor the update
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
-                    analysis = json.loads(analysis_str)
+                    analysis = clean_and_parse_json(analysis_str)
                 except json.JSONDecodeError:
                     analysis = {"attributes": "", "hard_request": ""} # Fallback
 
@@ -530,7 +546,8 @@ def create_update_agent_prompts_node(llm):
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),   
-                    "critique": critique_for_this_agent 
+                    "critique": critique_for_this_agent ,
+                    "original_problem": state["original_request"],
                 })
                 
                 # Update the prompt in our temporary copy
@@ -632,14 +649,15 @@ async def build_and_run_graph(payload: dict = Body(...)):
             for agent_prompt in prev_layer_prompts:
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
-                    analysis = json.loads(analysis_str)
+                    analysis = clean_and_parse_json(analysis_str)
                 except json.JSONDecodeError:
                     analysis = {"attributes": "", "hard_request": "Solve the original problem."}
                 
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),
-                    "critique": ""
+                    "critique": "",
+                    "original_problem": user_prompt,
                 })
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
