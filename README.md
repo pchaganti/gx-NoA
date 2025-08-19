@@ -14,7 +14,7 @@ This project is an open invitation to explore the frontiers of collective AI, pu
 
 
 
-*   **Dynamic Problem Re-framing:** This is the big one. The network now has a new ability to assess its own progress at the end of an epoch. If it decides it has made a "significant breakthrough," it doesn't just continue to refine the old solution. Instead, it **formulates a new, more advanced problem** that builds upon its success. It essentially gives itself a harder challenge, turning the process from simple refinement into a genuine journey of discovery.
+*   **Dynamic Problem Re-framing:** This is the big one. The network now has a new ability to assess its own progress at the end of an epoch. If it decides it has made a "significant breakthrough," it doesn't just continue to refine the old solution. Instead, it **formulates a new, more advanced problem** that builds upon its success. It essentially gives itself a harder challenge.
 
 *   **Divide and Conquer - Automatic Problem Decomposition:** Instead of every agent in the first layer tackling the same high-level prompt, NoA now starts by breaking down the user's initial problem into smaller, more granular sub-problems. Each agent is assigned a unique piece of the puzzle from the very beginning, ensuring a more focused and diverse approach right out of the gate.
 
