@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NoA | Free Deep Think</title>
+    <!-- ADDED: Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary-color: #0E1117;
@@ -147,13 +149,37 @@
             margin-bottom: 0;
             font-weight: normal;
         }
-        #results-container pre {
+        #results-container pre, #hidden-outputs-container pre {
             background-color: #000;
             padding: 1rem;
             border-radius: var(--border-radius);
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        .header-with-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--secondary-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .header-with-button h2 {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin: 0;
+        }
+        #download-log-button {
+            width: auto;
+            padding: 0.5rem 1rem;
+            margin-bottom: 0;
+            font-size: 0.9rem;
+            background-color: var(--secondary-color);
+        }
+        #download-log-button:hover:not(:disabled) {
+            background-color: #3a3b44;
+        }
+
     </style>
 </head>
 <body>
@@ -213,13 +239,20 @@
             </form>
         </div>
     </div>
+    <!-- NEW: Container for Perplexity Chart -->
+    <div class="container hidden" id="perplexity-chart-container">
+        <h2>Average Perplexity per Epoch</h2>
+        <canvas id="perplexityChart"></canvas>
+    </div>
     <div class="container">
-        <h2>Real-time Graph Activity</h2>
+        <div class="header-with-button">
+            <h2>Real-time Graph Activity</h2>
+            <button id="download-log-button" disabled>Download Full Log</button>
+        </div>
         <div id="log-container"></div>
     </div>
     <div class="container">
         <h2>Graph Visualization</h2>
-        <!-- MODIFIED: Updated placeholder text -->
         <div id="graph-container">
             <p>ASCII graph will be displayed here after the process starts...</p>
         </div>
@@ -228,8 +261,37 @@
         <h2>Final Result</h2>
         <div id="final-solution"></div>
     </div>
+    <!-- NEW: Container for hidden layer outputs -->
+    <div class="container hidden" id="hidden-outputs-container">
+        <h2>Final Epoch Hidden Layer Outputs</h2>
+        <div id="hidden-outputs"></div>
+    </div>
 
 <script>
+    function parseJsonFromDataString(inputString) {
+      // Define the prefix to look for and remove.
+      const prefix = "data: ";
+
+      // Check if the string actually starts with our prefix.
+      if (!inputString.startsWith(prefix)) {
+        console.error("Error: Input string does not have the expected 'data: ' prefix.", inputString);
+        return null;
+      }
+      
+      // Extract the JSON part by slicing the string after the prefix.
+      const jsonString = inputString.slice(prefix.length);
+
+      try {
+        // Use the standard JSON.parse() method to convert the string to an object.
+        const dataObject = JSON.parse(jsonString);
+        return dataObject;
+      } catch (error) {
+        // If JSON.parse() fails, catch the error and log it.
+        console.error("Failed to parse JSON from the extracted string:", error);
+        console.error("Problematic string was:", jsonString);
+        return null; // Return null to indicate failure.
+      }
+    }
     const graphParamsForm = document.getElementById('graph-params-form');
     const runButton = document.getElementById('run-button');
     const logContainer = document.getElementById('log-container');
@@ -239,6 +301,18 @@
     const llmProviderSelect = document.getElementById('llm_provider');
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
+    const downloadLogButton = document.getElementById('download-log-button');
+    const hiddenOutputsContainer = document.getElementById('hidden-outputs-container');
+    const hiddenOutputs = document.getElementById('hidden-outputs');
+    // NEW: Get references to chart elements
+    const perplexityChartContainer = document.getElementById('perplexity-chart-container');
+    const perplexityChartCanvas = document.getElementById('perplexityChart').getContext('2d');
+
+    let fullLogContent = '';
+    let perplexityChart = null; // To hold the chart instance
+    let epochCounter = 0;
+    let allPerplexityValues = [];
+    let allLbelsData = [];
 
     llmProviderSelect.addEventListener('change', (e) => {
         ollamaModelSection.classList.toggle('hidden', e.target.value !== 'Ollama');
@@ -251,12 +325,81 @@
     });
 
     const addLogMessage = (text, options = {}) => {
+        fullLogContent += text + '\n';
         const p = document.createElement('p');
-        if (options.isHTML) p.innerHTML = text;
-        else p.textContent = text;
-        if (options.color) p.style.color = options.color;
-        logContainer.appendChild(p);
+        // Use <pre> for JSON to preserve formatting
+        const container = (text.trim().startsWith('{') && text.trim().endsWith('}')) ? document.createElement('pre') : document.createElement('p');
+
+        if (options.isHTML) container.innerHTML = text;
+        else container.textContent = text;
+        
+        if (options.color) container.style.color = options.color;
+
+        logContainer.appendChild(container);
         logContainer.scrollTop = logContainer.scrollHeight;
+    };
+    
+    const downloadLog = () => {
+        const blob = new Blob([fullLogContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        a.download = `noa-run-log-${timestamp}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    downloadLogButton.addEventListener('click', downloadLog);
+
+    // Function to render the perplexity chart
+    const renderPerplexityChart = () => {
+        if (perplexityChart) {
+            perplexityChart.destroy(); // Destroy old chart before creating a new one
+        }
+
+        const labels =  allLbelsData;
+        
+        // --- IMPORTANT ---
+        // Check your logged data structure and make sure the key here ('average_perplexity')
+        // matches the key in your data. It might be 'perplexity', 'avg_perplexity', etc.
+        const data = allPerplexityValues; 
+
+        perplexityChartContainer.classList.remove('hidden');
+        perplexityChart = new Chart(perplexityChartCanvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Average Agent Perplexity',
+                    data: data,
+                    borderColor: 'rgba(255, 75, 75, 1)',
+                    backgroundColor: 'rgba(255, 75, 75, 0.2)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Perplexity Score'
+                        }
+                    },
+                    x: {
+                         title: {
+                            display: true,
+                            text: 'Epoch'
+                        }
+                    }
+                }
+            }
+        });
     };
 
     graphParamsForm.addEventListener('submit', async (e) => {
@@ -281,11 +424,20 @@
             return;
         }
         runButton.disabled = true;
+        downloadLogButton.disabled = true;
         runButton.textContent = 'Processing...';
         logContainer.innerHTML = ''; 
+        fullLogContent = '';
         graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
         resultsContainer.classList.add('hidden');
         finalSolutionContainer.innerHTML = '';
+        hiddenOutputsContainer.classList.add('hidden');
+        hiddenOutputs.innerHTML = '';
+        // NEW: Hide chart container and reset data on new run
+        perplexityChartContainer.classList.add('hidden');
+        allEpochsPerplexityData = [];
+
+
         addLogMessage('Sending request to build and run graph...');
         try {
             const response = await fetch('/build_and_run_graph', {
@@ -305,6 +457,9 @@
                 return;
             }
             addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+
+          
+
             if (result.final_solution && !result.final_solution.error) {
                 const solution = result.final_solution;
                 finalSolutionContainer.innerHTML = `
@@ -318,32 +473,67 @@
                     addLogMessage(`Error details: ${result.final_solution.error}`, { color: 'orange' });
                  }
             }
+
+            // MODIFIED: Check for and display hidden layer outputs and their prompts
+            if (result.hidden_layer_outputs && Object.keys(result.hidden_layer_outputs).length > 0) {
+                addLogMessage('Displaying hidden layer outputs and final system prompts from the last forward pass.', { color: 'cyan' });
+                const outputs = result.hidden_layer_outputs;
+                let content = '';
+                // Sort keys to display agents in order (e.g., agent_0_0, agent_0_1, etc.)
+                const sortedAgentIds = Object.keys(outputs).sort();
+                for (const agentId of sortedAgentIds) {
+                    const agentData = outputs[agentId]; // This is now an object with 'output' and 'system_prompt'
+                    content += `
+                        <h3>Final System Prompt for ${agentId}</h3>
+                        <pre><code>${agentData.system_prompt || 'N/A'}</code></pre>
+                        <h3>Final Output from ${agentId}</h3>
+                        <pre><code>${JSON.stringify(agentData.output, null, 2)}</code></pre>
+                    `;
+                }
+                hiddenOutputs.innerHTML = content;
+                hiddenOutputsContainer.classList.remove('hidden');
+            }
+
         } catch (error) {
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
         } finally {
             runButton.disabled = false;
+            downloadLogButton.disabled = false;
             runButton.textContent = 'Build and Run Graph';
         }
     });
-
-    function tryParseJson(message) {
-        try {
-            return JSON.parse(message);
-        } catch (e) { return null; }
-    }
 
     const eventSource = new EventSource('/stream_log');
 
     eventSource.onmessage = async function(event) {
         const rawMessage = event.data;
-
-        // --- MODIFIED: Listen for 'graph_ascii' and render in terminal ---
+        addLogMessage(rawMessage);
         if (rawMessage.includes('__start__')) {
-
             addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
             graphContainer.textContent = rawMessage;
             addLogMessage('>>> Graph rendered.', { color: 'lime' });
+        } else if (rawMessage.startsWith('data:')) {
+            // This handles the JSON data specifically
+            if(rawMessage.includes('perplexity') && rawMessage.includes('epoch')) {
+                addLogMessage('>>> Perplexity data received. Updating chart...', { color: 'cyan' });
+                const newPerplexityObject = parseJsonFromDataString(rawMessage);
+                
+                if (newPerplexityObject) {
+                    // *** IMPROVED LOGGING: This will print the actual JSON to the log container ***
+                    addLogMessage(JSON.stringify(newPerplexityObject, null, 2)); 
+
+                    console.log("Received Perplexity Data:", newPerplexityObject);
+
+                    epochCounter++;
+                    allPerplexityValues.push(parseFloat(newPerplexityObject.perplexity));
+                    allLbelsData.push(epochCounter);
+                    console.log(allPerplexityValues);
+                    console.log(allLbelsData);
+                    renderPerplexityChart(); // Render the chart with the full array
+                }
+            }
         } else {
+            // Handle all other plain text log messages
             addLogMessage(rawMessage);
         }
     }; 
