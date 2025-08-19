@@ -112,6 +112,9 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
+        elif "analyze the following text for its perplexity" in prompt:
+            # New case for perplexity heuristic
+            return str(random.uniform(20.0, 80.0))
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
         else: # This is a regular agent node being invoked
@@ -133,6 +136,7 @@ class GraphState(TypedDict):
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
     memory: Annotated[dict, lambda a, b: {**a, **b}] # Node ID -> List of past JSON outputs
     final_solution: dict
+    perplexity_history: List[float] # New: To store perplexity scores per epoch
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -140,7 +144,7 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
 
 Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
 When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
-Think of it as creatively coming up with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
+Think of it as creatively coming with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
 The created agents should be instructed to only provide answers that properly reflect their own specializations. 
 You will balance how much influence the previous agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 .
 You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
@@ -203,6 +207,24 @@ Agent's Past History to Summarize (JSON format):
 ---
 
 Provide a concise, dense summary of the agent's past actions and learnings:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_perplexity_heuristic_chain(llm):
+    """
+    NEW: This chain prompts an LLM to act as a perplexity heuristic.
+    """
+    prompt = ChatPromptTemplate.from_template("""
+You are a language model evaluator. Your task is to analyze the following text for its perplexity.
+Perplexity is a measure of how surprised a model is by a piece of text. A lower perplexity score indicates the text is more predictable, coherent, and well-structured. A higher score means the text is more surprising, complex, or potentially nonsensical.
+
+Analyze the following text and provide a numerical perplexity score between 1 (extremely coherent and predictable) and 100 (highly complex, surprising, or incoherent).
+Output ONLY the numerical score and nothing else.
+
+Text to analyze:
+---
+{text_to_analyze}
+---
 """)
     return prompt | llm | StrOutputParser()
 
@@ -480,6 +502,44 @@ def create_synthesis_node(llm):
         return {"final_solution": final_solution}
     return synthesis_node
 
+def create_metrics_node(llm):
+    """
+    NEW: This node calculates the perplexity heuristic for the epoch's agent outputs.
+    """
+    async def calculate_metrics_node(state: GraphState):
+        await log_stream.put("--- [METRICS PASS] Calculating Perplexity Heuristic ---")
+        
+        all_outputs = state.get("agent_outputs", {})
+        if not all_outputs:
+            await log_stream.put("LOG: No agent outputs to analyze. Skipping perplexity calculation.")
+            return {}
+
+        # Combine all reasoning and solution fields into one block of text
+        combined_text = "\n\n---\n\n".join(
+            f"Agent {agent_id}:\nSolution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
+            for agent_id, output in all_outputs.items()
+        )
+
+        perplexity_chain = get_perplexity_heuristic_chain(llm)
+        
+        try:
+            score_str = await perplexity_chain.ainvoke({"text_to_analyze": combined_text})
+            # Clean up the score string and convert to float
+            score = float(re.sub(r'[^\d.]', '', score_str))
+            await log_stream.put(f"SUCCESS: Calculated perplexity heuristic for Epoch {state['epoch']}: {score}")
+        except (ValueError, TypeError) as e:
+            score = 100.0  # Default to max perplexity on error
+            await log_stream.put(f"ERROR: Could not parse perplexity score. Defaulting to 100. Raw output: '{score_str}'. Error: {e}")
+
+        # Send metric to the frontend via the log stream
+        metric_payload = json.dumps({"epoch": state['epoch'], "perplexity": score})
+        await log_stream.put(f"{metric_payload}")
+
+        # Update the history in the state
+        new_history = state.get("perplexity_history", []) + [score]
+        return {"perplexity_history": new_history}
+
+    return calculate_metrics_node
 
 
 def create_critique_node(llm):
@@ -731,6 +791,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
+        workflow.add_node("metrics", create_metrics_node(llm)) # New Node
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
 
@@ -777,14 +838,17 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 return "package_results"
         
         workflow.add_conditional_edges(
-            "synthesis",
+            "metrics", # MODIFIED: Origin node is now 'metrics'
             should_critique,
             {
                 "perform_critique": "critique",
                 "package_results": "package_results"
             }
         )
-        await log_stream.put("CONNECT: synthesis -> should_critique (conditional)")
+        await log_stream.put("CONNECT: metrics -> should_critique (conditional)")
+
+        workflow.add_edge("synthesis", "metrics") # New Connection
+        await log_stream.put("CONNECT: synthesis -> metrics")
 
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
@@ -807,7 +871,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "layers": [], "critiques": {}, "epoch": 0,
             "max_epochs": int(params["num_epochs"]),
             "params": params, "all_layers_prompts": all_layers_prompts,
-            "agent_outputs": {}, "memory": {}, "final_solution": None
+            "agent_outputs": {}, "memory": {}, "final_solution": None,
+            "perplexity_history": [] # New: Initialize history
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
