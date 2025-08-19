@@ -487,7 +487,7 @@ def create_critique_node(llm):
 
                     tasks.append(get_individual_critique(agent_id, agent_output))
         
-        await asyncio.gather(*tasks)
+        await asyncio.gather(tasks)
 
         return {"critiques": critiques}
     return critique_node
@@ -563,7 +563,7 @@ def create_update_agent_prompts_node(llm):
                 await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
         
         new_epoch = state["epoch"]
-        await log_stream.put(f"--- Epoch {state['epoch']+1} Finished. Starting Epoch {new_epoch + 2} ---")
+        await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch + 1} ---")
 
         # Reset agent outputs and critiques for the new epoch
         return {
@@ -606,7 +606,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 api_key = os.getenv("GEMINI_API_KEY")
                 if not api_key:
                     raise ValueError("GEMINI_API_KEY not found in environment variables.")
-                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
+                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
         error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly."
@@ -673,10 +673,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
         # --- Graph Definition ---
         workflow = StateGraph(GraphState)
 
-        # Gateway node that increments the epoch and fans out
+        # Gateway node that increments the epoch
         def epoch_gateway(state: GraphState):
             new_epoch = state.get("epoch", 0) + 1
-            return {"epoch": new_epoch}
+            state['epoch'] = new_epoch
+            # Clear outputs from previous epoch before starting the new forward pass
+            state['agent_outputs'] = {}
+            return state
             
         workflow.add_node("epoch_gateway", epoch_gateway)
 
@@ -688,6 +691,14 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_node("synthesis", create_synthesis_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
+
+        # Add a final node to capture the state before ending
+        def package_final_state(state: GraphState):
+            """This node is a clean exit point. It captures the state from the final
+            forward pass before the graph terminates."""
+            return state
+        workflow.add_node("package_results", package_final_state)
+
 
         # --- Graph Connections ---
         await log_stream.put("--- Connecting Graph Nodes ---")
@@ -714,34 +725,40 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        workflow.add_edge("synthesis", "critique")
-        await log_stream.put("CONNECT: synthesis -> critique")
-        workflow.add_edge("critique", "update_prompts")
-        await log_stream.put("CONNECT: critique -> update_prompts")
-        
-        async def should_continue(state: GraphState):
-            if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put("LOG: Max epochs reached. Ending execution.")
-                return END
-            await log_stream.put(f"LOG: Epoch {state['epoch']} of {state['max_epochs']} complete. Continuing to next epoch.")
-            return "continue_epoch"
+        # MODIFIED: Conditional logic to go to a final packaging step instead of END
+        async def should_critique(state: GraphState):
+            if state["epoch"] < state["max_epochs"]:
+                await log_stream.put(f"LOG: Epoch {state['epoch']} of {state['max_epochs']} complete. Proceeding to reflection/critique pass.")
+                return "perform_critique"
+            else:
+                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Capturing final state and ending execution.")
+                return "package_results"
         
         workflow.add_conditional_edges(
-            "update_prompts",
-            should_continue,
+            "synthesis",
+            should_critique,
             {
-                "continue_epoch": "epoch_gateway",
-                END: END
+                "perform_critique": "critique",
+                "package_results": "package_results"
             }
         )
-        await log_stream.put("LOG: Conditional edge set: update_prompts will loop to epoch_gateway or end.")
+        await log_stream.put("CONNECT: synthesis -> should_critique (conditional)")
+
+        workflow.add_edge("critique", "update_prompts")
+        await log_stream.put("CONNECT: critique -> update_prompts")
+
+        workflow.add_edge("update_prompts", "epoch_gateway")
+        await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
+
+        workflow.add_edge("package_results", END)
+        await log_stream.put("CONNECT: package_results -> END")
         
         # --- Graph Execution ---
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
         ascii_art = graph.get_graph().draw_ascii()
-        await log_stream.put(ascii_art)
+        await log_stream.put(f"{ascii_art}")
 
         initial_state = {
             "original_request": user_prompt,
@@ -754,7 +771,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
         final_state = None
 
-        async for output in graph.astream(initial_state, {'recursion_limit': 1000}):
+        async for output in graph.astream(initial_state, {'recursion_limit': int(params["num_epochs"]) * 1000}):
             for key, value in output.items():
                 await log_stream.put(f"--- Node Finished Processing: {key} ---")
             final_state = output
@@ -764,9 +781,31 @@ async def build_and_run_graph(payload: dict = Body(...)):
         
         final_solution = final_state_value.get("final_solution", {"error": "No final solution found in the final state."})
 
+        # MODIFIED: Package hidden layer outputs with their final system prompts
+        hidden_layer_outputs = {}
+        final_prompts = final_state_value.get("all_layers_prompts", [])
+
+        if "agent_outputs" in final_state_value and final_prompts:
+            for agent_id, output in final_state_value["agent_outputs"].items():
+                try:
+                    parts = agent_id.split('_')
+                    layer_index = int(parts[1])
+                    agent_index_in_layer = int(parts[2])
+
+                    # The last layer's output goes into synthesis, so we only show the ones before it.
+                    if layer_index < (cot_trace_depth - 1):
+                        system_prompt = final_prompts[layer_index][agent_index_in_layer]
+                        hidden_layer_outputs[agent_id] = {
+                            "output": output,
+                            "system_prompt": system_prompt
+                        }
+                except (IndexError, ValueError) as e:
+                    await log_stream.put(f"WARNING: Could not process hidden output for {agent_id}. Error: {e}")
+
         return JSONResponse(content={
             "message": "Graph execution complete.", 
             "final_solution": final_solution,
+            "hidden_layer_outputs": hidden_layer_outputs
         })
 
     except Exception as e:

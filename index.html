@@ -147,7 +147,7 @@
             margin-bottom: 0;
             font-weight: normal;
         }
-        #results-container pre {
+        #results-container pre, #hidden-outputs-container pre {
             background-color: #000;
             padding: 1rem;
             border-radius: var(--border-radius);
@@ -246,7 +246,6 @@
     </div>
     <div class="container">
         <h2>Graph Visualization</h2>
-        <!-- MODIFIED: Updated placeholder text -->
         <div id="graph-container">
             <p>ASCII graph will be displayed here after the process starts...</p>
         </div>
@@ -254,6 +253,11 @@
     <div class="container hidden" id="results-container">
         <h2>Final Result</h2>
         <div id="final-solution"></div>
+    </div>
+    <!-- NEW: Container for hidden layer outputs -->
+    <div class="container hidden" id="hidden-outputs-container">
+        <h2>Final Epoch Hidden Layer Outputs</h2>
+        <div id="hidden-outputs"></div>
     </div>
 
 <script>
@@ -267,6 +271,10 @@
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
     const downloadLogButton = document.getElementById('download-log-button');
+    // NEW: Get references to new elements
+    const hiddenOutputsContainer = document.getElementById('hidden-outputs-container');
+    const hiddenOutputs = document.getElementById('hidden-outputs');
+
 
     let fullLogContent = '';
 
@@ -334,6 +342,10 @@
         graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
         resultsContainer.classList.add('hidden');
         finalSolutionContainer.innerHTML = '';
+        // NEW: Hide and clear hidden outputs container on new run
+        hiddenOutputsContainer.classList.add('hidden');
+        hiddenOutputs.innerHTML = '';
+
         addLogMessage('Sending request to build and run graph...');
         try {
             const response = await fetch('/build_and_run_graph', {
@@ -366,6 +378,27 @@
                     addLogMessage(`Error details: ${result.final_solution.error}`, { color: 'orange' });
                  }
             }
+
+            // MODIFIED: Check for and display hidden layer outputs and their prompts
+            if (result.hidden_layer_outputs && Object.keys(result.hidden_layer_outputs).length > 0) {
+                addLogMessage('Displaying hidden layer outputs and final system prompts from the last forward pass.', { color: 'cyan' });
+                const outputs = result.hidden_layer_outputs;
+                let content = '';
+                // Sort keys to display agents in order (e.g., agent_0_0, agent_0_1, etc.)
+                const sortedAgentIds = Object.keys(outputs).sort();
+                for (const agentId of sortedAgentIds) {
+                    const agentData = outputs[agentId]; // This is now an object with 'output' and 'system_prompt'
+                    content += `
+                        <h3>Final System Prompt for ${agentId}</h3>
+                        <pre><code>${agentData.system_prompt || 'N/A'}</code></pre>
+                        <h3>Final Output from ${agentId}</h3>
+                        <pre><code>${JSON.stringify(agentData.output, null, 2)}</code></pre>
+                    `;
+                }
+                hiddenOutputs.innerHTML = content;
+                hiddenOutputsContainer.classList.remove('hidden');
+            }
+
         } catch (error) {
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
         } finally {
@@ -381,14 +414,9 @@
 
         const rawMessage = event.data;
         if (rawMessage.includes('__start__')) {
-             try {
-                
-                addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
-                graphContainer.textContent = rawMessage;
-                addLogMessage('>>> Graph rendered.', { color: 'lime' });
-            } catch (e) {
-                 addLogMessage(rawMessage);
-            }
+            addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
+            graphContainer.textContent = rawMessage;
+            addLogMessage('>>> Graph rendered.', { color: 'lime' });
         } else {
             addLogMessage(rawMessage);
         }
