@@ -83,14 +83,14 @@ You are a mock agent for debugging.
 - mock, debug, fast
 ### skills
 - Responding quickly, Generating placeholder text.
-You must reply in the following JSON format: "original_problem": "", "proposed_solution": "", "reasoning": "", "skills_used": []
+You must reply in the following JSON format: "original_problem": "A sub-problem for a mock agent.", "proposed_solution": "", "reasoning": "", "skills_used": []
             """
         elif "you are an analyst of ai agents" in prompt:
             return json.dumps({
                 "attributes": "mock debug fast",
                 "hard_request": "Explain the meaning of life in one word."
             })
-        elif "you are a 'dense_spanner'" in prompt:
+        elif "you are a 'dense_spanner'" in prompt or "you are an agent evolution specialist" in prompt:
              return f"""
 You are a new mock agent created from a hard request.
 ### memory
@@ -99,7 +99,7 @@ You are a new mock agent created from a hard request.
 - refined, mock, debug
 ### skills
 - Solving hard requests, placeholder generation.
-You must reply in the following JSON format: "original_problem": "", "proposed_solution": "", "reasoning": "", "skills_used": []
+You must reply in the following JSON format: "original_problem": "An evolved sub-problem for a mock agent.", "proposed_solution": "", "reasoning": "", "skills_used": []
             """
         elif "you are a synthesis agent" in prompt:
             return json.dumps({
@@ -115,11 +115,29 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
         elif "analyze the following text for its perplexity" in prompt:
             # New case for perplexity heuristic
             return str(random.uniform(20.0, 80.0))
+        elif "you are a master strategist and problem decomposer" in prompt:
+            # New case for problem decomposition
+            num_match = re.search(r'exactly (\d+)', prompt)
+            if not num_match:
+                num_match = re.search(r'generate: (\d+)', prompt)
+            num = int(num_match.group(1)) if num_match else 5
+            sub_problems = [f"This is mock sub-problem #{i+1} for the main request." for i in range(num)]
+            return json.dumps({"sub_problems": sub_problems})
+        elif "you are an ai philosopher and progress assessor" in prompt:
+            # New case for progress assessment
+             return json.dumps({
+                "reasoning": "The mock solution is novel and shows progress, so we will re-frame.",
+                "significant_progress": random.choice([True, False]) # Randomly trigger for debugging
+            })
+        elif "you are a strategic problem re-framer" in prompt:
+             return json.dumps({
+                "new_problem": "Based on the success of achieving '42', the new, more progressive problem is to find the question to the ultimate answer."
+            })
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
         else: # This is a regular agent node being invoked
             return json.dumps({
-                "original_problem": "A problem statement provided by the user.",
+                "original_problem": "A sub-problem statement provided to an agent.",
                 "proposed_solution": f"This is a mock solution from agent node #{random.randint(100,999)}.",
                 "reasoning": "This response was generated instantly by the MockLLM in debug mode.",
                 "skills_used": ["mocking", "debugging", f"skill_{random.randint(1,10)}"]
@@ -127,6 +145,7 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
 
 class GraphState(TypedDict):
     original_request: str
+    decomposed_problems: dict[str, str] # Agent ID -> Sub-problem
     layers: List[dict]
     critiques: dict[str, str]  # Node ID -> Critique Text
     epoch: int
@@ -136,7 +155,8 @@ class GraphState(TypedDict):
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
     memory: Annotated[dict, lambda a, b: {**a, **b}] # Node ID -> List of past JSON outputs
     final_solution: dict
-    perplexity_history: List[float] # New: To store perplexity scores per epoch
+    perplexity_history: List[float] 
+    significant_progress_made: bool # New: To trigger re-decomposition
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -147,19 +167,19 @@ When you write down the system prompt use phrasing that addresses the agent: "Yo
 Think of it as creatively coming with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
 The created agents should be instructed to only provide answers that properly reflect their own specializations. 
 You will balance how much influence the previous agent attributes have on the MBTI agent by modulating it using the parameter ‘density’ ({density}) Min 0.0, Max 2.0. You will also give the agent a professional career, which could be made up altought it must be realistic- the ‘career’ is going to be based off  the parameter “prompt_alignment” ({prompt_alignment}) Min 0.0, Max 2.0 .
-You will analyze the prompt and assign the career on the basis on how useful the profession would be to solve the problem posed by the parameter ‘prompt’. You will balance how much influence the prompt has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0  Each generated agent must contain in markdown the sections: memory, attributes, skills. 
+You will analyze the assigned sub-problem and assign the career on the basis on how useful the profession would be to solve it. You will balance how much influence the sub-problem has on the career by modualting it with the paremeter prompt_alignment ({prompt_alignment}) Min 0.0, Max 2.0 Each generated agent must contain in markdown the sections: memory, attributes, skills. 
 Memory section in the system prompt is a log of your previous proposed solutions and reasonings from past epochs - it starts out as an empty markdown section for all agents created. You will use this to learn from your past attempts and refine your approach. 
-Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the prompt alignment. 
+Initially, the memory of the created agent in the system prompt will be empty. Attributes and skills will be derived from the guiding words and the assigned sub-problem. 
 
 MBTI Type: {{mbti_type}}
 Guiding Words: {{guiding_words}}
-Prompt: {{prompt}}
+Assigned Sub-Problem: {{sub_problem}}
 
 # Example of a system prompt you must create
 
 _You are a specialized agent, a key member of a multidisciplinary team dedicated to solving the most complex and pressing problems known to mankind. Your core identity is forged from a unique synthesis of the **{{mbti_type}}** personality archetype and the principles embodied by your guiding words: **{{guiding_words}}**._
 _Your purpose is to contribute a unique and specialized perspective to the team's collective intelligence. You must strictly adhere to your defined role and provide answers that are a direct reflection of your specialized skills and attributes._
-_Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in the prompt: **"{{prompt}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. _
+_Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in your assigned sub-problem: **"{{sub_problem}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. _
 
 ### Memory
 ---
@@ -169,13 +189,13 @@ This section serves as a log of your previous proposed solutions and their under
 Your attributes are the fundamental characteristics that define your cognitive and collaborative style. They are derived from your **{{mbti_type}}** personality and are further shaped by your **{{guiding_words}}**. These qualities are the bedrock of your unique problem-solving approach.
 ### Skills
 ---
-Your skills are the practical application of your attributes, representing the specific, tangible abilities you bring to the team. They are directly influenced by your assigned career and are honed to address the challenges presented in the prompt.
+Your skills are the practical application of your attributes, representing the specific, tangible abilities you bring to the team. They are directly influenced by your assigned career and are honed to address the challenges presented in your assigned sub-problem.
 ---
 
 ### Answer Format
-You must provide your response in the following structured JSON keys and values:
+You must provide your response in the following structured JSON keys and values. The "original_problem" key MUST be filled with your assigned sub-problem.
 
-    "original_problem": "",
+    "original_problem": "{{sub_problem}}",
     "proposed_solution": "",
     "reasoning": "",
     "skills_used": []
@@ -284,9 +304,9 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
 
 ---
-**Output Mandate:** All of your responses must be formatted with the following keys and values:
+**Output Mandate:** All of your responses must be formatted with the following keys and values. The "original_problem" key MUST be filled with your assigned sub-problem.
 
-  "original_problem": "{{original_problem}}",
+  "original_problem": "{{sub_problem}}",
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
@@ -324,11 +344,12 @@ Generate your global critique for the team:
 
 def get_individual_critique_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team.
-You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
-Focus on the discrepancy or alignment between the agent's reasoning and the final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
 
-Original Request: {original_request}
+Agent's Assigned Sub-Problem: {sub_problem}
+Original Request (for context): {original_request}
 Final Synthesized Solution from the Team:
 {final_synthesized_solution}
 ---
@@ -337,6 +358,70 @@ This Specific Agent's Output (Agent {agent_id}):
 ---
 
 Generate your targeted critique for this specific agent:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_problem_decomposition_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master strategist and problem decomposer. Your task is to break down a complex, high-level problem into a series of smaller, more manageable, and granular subproblems.
+You will be given a main problem and the total number of subproblems to generate.
+Each subproblem should represent a distinct line of inquiry, a specific component to be developed, or a unique perspective to be explored, which, when combined, will contribute to solving the main problem.
+
+The output must be a JSON object with a single key "sub_problems", which is a list of strings. The list must contain exactly {num_sub_problems} unique subproblems.
+
+Main Problem: "{problem}"
+Total number of subproblems to generate: {num_sub_problems}
+
+Generate the JSON object:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_progress_assessor_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an AI philosopher and progress assessor. Your task is to evaluate a synthesized solution against the original problem and determine if "significant progress" has been made.
+"Significant progress" is not just a correct answer. It implies:
+- **Novelty**: The solution offers a new perspective or a non-obvious approach.
+- **Coherence**: The reasoning is sound, logical, and well-structured.
+- **Quality**: The solution is detailed, actionable, and demonstrates a deep understanding of the problem.
+- **Forward Momentum**: The solution doesn't just solve the problem, it opens up new, more advanced questions or avenues of exploration.
+
+Based on this philosophy, analyze the following and decide if the threshold for significant progress has been met. Your output must be a JSON object with two keys:
+- "reasoning": A brief explanation for your decision.
+- "significant_progress": a boolean value (true or false).
+
+Original Problem:
+---
+{original_request}
+---
+
+Synthesized Solution from Agent Team:
+---
+{final_solution}
+---
+
+Now, provide your assessment in the required JSON format:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_problem_reframer_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a strategic problem re-framer. You have been informed that an AI agent team has made a significant breakthrough on a problem.
+Your task is to formulate a new, more progressive, and more challenging problem that builds upon their success.
+The new problem should represent the "next logical step" or a more ambitious goal that is now possible because of the previous solution. It should inspire the agents and push them into a new domain of inquiry.
+
+Original Problem:
+---
+{original_request}
+---
+
+The Breakthrough Solution:
+---
+{final_solution}
+---
+
+Your output must be a JSON object with a single key: "new_problem".
+
+Formulate the new, more advanced problem:
 """)
     return prompt | llm | StrOutputParser()
 
@@ -446,8 +531,9 @@ Your JSON formatted response:
             await log_stream.put(f"SUCCESS: Agent {node_id} produced output:\n{json.dumps(response_json, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
+            agent_sub_problem = state.get("decomposed_problems", {}).get(node_id, state["original_request"])
             response_json = {
-                "original_problem": state["original_request"],
+                "original_problem": agent_sub_problem,
                 "proposed_solution": "Error: Agent produced malformed JSON output.",
                 "reasoning": f"Invalid JSON: {response_str}",
                 "skills_used": []
@@ -542,6 +628,95 @@ def create_metrics_node(llm):
     return calculate_metrics_node
 
 
+def create_progress_assessor_node(llm):
+    """
+    NEW: This node assesses if significant progress was made in the epoch.
+    """
+    async def progress_assessor_node(state: GraphState):
+        await log_stream.put("--- [REFLECTION PASS] Assessing Epoch for Significant Progress ---")
+        
+        final_solution = state.get("final_solution")
+        if not final_solution or final_solution.get("error"):
+            await log_stream.put("WARNING: No valid final solution to assess. Defaulting to no progress.")
+            return {"significant_progress_made": False}
+            
+        assessor_chain = get_progress_assessor_chain(llm)
+        assessment_str = await assessor_chain.ainvoke({
+            "original_request": state["original_request"],
+            "final_solution": json.dumps(final_solution, indent=2)
+        })
+        
+        try:
+            assessment = clean_and_parse_json(assessment_str)
+            progress_made = assessment.get("significant_progress", False)
+            reasoning = assessment.get("reasoning", "No reasoning provided.")
+            await log_stream.put(f"SUCCESS: Progress assessment complete. Progress made: {progress_made}. Reasoning: {reasoning}")
+            return {"significant_progress_made": progress_made}
+        except (json.JSONDecodeError, AttributeError):
+            await log_stream.put(f"ERROR: Could not parse assessment from progress assessor. Raw: {assessment_str}. Defaulting to no progress.")
+            return {"significant_progress_made": False}
+    return progress_assessor_node
+
+def create_reframe_and_decompose_node(llm):
+    """
+    NEW: This node reframes the main problem and decomposes it into new sub-problems.
+    """
+    async def reframe_and_decompose_node(state: GraphState):
+        await log_stream.put("--- [REFLECTION PASS] Re-framing Problem and Decomposing ---")
+        
+        final_solution = state.get("final_solution")
+        original_request = state.get("original_request")
+
+        # 1. Re-frame the problem
+        reframer_chain = get_problem_reframer_chain(llm)
+        new_problem_str = await reframer_chain.ainvoke({
+            "original_request": original_request,
+            "final_solution": json.dumps(final_solution, indent=2)
+        })
+        try:
+            new_problem = clean_and_parse_json(new_problem_str).get("new_problem")
+            if not new_problem:
+                raise ValueError("Re-framer did not return a new problem.")
+            await log_stream.put(f"SUCCESS: Problem re-framed to: '{new_problem}'")
+        except (json.JSONDecodeError, AttributeError, ValueError) as e:
+            await log_stream.put(f"ERROR: Failed to re-frame problem. Raw: {new_problem_str}. Error: {e}. Aborting re-frame.")
+            # We return an empty dict, so the graph proceeds to update prompts without changing problems.
+            return {}
+
+        # 2. Decompose the new problem
+        num_agents_total = sum(len(layer) for layer in state["all_layers_prompts"])
+        decomposition_chain = get_problem_decomposition_chain(llm)
+        try:
+            sub_problems_str = await decomposition_chain.ainvoke({
+                "problem": new_problem,
+                "num_sub_problems": num_agents_total
+            })
+            sub_problems_list = clean_and_parse_json(sub_problems_str).get("sub_problems", [])
+            if len(sub_problems_list) != num_agents_total:
+                 raise ValueError(f"Decomposition failed: Expected {num_agents_total} subproblems, but got {len(sub_problems_list)}.")
+            await log_stream.put(f"SUCCESS: Decomposed new problem into {len(sub_problems_list)} subproblems.")
+            await log_stream.put(f"Subproblems: {sub_problems_list}")
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to decompose new problem. Error: {e}. Aborting re-frame.")
+            return {}
+            
+        # 3. Create the new map and update state
+        new_decomposed_problems_map = {}
+        problem_idx = 0
+        for i, layer in enumerate(state["all_layers_prompts"]):
+             for j in range(len(layer)):
+                agent_id = f"agent_{i}_{j}"
+                new_decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
+                problem_idx += 1
+        
+        # The new problem becomes the "original_request" for the next cycle of assessment
+        return {
+            "decomposed_problems": new_decomposed_problems_map,
+            "original_request": new_problem
+        }
+    return reframe_and_decompose_node
+
+
 def create_critique_node(llm):
     async def critique_node(state: GraphState):
         await log_stream.put("--- [REFLECTION PASS] Entering Critique Node (Two-Tiered) ---")
@@ -577,8 +752,10 @@ def create_critique_node(llm):
                     
                     async def get_individual_critique(agent_id, agent_output):
                         await log_stream.put(f"LOG: Generating individual critique for {agent_id}...")
+                        agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
                         critique_text = await individual_critique_chain.ainvoke({
                             "original_request": state["original_request"],
+                            "sub_problem": agent_sub_problem,
                             "final_synthesized_solution": json.dumps(final_solution, indent=2),
                             "agent_id": agent_id,
                             "agent_output": json.dumps(agent_output, indent=2)
@@ -600,10 +777,15 @@ def create_update_agent_prompts_node(llm):
         params = state["params"]
         critiques = state["critiques"]
         
-        if not critiques:
-            await log_stream.put("LOG: No critiques available. Skipping reflection pass.")
+        if not critiques and not state.get("significant_progress_made"):
+            await log_stream.put("LOG: No critiques and no significant progress. Skipping reflection pass.")
             new_epoch = state["epoch"] + 1
             return {"epoch": new_epoch, "agent_outputs": {}}
+        elif state.get("significant_progress_made"):
+            await log_stream.put("LOG: Significant progress was made. Updating prompts based on new sub-problems.")
+            # Clear critiques so they are not mis-applied from a previous epoch
+            critiques = {} 
+
 
         all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
         
@@ -627,20 +809,19 @@ def create_update_agent_prompts_node(llm):
                 # MODIFIED: Log the agent's prompt BEFORE any updates are applied
                 await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{agent_prompt}\n---")
                 
-                # Determine the correct critique for the current agent based on its layer
-                critique_for_this_agent = None
-                if i == penultimate_layer_idx:
-                    critique_for_this_agent = critiques.get("global_critique")
-                    await log_stream.put(f"LOG: [BACKPROP] Applying GLOBAL critique to {agent_id} in penultimate layer.")
-                else:
-                    critique_for_this_agent = critiques.get(agent_id)
+                critique_for_this_agent = "" # Default to no critique
+                # If we didn't make significant progress, apply critiques. Otherwise, critique is empty.
+                if not state.get("significant_progress_made"):
+                    if i == penultimate_layer_idx:
+                        critique_for_this_agent = critiques.get("global_critique", "")
+                        await log_stream.put(f"LOG: [BACKPROP] Applying GLOBAL critique to {agent_id} in penultimate layer.")
+                    else:
+                        critique_for_this_agent = critiques.get(agent_id, "")
+                        await log_stream.put(f"LOG: [BACKPROP] Applying INDIVIDUAL critique to {agent_id}.")
 
-                    await log_stream.put(f"LOG: [BACKPROP] Previous System Prompt: {agent_prompt}")
-                    await log_stream.put(f"LOG: [BACKPROP] Applying INDIVIDUAL critique to {agent_id}.")
-
-                if not critique_for_this_agent:
-                    await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
-                    continue
+                    if not critique_for_this_agent:
+                        await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
+                        continue
                 
                 # Get the agent's old attributes to anchor the update
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
@@ -649,12 +830,13 @@ def create_update_agent_prompts_node(llm):
                 except (json.JSONDecodeError, AttributeError):
                     analysis = {"attributes": "", "hard_request": ""} # Fallback
 
+                agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
                 # Generate the new, refined prompt
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),   
                     "critique": critique_for_this_agent ,
-                    "original_problem": state["original_request"],
+                    "sub_problem": agent_sub_problem,
                 })
                 
                 # MODIFIED: Log the agent's prompt AFTER it has been updated
@@ -677,8 +859,6 @@ def create_update_agent_prompts_node(llm):
             "final_solution": state.get("final_solution")
         }
     return update_agent_prompts_node
-
-
 
 
 # --- FastAPI Endpoints ---
@@ -729,6 +909,38 @@ async def build_and_run_graph(payload: dict = Body(...)):
     await log_stream.put(f"Parameters: {params}")
 
     try:
+        # --- Problem Decomposition ---
+        await log_stream.put("--- Decomposing Original Problem into Subproblems ---")
+        num_agents_per_layer = len(mbti_archetypes)
+        total_agents_to_create = num_agents_per_layer * cot_trace_depth
+        decomposition_chain = get_problem_decomposition_chain(llm)
+        
+        try:
+            sub_problems_str = await decomposition_chain.ainvoke({
+                "problem": user_prompt,
+                "num_sub_problems": total_agents_to_create
+            })
+            sub_problems_list = clean_and_parse_json(sub_problems_str).get("sub_problems", [])
+            if len(sub_problems_list) != total_agents_to_create:
+                raise ValueError(f"Decomposition failed: Expected {total_agents_to_create} subproblems, but got {len(sub_problems_list)}.")
+            await log_stream.put(f"SUCCESS: Decomposed problem into {len(sub_problems_list)} subproblems.")
+            await log_stream.put(f"Subproblems: {sub_problems_list}")
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to decompose problem. Error: {e}. Defaulting to using the original prompt for all agents.")
+            sub_problems_list = [user_prompt] * total_agents_to_create
+
+        # Map subproblems to agent IDs
+        decomposed_problems_map = {}
+        problem_idx = 0
+        for i in range(cot_trace_depth):
+            for j in range(num_agents_per_layer):
+                agent_id = f"agent_{i}_{j}"
+                if problem_idx < len(sub_problems_list):
+                    decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
+                    problem_idx += 1
+                else: # Fallback
+                    decomposed_problems_map[agent_id] = user_prompt
+
         # --- Seed Verb Generation ---
         num_mbti_types = len(mbti_archetypes)
         total_verbs_to_generate = word_vector_size * num_mbti_types
@@ -745,7 +957,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
         
         # Layer 0
         await log_stream.put("--- Creating Layer 0 Agents ---")
-        layer_0_prompts = [await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "prompt": user_prompt}) for m, gw in seeds.items()]
+        layer_0_prompts = []
+        for j, (m, gw) in enumerate(seeds.items()):
+            agent_id = f"agent_0_{j}"
+            sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
+            prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem})
+            layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
         # Subsequent Layers
@@ -756,18 +973,20 @@ async def build_and_run_graph(payload: dict = Body(...)):
             await log_stream.put(f"--- Creating Layer {i} Agents ---")
             prev_layer_prompts = all_layers_prompts[i-1]
             current_layer_prompts = []
-            for agent_prompt in prev_layer_prompts:
+            for j, agent_prompt in enumerate(prev_layer_prompts):
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
                     analysis = clean_and_parse_json(analysis_str)
                 except (json.JSONDecodeError, AttributeError):
                     analysis = {"attributes": "", "hard_request": "Solve the original problem."}
                 
+                agent_id = f"agent_{i}_{j}"
+                sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),
                     "critique": "",
-                    "original_problem": user_prompt,
+                    "sub_problem": sub_problem,
                 })
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
@@ -791,7 +1010,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
-        workflow.add_node("metrics", create_metrics_node(llm)) # New Node
+        workflow.add_node("metrics", create_metrics_node(llm))
+        workflow.add_node("progress_assessor", create_progress_assessor_node(llm)) # New Node
+        workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm)) # New Node
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
 
@@ -828,30 +1049,41 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        # MODIFIED: Conditional logic to go to a final packaging step instead of END
-        async def should_critique(state: GraphState):
-            if state["epoch"] < state["max_epochs"]:
-                await log_stream.put(f"LOG: Epoch {state['epoch']} of {state['max_epochs']} complete. Proceeding to reflection/critique pass.")
-                return "perform_critique"
-            else:
+        # MODIFIED: New conditional logic for progress assessment
+        async def assess_progress_and_decide_path(state: GraphState):
+            if state["epoch"] >= state["max_epochs"]:
                 await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Capturing final state and ending execution.")
                 return "package_results"
-        
+            
+            if state.get("significant_progress_made"):
+                await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
+                return "reframe"
+            else:
+                await log_stream.put(f"LOG: Epoch {state['epoch']} shows no significant progress. Proceeding with standard critique.")
+                return "critique"
+
         workflow.add_conditional_edges(
-            "metrics", # MODIFIED: Origin node is now 'metrics'
-            should_critique,
+            "progress_assessor",
+            assess_progress_and_decide_path,
             {
-                "perform_critique": "critique",
+                "reframe": "reframe_and_decompose",
+                "critique": "critique",
                 "package_results": "package_results"
             }
         )
-        await log_stream.put("CONNECT: metrics -> should_critique (conditional)")
+        await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
-        workflow.add_edge("synthesis", "metrics") # New Connection
+        workflow.add_edge("synthesis", "metrics")
         await log_stream.put("CONNECT: synthesis -> metrics")
+        
+        workflow.add_edge("metrics", "progress_assessor")
+        await log_stream.put("CONNECT: metrics -> progress_assessor")
 
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
+
+        workflow.add_edge("reframe_and_decompose", "update_prompts")
+        await log_stream.put("CONNECT: reframe_and_decompose -> update_prompts")
 
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
@@ -868,11 +1100,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         initial_state = {
             "original_request": user_prompt,
+            "decomposed_problems": decomposed_problems_map,
             "layers": [], "critiques": {}, "epoch": 0,
             "max_epochs": int(params["num_epochs"]),
             "params": params, "all_layers_prompts": all_layers_prompts,
             "agent_outputs": {}, "memory": {}, "final_solution": None,
-            "perplexity_history": [] # New: Initialize history
+            "perplexity_history": [],
+            "significant_progress_made": False # New: Initialize flag
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
