@@ -154,6 +154,30 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        .header-with-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--secondary-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .header-with-button h2 {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin: 0;
+        }
+        #download-log-button {
+            width: auto;
+            padding: 0.5rem 1rem;
+            margin-bottom: 0;
+            font-size: 0.9rem;
+            background-color: var(--secondary-color);
+        }
+        #download-log-button:hover:not(:disabled) {
+            background-color: #3a3b44;
+        }
+
     </style>
 </head>
 <body>
@@ -214,7 +238,10 @@
         </div>
     </div>
     <div class="container">
-        <h2>Real-time Graph Activity</h2>
+        <div class="header-with-button">
+            <h2>Real-time Graph Activity</h2>
+            <button id="download-log-button" disabled>Download Full Log</button>
+        </div>
         <div id="log-container"></div>
     </div>
     <div class="container">
@@ -239,6 +266,9 @@
     const llmProviderSelect = document.getElementById('llm_provider');
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
+    const downloadLogButton = document.getElementById('download-log-button');
+
+    let fullLogContent = '';
 
     llmProviderSelect.addEventListener('change', (e) => {
         ollamaModelSection.classList.toggle('hidden', e.target.value !== 'Ollama');
@@ -251,6 +281,7 @@
     });
 
     const addLogMessage = (text, options = {}) => {
+        fullLogContent += text + '\n';
         const p = document.createElement('p');
         if (options.isHTML) p.innerHTML = text;
         else p.textContent = text;
@@ -258,6 +289,21 @@
         logContainer.appendChild(p);
         logContainer.scrollTop = logContainer.scrollHeight;
     };
+    
+    const downloadLog = () => {
+        const blob = new Blob([fullLogContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        a.download = `noa-run-log-${timestamp}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    downloadLogButton.addEventListener('click', downloadLog);
 
     graphParamsForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -281,8 +327,10 @@
             return;
         }
         runButton.disabled = true;
+        downloadLogButton.disabled = true;
         runButton.textContent = 'Processing...';
         logContainer.innerHTML = ''; 
+        fullLogContent = '';
         graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
         resultsContainer.classList.add('hidden');
         finalSolutionContainer.innerHTML = '';
@@ -322,27 +370,25 @@
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
         } finally {
             runButton.disabled = false;
+            downloadLogButton.disabled = false;
             runButton.textContent = 'Build and Run Graph';
         }
     });
 
-    function tryParseJson(message) {
-        try {
-            return JSON.parse(message);
-        } catch (e) { return null; }
-    }
-
     const eventSource = new EventSource('/stream_log');
 
     eventSource.onmessage = async function(event) {
+
         const rawMessage = event.data;
-
-        // --- MODIFIED: Listen for 'graph_ascii' and render in terminal ---
         if (rawMessage.includes('__start__')) {
-
-            addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
-            graphContainer.textContent = rawMessage;
-            addLogMessage('>>> Graph rendered.', { color: 'lime' });
+             try {
+                
+                addLogMessage('>>> ASCII Graph received. Rendering...', { color: 'cyan' });
+                graphContainer.textContent = rawMessage;
+                addLogMessage('>>> Graph rendered.', { color: 'lime' });
+            } catch (e) {
+                 addLogMessage(rawMessage);
+            }
         } else {
             addLogMessage(rawMessage);
         }

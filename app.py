@@ -329,8 +329,8 @@ def create_agent_node(llm, agent_prompt, node_id):
         """
         await log_stream.put(f"--- [FORWARD PASS] Invoking Agent: {node_id} ---")
         
-        # INCREASED VERBOSITY
-        await log_stream.put(f"VERBOSE LOG: System Prompt for {node_id}:\n---\n{agent_prompt}\n---")
+        # MODIFIED: Log the full system prompt for data collection
+        await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
 
         # Determine the input for the agent based on its layer
         layer_index = int(node_id.split('_')[1])
@@ -379,10 +379,9 @@ Your JSON formatted response:
         try:
             # The agent is expected to return a JSON string.
             response_json = clean_and_parse_json(response_str)
-            await log_stream.put(f"SUCCESS: Agent {node_id} finished. Solution snippet: {str(response_json.get('proposed_solution'))[:80]}...")
-            # INCREASED VERBOSITY
-            await log_stream.put(f"VERBOSE LOG: Full JSON Response from {node_id}:\n---\n{json.dumps(response_json, indent=2)}\n---")
-        except json.JSONDecodeError:
+            # MODIFIED: Log the entire JSON output, not just a snippet
+            await log_stream.put(f"SUCCESS: Agent {node_id} produced output:\n{json.dumps(response_json, indent=2)}")
+        except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
             response_json = {
                 "original_problem": state["original_request"],
@@ -433,8 +432,9 @@ def create_synthesis_node(llm):
         
         try:
             final_solution = clean_and_parse_json(final_solution_str)
-            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution snippet: {str(final_solution.get('proposed_solution'))[:80]}...")
-        except json.JSONDecodeError:
+            # MODIFIED: Log the full final solution
+            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution, indent=2)}")
+        except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
             
@@ -461,7 +461,7 @@ def create_critique_node(llm):
             "proposed_solution": json.dumps(final_solution, indent=2)
         })
         critiques["global_critique"] = global_critique_text
-        await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text[:150]}...")
+        await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text}...")
 
         # 2. Generate Individual Critiques for all other agents (layers 0 to n-2)
         await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
@@ -483,7 +483,7 @@ def create_critique_node(llm):
                             "agent_output": json.dumps(agent_output, indent=2)
                         })
                         critiques[agent_id] = critique_text
-                        await log_stream.put(f"SUCCESS: Individual critique for {agent_id} generated: {critique_text[:100]}...")
+                        await log_stream.put(f"SUCCESS: Individual critique for {agent_id} generated: {critique_text}...")
 
                     tasks.append(get_individual_critique(agent_id, agent_output))
         
@@ -522,6 +522,9 @@ def create_update_agent_prompts_node(llm):
             for j, agent_prompt in enumerate(all_prompts_copy[i]):
                 agent_id = f"agent_{i}_{j}"
                 
+                # MODIFIED: Log the agent's prompt BEFORE any updates are applied
+                await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{agent_prompt}\n---")
+                
                 # Determine the correct critique for the current agent based on its layer
                 critique_for_this_agent = None
                 if i == penultimate_layer_idx:
@@ -529,6 +532,8 @@ def create_update_agent_prompts_node(llm):
                     await log_stream.put(f"LOG: [BACKPROP] Applying GLOBAL critique to {agent_id} in penultimate layer.")
                 else:
                     critique_for_this_agent = critiques.get(agent_id)
+
+                    await log_stream.put(f"LOG: [BACKPROP] Previous System Prompt: {agent_prompt}")
                     await log_stream.put(f"LOG: [BACKPROP] Applying INDIVIDUAL critique to {agent_id}.")
 
                 if not critique_for_this_agent:
@@ -539,7 +544,7 @@ def create_update_agent_prompts_node(llm):
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
                     analysis = clean_and_parse_json(analysis_str)
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, AttributeError):
                     analysis = {"attributes": "", "hard_request": ""} # Fallback
 
                 # Generate the new, refined prompt
@@ -550,12 +555,15 @@ def create_update_agent_prompts_node(llm):
                     "original_problem": state["original_request"],
                 })
                 
+                # MODIFIED: Log the agent's prompt AFTER it has been updated
+                await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
+                
                 # Update the prompt in our temporary copy
                 all_prompts_copy[i][j] = new_prompt
-                await log_stream.put(f"SUCCESS: [BACKPROP] System prompt for {agent_id} has been updated.")
+                await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
         
-        new_epoch = state["epoch"] + 1
-        await log_stream.put(f"--- Epoch {state['epoch']+1} Finished. Starting Epoch {new_epoch+1} ---")
+        new_epoch = state["epoch"]
+        await log_stream.put(f"--- Epoch {state['epoch']+1} Finished. Starting Epoch {new_epoch + 2} ---")
 
         # Reset agent outputs and critiques for the new epoch
         return {
@@ -650,7 +658,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
                     analysis = clean_and_parse_json(analysis_str)
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, AttributeError):
                     analysis = {"attributes": "", "hard_request": "Solve the original problem."}
                 
                 new_prompt = await dense_spanner_chain.ainvoke({
@@ -665,9 +673,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
         # --- Graph Definition ---
         workflow = StateGraph(GraphState)
 
-        # Add a gateway node to fan-out at the start of each epoch
-        workflow.add_node("epoch_gateway", lambda state: {"epoch": state["epoch"] + 1})
-
+        # Gateway node that increments the epoch and fans out
+        def epoch_gateway(state: GraphState):
+            new_epoch = state.get("epoch", 0) + 1
+            return {"epoch": new_epoch}
+            
+        workflow.add_node("epoch_gateway", epoch_gateway)
 
         for i, layer_prompts in enumerate(all_layers_prompts):
             for j, prompt in enumerate(layer_prompts):
@@ -678,20 +689,17 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
 
-        # --- Graph Connections (MODIFIED FOR MLP STRUCTURE & CORRECT EPOCH LOOP) ---
+        # --- Graph Connections ---
         await log_stream.put("--- Connecting Graph Nodes ---")
         
-        # 1. Set the entry point to the gateway for parallel execution
         workflow.set_entry_point("epoch_gateway")
         await log_stream.put("LOG: Entry point set to 'epoch_gateway'.")
         
-        # 2. Connect gateway to all agents in the first layer
         first_layer_nodes = [f"agent_0_{j}" for j in range(len(all_layers_prompts[0]))]
         for node in first_layer_nodes:
             workflow.add_edge("epoch_gateway", node)
             await log_stream.put(f"CONNECT: epoch_gateway -> {node}")
 
-        # 3. Create dense, bipartite connections between consecutive layers
         for i in range(cot_trace_depth - 1):
             current_layer_nodes = [f"agent_{i}_{j}" for j in range(len(all_layers_prompts[i]))]
             next_layer_nodes = [f"agent_{i+1}_{k}" for k in range(len(all_layers_prompts[i+1]))]
@@ -700,20 +708,17 @@ async def build_and_run_graph(payload: dict = Body(...)):
                     workflow.add_edge(current_node, next_node)
                     await log_stream.put(f"CONNECT: {current_node} -> {next_node}")
         
-        # 4. Connect all agents in the last layer to the synthesis node
         last_layer_idx = cot_trace_depth - 1
         last_layer_nodes = [f"agent_{last_layer_idx}_{j}" for j in range(len(all_layers_prompts[last_layer_idx]))]
         for node in last_layer_nodes:
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        # 5. Define the forward-pass to reflection-pass loop
         workflow.add_edge("synthesis", "critique")
         await log_stream.put("CONNECT: synthesis -> critique")
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
         
-        # 6. Define the conditional edge for continuing epochs or ending
         async def should_continue(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
                 await log_stream.put("LOG: Max epochs reached. Ending execution.")
@@ -725,7 +730,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "update_prompts",
             should_continue,
             {
-                "continue_epoch": "epoch_gateway", # Loop back to the gateway for the next parallel run
+                "continue_epoch": "epoch_gateway",
                 END: END
             }
         )
@@ -735,7 +740,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
-        # --- Generate and send ASCII graph ---
         ascii_art = graph.get_graph().draw_ascii()
         await log_stream.put(ascii_art)
 
@@ -749,10 +753,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
         final_state = None
-        # Corrected epoch counting
-        initial_state["epoch"] = 0
-        async for output in graph.astream(initial_state, {'recursion_limit': 100000000000}):
-            # This now correctly streams outputs from parallel nodes as they finish
+
+        async for output in graph.astream(initial_state, {'recursion_limit': 1000}):
             for key, value in output.items():
                 await log_stream.put(f"--- Node Finished Processing: {key} ---")
             final_state = output
