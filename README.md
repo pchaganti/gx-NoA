@@ -1,3 +1,5 @@
+![thumbnail](https://github.com/user-attachments/assets/13694758-a5c9-40c5-9c07-c7a168e660cf)
+
 # Network of Agents (NoA): Democratizing Deep Thought 🧠
 
 **Is true "deep thinking" only for trillion-dollar companies?**
