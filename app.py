@@ -60,6 +60,7 @@ def clean_and_parse_json(llm_output_string):
     return None
 
 # --- MOCK LLM FOR DEBUGGING ---
+# --- MOCK LLM FOR DEBUGGING ---
 class MockLLM(Runnable):
     """A mock LLM for debugging that returns instant, pre-canned responses."""
 
@@ -109,6 +110,8 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
             # Covers both global and individual critique prompts
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
+        elif "you are a memory summarization agent" in prompt:
+            return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
         else: # This is a regular agent node being invoked
@@ -118,8 +121,6 @@ You must reply in the following JSON format: "original_problem": "", "proposed_s
                 "reasoning": "This response was generated instantly by the MockLLM in debug mode.",
                 "skills_used": ["mocking", "debugging", f"skill_{random.randint(1,10)}"]
             })
-
-
 
 class GraphState(TypedDict):
     original_request: str
@@ -192,7 +193,18 @@ Agent System Prompt to analyze:
 """)
     return prompt | llm | StrOutputParser()
 
+def get_memory_summarizer_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a memory summarization agent. You will receive a JSON log of an agent's past actions (solutions and reasoning) over several epochs. Your task is to create a concise, third-person summary of the agent's behavior, learnings, and evolution. Focus on capturing the key strategies attempted, the shifts in reasoning, and any notable successes or failures. Do not lose critical information, but synthesize it into a coherent narrative of the agent's past performance.
 
+Agent's Past History to Summarize (JSON format):
+---
+{history}
+---
+
+Provide a concise, dense summary of the agent's past actions and learnings:
+""")
+    return prompt | llm | StrOutputParser()
 
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
@@ -314,8 +326,6 @@ Problem: "{problem}"
 """)
     return prompt | llm | StrOutputParser()
 
-
-
 def create_agent_node(llm, agent_prompt, node_id):
     """
     Creates a node in the graph that represents an agent.
@@ -353,9 +363,40 @@ def create_agent_node(llm, agent_prompt, node_id):
             await log_stream.put(f"LOG: Agent {node_id} (Layer {layer_index}) is processing {len(prev_layer_outputs)} outputs from Layer {prev_layer_index}.")
             input_data = json.dumps(prev_layer_outputs, indent=2)
 
-        # Retrieve the agent's memory from previous epochs
-        agent_memory_history = state.get("memory", {}).get(node_id, [])
-        memory_str = "\n".join([f"- Epoch {i}: {json.dumps(mem)}" for i, mem in enumerate(agent_memory_history)])
+        # Make a mutable copy of the memory to work with
+        current_memory = state.get("memory", {}).copy()
+        agent_memory_history = current_memory.get(node_id, [])
+
+        # --- Memory Summarization Logic ---
+        # Using character count as a proxy for tokens. 256k tokens ~ 1M characters.
+        # Set a threshold to trigger summarization before hitting the limit.
+        MEMORY_THRESHOLD_CHARS = 900000
+        NUM_RECENT_ENTRIES_TO_KEEP = 10
+
+        memory_as_string = json.dumps(agent_memory_history)
+        if len(memory_as_string) > MEMORY_THRESHOLD_CHARS and len(agent_memory_history) > NUM_RECENT_ENTRIES_TO_KEEP:
+            await log_stream.put(f"WARNING: Memory for agent {node_id} exceeds threshold ({len(memory_as_string)} chars). Summarizing...")
+
+            entries_to_summarize = agent_memory_history[:-NUM_RECENT_ENTRIES_TO_KEEP]
+            recent_entries = agent_memory_history[-NUM_RECENT_ENTRIES_TO_KEEP:]
+
+            history_to_summarize_str = json.dumps(entries_to_summarize, indent=2)
+
+            summarizer_chain = get_memory_summarizer_chain(llm)
+            summary_text = await summarizer_chain.ainvoke({"history": history_to_summarize_str})
+
+            summary_entry = {
+                "summary_of_past_epochs": summary_text,
+                "note": f"This is a summary of epochs up to {state['epoch'] - NUM_RECENT_ENTRIES_TO_KEEP -1}."
+            }
+
+            # Replace old entries with the new summary
+            agent_memory_history = [summary_entry] + recent_entries
+            await log_stream.put(f"SUCCESS: Memory for agent {node_id} has been summarized. New memory length: {len(json.dumps(agent_memory_history))} chars.")
+
+        # Construct the memory string for the prompt from the (potentially summarized) history
+        memory_str = "\n".join([f"- {json.dumps(mem)}" for mem in agent_memory_history])
+
 
         # Construct the full prompt for the LLM
         full_prompt = f"""
@@ -390,12 +431,10 @@ Your JSON formatted response:
                 "skills_used": []
             }
             
-        # Update the memory for this node
-        current_memory = state.get("memory", {}).copy()
-        if node_id not in current_memory:
-            current_memory[node_id] = []
         # Append the new output to this agent's memory log
-        current_memory[node_id].append(response_json)
+        agent_memory_history.append(response_json)
+        # Update the main memory dictionary with the final, updated history for this agent
+        current_memory[node_id] = agent_memory_history
 
         return {
             "agent_outputs": {node_id: response_json},
@@ -440,6 +479,8 @@ def create_synthesis_node(llm):
             
         return {"final_solution": final_solution}
     return synthesis_node
+
+
 
 def create_critique_node(llm):
     async def critique_node(state: GraphState):
@@ -487,7 +528,8 @@ def create_critique_node(llm):
 
                     tasks.append(get_individual_critique(agent_id, agent_output))
         
-        await asyncio.gather(tasks)
+        # CORRECTED: Unpack the tasks list into arguments for asyncio.gather
+        await asyncio.gather(*tasks)
 
         return {"critiques": critiques}
     return critique_node
