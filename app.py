@@ -37,8 +37,7 @@ app = FastAPI()
 log_stream = asyncio.Queue()
 
 final_reports = {}
-
-#i really like to keep my pseudoscience deep, obscure and esoteric 
+active_sessions = {}
 
 reactor_list = [
 
@@ -1599,7 +1598,9 @@ class MockLLM(Runnable):
         prompt = str(input_data).lower()
         await asyncio.sleep(0.05)
 
-        if "create the system prompt of an agent" in prompt:
+        if "you are a helpful ai assistant" in prompt:
+            return "This is a mock streaming response for the RAG chat in debug mode."
+        elif "create the system prompt of an agent" in prompt:
             return f"""
 You are a mock agent for debugging.
 ### memory
@@ -1689,7 +1690,6 @@ Generate your global critique for the team:"""
         elif "you are an expert computational astrologer" in prompt:
             return random.choice(reactor_list)
         elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
-
             return """
 # Mock Academic Paper
 ## Based on Provided RAG Context
@@ -1716,6 +1716,17 @@ The provided context, consisting of various agent solutions and reasoning, has b
                 "reasoning": "This response was generated instantly by the MockLLM in debug mode.",
                 "skills_used": ["mocking", "debugging", f"skill_{random.randint(1,10)}"]
             })
+            
+    async def astream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+        prompt = str(input_data).lower()
+        if "you are a helpful ai assistant" in prompt:
+            words = ["This", " is", " a", " mock", " streaming", " response", " for", " the", " RAG", " chat", " in", " debug", " mode."]
+            for word in words:
+                yield word
+                await asyncio.sleep(0.05)
+        else:
+            result = await self.ainvoke(input_data, config, **kwargs)
+            yield result
 
 class GraphState(TypedDict):
     original_request: str
@@ -2194,6 +2205,21 @@ Retrieved RAG Context (Research Materials):
 Now, write the formal academic paper based on the provided materials.
 """)
     return prompt | llm | StrOutputParser()
+
+def get_rag_chat_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a helpful AI assistant. Use the following context to answer the user's question. If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+Context:
+---
+{context}
+---
+
+Question: {question}
+
+Answer:
+""")
+    return prompt | llm
 
 def create_agent_node(llm, node_id):
     """
@@ -2966,7 +2992,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
-        workflow.add_node("final_harvest", create_final_harvest_node(llm, summarizer_llm, num_questions))
 
 
         await log_stream.put("--- Connecting Graph Nodes ---")
@@ -2995,7 +3020,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing and harvest.")
+                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
                 return "update_rag_index"
             
             if state.get("significant_progress_made"):
@@ -3037,11 +3062,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
 
-        workflow.add_edge("update_rag_index", "final_harvest")
-        await log_stream.put("CONNECT: update_rag_index -> final_harvest")
-
-        workflow.add_edge("final_harvest", END)
-        await log_stream.put("CONNECT: final_harvest -> END")
+        workflow.add_edge("update_rag_index", END)
+        await log_stream.put("CONNECT: update_rag_index -> END")
         
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
@@ -3066,29 +3088,39 @@ async def build_and_run_graph(payload: dict = Body(...)):
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
-        final_state = None
+        final_aggregated_state = initial_state.copy()
 
         async for output in graph.astream(initial_state, {'recursion_limit': int(params["num_epochs"]) * 1000}):
-            for key, value in output.items():
-                await log_stream.put(f"--- Node Finished Processing: {key} ---")
-            final_state = output
+            for node_name, node_output in output.items():
+                await log_stream.put(f"--- Node Finished Processing: {node_name} ---")
+                if node_output is not None:
+                    for key, value in node_output.items():
+                        if key in ['agent_outputs', 'memory']:
+                            if key in final_aggregated_state and isinstance(final_aggregated_state[key], dict):
+                                final_aggregated_state[key].update(value)
+                            else:
+                                final_aggregated_state[key] = value
+                        else:
+                            final_aggregated_state[key] = value
         
-        final_state_value = list(final_state.values())[0] if final_state else {}
-        await log_stream.put("--- Execution Finished ---")
+        final_state_value = final_aggregated_state
+        await log_stream.put("--- Agent Execution Finished. Pausing for User Chat. ---")
         
-        academic_papers = final_state_value.get("academic_papers", {})
-
         session_id = str(uuid.uuid4())
-        if academic_papers:
-            final_reports[session_id] = academic_papers
-            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created. Session ID: {session_id}")
-        else:
-            await log_stream.put("WARNING: No academic papers were generated in the final harvest.")
 
+        active_sessions[session_id] = {
+            "state": final_state_value,
+            "chat_history": [],
+            "llm": llm,
+            "summarizer_llm": summarizer_llm,
+            "embeddings_model": embeddings_model,
+            "params": params
+        }
+        await log_stream.put(f"--- 🧠 RAG Index Ready. Chat is now active. Session ID: {session_id} ---")
 
         return JSONResponse(content={
-            "message": "Graph execution complete.", 
-            "session_id": session_id if academic_papers else None
+            "message": "Chat is now active.",
+            "session_id": session_id
         })
 
     except Exception as e:
@@ -3098,6 +3130,105 @@ async def build_and_run_graph(payload: dict = Body(...)):
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
+@app.post("/chat")
+async def chat_with_index(payload: dict = Body(...)):
+    session_id = payload.get("session_id")
+    message = payload.get("message")
+    session = active_sessions.get(session_id)
+
+    if not session:
+        return JSONResponse(content={"error": "Invalid session ID"}, status_code=404)
+
+    state = session["state"]
+    raptor_index = state.get("raptor_index")
+    llm = session["llm"]
+
+    if not raptor_index:
+        return JSONResponse(content={"error": "RAG index not found for this session"}, status_code=500)
+
+    async def stream_response():
+        try:
+            retrieved_docs = raptor_index.retrieve(message, k=10)
+            context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+
+            chat_chain = get_rag_chat_chain(llm)
+            full_response = ""
+            async for chunk in chat_chain.astream({"context": context, "question": message}):
+                content = chunk.content if hasattr(chunk, 'content') else chunk
+                yield content
+                full_response += content
+
+            session["chat_history"].append({"role": "user", "content": message})
+            session["chat_history"].append({"role": "ai", "content": full_response})
+            active_sessions[session_id] = session
+
+        except Exception as e:
+            print(f"Error during chat streaming: {e}")
+            yield f"Error: Could not generate response. {e}"
+
+    return StreamingResponse(stream_response(), media_type="text/event-stream")
+
+
+@app.post("/harvest")
+async def harvest_session(payload: dict = Body(...)):
+    session_id = payload.get("session_id")
+    session = active_sessions.get(session_id)
+
+    if not session:
+        return JSONResponse(content={"error": "Invalid session ID"}, status_code=404)
+
+    try:
+        await log_stream.put("--- [HARVEST] Initiating Final Harvest Process ---")
+        state = session["state"]
+        chat_history = session["chat_history"]
+        llm = session["llm"]
+        summarizer_llm = session["summarizer_llm"]
+        embeddings_model = session["embeddings_model"]
+        params = session["params"]
+
+        chat_docs = []
+        if chat_history:
+            for i, turn in enumerate(chat_history):
+                 if turn['role'] == 'ai':
+                    user_turn = chat_history[i-1]
+                    content = f"User Question: {user_turn['content']}\n\nAI Answer: {turn['content']}"
+                    chat_docs.append(Document(page_content=content, metadata={"source": "chat_session", "turn": i//2}))
+            await log_stream.put(f"LOG: Converted {len(chat_history)} chat turns into {len(chat_docs)} documents.")
+            state["all_rag_documents"].extend(chat_docs)
+            await log_stream.put(f"LOG: Added chat documents. Total RAG documents now: {len(state['all_rag_documents'])}.")
+            
+            await log_stream.put("--- [RAG PASS] Re-building Final RAPTOR Index with Chat History ---")
+            update_rag_node = create_update_rag_index_node(summarizer_llm, embeddings_model)
+            update_result = await update_rag_node(state)
+            state.update(update_result)
+
+        num_questions = int(params.get('num_questions', 25))
+        final_harvest_node = create_final_harvest_node(llm, summarizer_llm, num_questions)
+        final_harvest_result = await final_harvest_node(state)
+        state.update(final_harvest_result)
+
+        academic_papers = state.get("academic_papers", {})
+        report_session_id = str(uuid.uuid4())
+        if academic_papers:
+            final_reports[report_session_id] = academic_papers
+            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created. Session ID: {report_session_id}")
+        else:
+            await log_stream.put("WARNING: No academic papers were generated in the final harvest.")
+
+        del active_sessions[session_id]
+
+        return JSONResponse(content={
+            "message": "Harvest complete.",
+            "session_id": report_session_id if academic_papers else None
+        })
+
+    except Exception as e:
+        error_message = f"An error occurred during harvest: {e}"
+        await log_stream.put(error_message)
+        await log_stream.put(traceback.format_exc())
+        if session_id in active_sessions:
+            del active_sessions[session_id]
+        return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
 @app.get('/stream_log')
