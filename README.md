@@ -6,7 +6,7 @@ I've been thinking a lot about how we, as people, develop ideas. It's rarely a s
 
 I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
 
-**Is true "deep thinking" only for trillion-dollar companies?**
+## **Is true "deep thinking" only for trillion-dollar companies?**
 NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
