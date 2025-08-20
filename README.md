@@ -7,7 +7,7 @@ I've been thinking a lot about how we, as people, develop ideas. It's rarely a s
 I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
 
 **Is true "deep thinking" only for trillion-dollar companies?**
-NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
+NoA is a research platform that challenges the paradigm of centralized, proprietary AI by exploring a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
@@ -141,7 +141,7 @@ The behavior of the NoA network is governed by several key hyperparameters, allo
 
 The application is built with a Python backend and a vanilla HTML/CSS/JS frontend.
 
-*   **Backend**: FastAPI, LangChain, LangGraph, Google Gemini / Ollama
+*   **Backend**: FastAPI, LangChain, LangGraph, Ollama
 *   **Frontend**: HTML, CSS, JavaScript
 
 ### Installation and Execution
@@ -163,9 +163,13 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 
 3.  **Install dependencies:** `pip install -r requirements.txt`.
 
-4.  **Set up your environment variables:**
-    *   Create a file named `.env` in the project root.
-    *   If using Google Gemini, add your API key: `GEMINI_API_KEY="YOUR_API_KEY_HERE"`
+4.  **Install and Run Ollama**: This application requires a running Ollama server for local inference.
+    *   Follow the official instructions to install Ollama.
+    *   Download a model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
+        ```bash
+        ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
+        ```
+    *   Ensure the Ollama application is running in the background.
 
 5.  **Run the application:**
     ```bash
@@ -174,26 +178,13 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 
 6.  **Access the GUI:** Open your web browser and navigate to `http://127.0.0.1:8000`.
 
-### Using Local Inference with Ollama
-
-This application supports running inference locally using an Ollama server.
-
-1.  **Install Ollama**: Follow the official instructions to install Ollama.
-2.  **Download a Model**: Pull the desired model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
-    ```bash
-    ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
-    ```
-3.  **Run Ollama Server**: Make sure the Ollama application is running in the background.
-4.  **Select in GUI**: In the web interface, select "Local Ollama".
-
 ## How It Works
 
-1.  **Choose your LLM**: Select between Google Gemini or Local Ollama.
-2.  **Architect the Network**: Use the GUI to set the hyperparameters that define your network's structure and learning capacity.
-3.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
-4.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
-5.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
-6.  **Download the Final Report**: Once all epochs are complete, the final harvest phase will run. A download link for a ZIP file containing the generated research papers will appear.
+1.  **Architect the Network**: Use the GUI to set the hyperparameters that define your network's structure and learning capacity.
+2.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
+3.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
+4.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
+5.  **Download the Final Report**: Once all epochs are complete, the final harvest phase will run. A download link for a ZIP file containing the generated research papers will appear.
 
 ## Let's Collaborate: Building a P2P Network
 

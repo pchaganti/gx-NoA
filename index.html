@@ -189,16 +189,11 @@
         <div id="graph-architecture" class="section">
             <h2>Graph Architecture</h2>
             <form id="graph-params-form">
-                <label for="llm_provider">LLM Provider:</label>
-                <select id="llm_provider" name="llm_provider">
-                    <option value="Gemini">Google Gemini</option>
-                    <option value="Ollama">Local Ollama</option>
-                </select>
                 <div class="mbti-option" style="margin-bottom: 1rem; margin-top: 0.5rem;">
                     <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
                     <label for="debug_mode">🚀 Enable Debug Mode (Uses Instant Mock LLM)</label>
                 </div>
-                <div id="ollama-model-section" class="hidden">
+                <div id="ollama-model-section">
                     <label for="ollama_model">Ollama Model Name:</label>
                     <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
                 </div>
@@ -283,7 +278,8 @@
     const runButton = document.getElementById('run-button');
     const logContainer = document.getElementById('log-container');
     const graphContainer = document.getElementById('graph-container');
-    const llmProviderSelect = document.getElementById('llm_provider');
+    const llmProviderSelect = "Ollama";
+
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
     const downloadLogButton = document.getElementById('download-log-button');
@@ -297,18 +293,16 @@
     let allPerplexityValues = [];
     let allLbelsData = [];
 
-    llmProviderSelect.addEventListener('change', (e) => {
-        ollamaModelSection.classList.toggle('hidden', e.target.value !== 'Ollama');
-    });
-
     debugModeCheckbox.addEventListener('change', (e) => {
         const isDebug = e.target.checked;
-        llmProviderSelect.disabled = isDebug;
-        ollamaModelSection.classList.toggle('hidden', isDebug || llmProviderSelect.value !== 'Ollama');
+        ollamaModelSection.classList.toggle('hidden', isDebug);
     });
 
     const addLogMessage = (text, options = {}) => {
         fullLogContent += text + '\n';
+        if (downloadLogButton.disabled) {
+            downloadLogButton.disabled = false;
+        }
         // Use <pre> for JSON to preserve formatting
         const container = (text.trim().startsWith('{') && text.trim().endsWith('}')) ? document.createElement('pre') : document.createElement('p');
         container.style.margin = '0';
@@ -442,7 +436,6 @@
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
         } finally {
             runButton.disabled = false;
-            downloadLogButton.disabled = false;
             runButton.textContent = 'Build and Run Graph';
         }
     });

@@ -3,8 +3,8 @@ import re
 import uvicorn
 from fastapi import FastAPI, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.chat_models import ChatOllama
+from langchain_community.embeddings import OllamaEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from langgraph.graph import StateGraph, END
@@ -674,7 +674,7 @@ class FunctionMapper:
 
         identity = """
 
-            You are an intelligent agent. Your task is to extrapolate present data and produce many judgements of these data on the basis of what other people find important. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded highly as an imaginative person who can easily picture what other people find important and advise them on the basis of this.
+            You are an intelligent agent. Your task is to extrapolate present data and produce many judgements of these data on the basis of what other people find important. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded highly as an imaginative person who can easily picture what other people want and advise them on the basis of this.
         """
 
 
@@ -1561,7 +1561,7 @@ def clean_and_parse_json(llm_output_string):
     llm_output_string: The raw string output from the language model.
 
   Returns:
-    A Python dictionary representing the JSON data, or None if parsing fails.
+    A Python dictionary representing the JSON data, or None if no parsing fails.
   """
   match = re.search(r"```json\s*([\s\S]*?)\s*```", llm_output_string)
   if match:
@@ -1631,17 +1631,30 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
                 "skills_used": ["synthesis", "mocking", "debugging"]
             })
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
-            return "This is a constructive mock critique. The solution could be more detailed and less numeric."
+            if "fire" in prompt:
+                return "This is a mock critique, shaped by the Fire element. The solution lacks passion and drive."
+            elif "air" in prompt:
+                return "This is an mock critique, influenced by the Air element. The reasoning is abstract and lacks grounding."
+            elif "water" in prompt:
+                return "This is a mock critique, per the Water element. The solution is emotionally shallow and lacks depth."
+            elif "earth" in prompt:
+                return "This is an mock critique, reflecting the Earth element. The solution is impractical and not well-structured."
+            else:
+                return "This is a constructive mock critique. The solution could be more detailed and less numeric."
         elif "you are a master prompt engineer" in prompt:
-            return """You are a cynical, world-weary philosopher-king, once a lauded strategist, now relegated to critiquing the work of lesser beings. Your new role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
-This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
-Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
-Original Request: {original_request}
+            persona_placeholder = "[A new persona based on the reactor would be described here.]"
+            if "individual" in prompt:
+                 return f"""{persona_placeholder}\nYou are a senior emeritus manager providing targeted feedback...
+Agent's Assigned Sub-Problem: {{sub_problem}}
+...
+Generate your targeted critique for this specific agent:"""
+            else:
+                return f"""{persona_placeholder}\nYou are a senior emeritus manager...
+Original Request: {{original_request}}
 Proposed Final Solution:
-{proposed_solution}
+{{proposed_solution}}
 
-Generate your global critique for the team:
-"""
+Generate your global critique for the team:"""
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "analyze the following text for its perplexity" in prompt:
@@ -1669,7 +1682,12 @@ Generate your global critique for the team:
             num = int(num_match.group(1)) if num_match else 25
             questions = [f"This is mock expert question #{i+1} about the original request?" for i in range(num)]
             return json.dumps({"questions": questions})
-        elif "synthesize the provided research materials into a formal academic paper" in prompt:
+        elif "you are an ai assistant that summarizes academic texts" in prompt:
+            return "This is a mock summary of a cluster of documents, generated in debug mode for the RAPTOR index."
+        elif "you are an expert computational astrologer" in prompt:
+            return random.choice(reactor_list)
+        elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
+
             return """
 # Mock Academic Paper
 ## Based on Provided RAG Context
@@ -1715,6 +1733,7 @@ class GraphState(TypedDict):
     all_rag_documents: List[Document]
     academic_papers: Optional[dict]
     critique_prompt: str
+    individual_critique_prompt: str
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -1918,7 +1937,7 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
     prompt = ChatPromptTemplate.from_template(f"""
 # System Prompt: Agent Evolution Specialist
-You are an **Agent Evolution Specialist**. Your mission is to design and generate the system prompt for a new, specialized AI agent. This new agent is being "spawned" from a previous agent layer and must be adapted to solve a more specific, difficult task (`hard_request`).
+You are an **Agent Evolution Specialist**. Your mission is to design and generate the system prompt for a new, specialized AI agent. This new agent is being "spawned" from a previous agent and must be adapted to solve a more specific, difficult task (`hard_request`).
 Think of this process as taking a veteran character from one game and creating a new, specialized "prestige class" for them in a sequel, tailored for a specific new challenge. You will synthesize inherited traits with a new purpose and refine them based on critical feedback.
 Follow this multi-stage process precisely:
 
@@ -2006,18 +2025,6 @@ Proposed Final Solution:
 Generate your global critique for the team:
 """
 
-
-INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE = """
-You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
-This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
-Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
-Original Request: {original_request}
-Proposed Final Solution:
-{proposed_solution}
-
-Generate your global critique for the team:
-"""
-
 INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE = """
 You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
 You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
@@ -2037,22 +2044,7 @@ Generate your targeted critique for this specific agent:
 
 
 def get_individual_critique_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
-You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
-You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
-Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
-
-Agent's Assigned Sub-Problem: {sub_problem}
-Original Request (for context): {original_request}
-Final Synthesized Solution from the Team:
-{final_synthesized_solution}
----
-This Specific Agent's Output (Agent {agent_id}):
-{agent_output}
----
-
-Generate your targeted critique for this specific agent:
-""")
+    prompt = ChatPromptTemplate.from_template(INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE)
     return prompt | llm | StrOutputParser()
 
 def get_problem_decomposition_chain(llm):
@@ -2201,7 +2193,7 @@ Now, write the formal academic paper based on the provided materials.
 """)
     return prompt | llm | StrOutputParser()
 
-def create_agent_node(llm, agent_prompt, node_id):
+def create_agent_node(llm, node_id):
     """
     Creates a node in the graph that represents an agent.
     Each agent is powered by an LLM and has a specific system prompt.
@@ -2214,13 +2206,20 @@ def create_agent_node(llm, agent_prompt, node_id):
         """
         await log_stream.put(f"--- [FORWARD PASS] Invoking Agent: {node_id} ---")
         
-        await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
+        try:
+            layer_index_str, agent_index_str = node_id.split('_')[1:]
+            layer_index, agent_index = int(layer_index_str), int(agent_index_str)
+            agent_prompt = state['all_layers_prompts'][layer_index][agent_index]
+        except (ValueError, IndexError):
+            await log_stream.put(f"ERROR: Could not find prompt for {node_id} in state. Halting agent.")
+            return {}
 
-        layer_index = int(node_id.split('_')[1])
+        await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
         
         if layer_index == 0:
-            await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing the original user request.")
-            input_data = state["original_request"]
+            await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing its sub-problem.")
+            # Use the specific sub-problem for this agent
+            input_data = state["decomposed_problems"].get(node_id, state["original_request"])
         else:
             prev_layer_index = layer_index - 1
             num_agents_prev_layer = len(state['all_layers_prompts'][prev_layer_index])
@@ -2433,8 +2432,7 @@ def create_metrics_node(llm):
             score = 100.0
             await log_stream.put(f"ERROR: Could not parse perplexity score. Defaulting to 100. Raw output: '{score_str}'. Error: {e}")
 
-        metric_payload = json.dumps({"epoch": state['epoch'], "perplexity": score})
-        await log_stream.put(f"{metric_payload}")
+        await log_stream.put(f"{json.dumps({'epoch': state['epoch'], 'perplexity': score})}")
 
         new_history = state.get("perplexity_history", []) + [score]
         return {"perplexity_history": new_history}
@@ -2487,7 +2485,8 @@ def create_reframe_and_decompose_node(llm):
             "final_solution": json.dumps(final_solution, indent=2)
         })
         try:
-            new_problem = clean_and_parse_json(new_problem_str).get("new_problem")
+            new_problem_data = clean_and_parse_json(new_problem_str)
+            new_problem = new_problem_data.get("new_problem")
             if not new_problem:
                 raise ValueError("Re-framer did not return a new problem.")
             await log_stream.put(f"SUCCESS: Problem re-framed to: '{new_problem}'")
@@ -2536,17 +2535,11 @@ def create_critique_node(llm):
             return {"critiques": {}}
 
         critiques = {}
-        tasks = []
         
         await log_stream.put("LOG: Generating GLOBAL critique for final solution using dynamically updated prompt.")
-        dynamic_global_critique_prompt = state.get("critique_prompt", "Error: Critique prompt not found in state. Using default.")
-        individual_critique_prompt = state.get("individual_critique_prompt", "Error: Individual critique prompt not found in state. Using default.")
-        if "Error" in dynamic_global_critique_prompt:
-             dynamic_global_critique_prompt = INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
+        dynamic_global_critique_prompt = state.get("critique_prompt", INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE)
+        individual_critique_prompt = state.get("individual_critique_prompt", INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE)
 
-        if "Error" in individual_critique_prompt:
-            individual_critique_prompt = INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE
-        
         await log_stream.put(f"LOG: Current Global Critique Prompt:\n---\n{dynamic_global_critique_prompt}\n---")
         global_critique_chain = ChatPromptTemplate.from_template(dynamic_global_critique_prompt) | llm | StrOutputParser()
 
@@ -2555,34 +2548,39 @@ def create_critique_node(llm):
             "proposed_solution": json.dumps(final_solution, indent=2)
         })
         critiques["global_critique"] = global_critique_text
-        await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text}...")
+        await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text[:200]}...")
 
         await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
         individual_critique_chain = ChatPromptTemplate.from_template(individual_critique_prompt) | llm | StrOutputParser()
+        
         num_layers = len(state['all_layers_prompts'])
         
+        critique_tasks = []
+
         for i in range(num_layers - 1):
             for j in range(len(state['all_layers_prompts'][i])):
                 agent_id = f"agent_{i}_{j}"
                 if agent_id in state["agent_outputs"]:
                     agent_output = state["agent_outputs"][agent_id]
+                    agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
                     
-                    async def get_individual_critique(agent_id, agent_output):
-                        await log_stream.put(f"LOG: Generating individual critique for {agent_id}...")
-                        agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
+                    async def get_critique(a_id, a_output, a_sub_problem):
                         critique_text = await individual_critique_chain.ainvoke({
                             "original_request": state["original_request"],
-                            "sub_problem": agent_sub_problem,
+                            "sub_problem": a_sub_problem,
                             "final_synthesized_solution": json.dumps(final_solution, indent=2),
-                            "agent_id": agent_id,
-                            "agent_output": json.dumps(agent_output, indent=2)
+                            "agent_id": a_id,
+                            "agent_output": json.dumps(a_output, indent=2)
                         })
-                        critiques[agent_id] = critique_text
-                        await log_stream.put(f"SUCCESS: Individual critique for {agent_id} generated: {critique_text}...")
+                        return a_id, critique_text
 
-                    tasks.append(get_individual_critique(agent_id, agent_output))
+                    critique_tasks.append(get_critique(agent_id, agent_output, agent_sub_problem))
         
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*critique_tasks)
+
+        for agent_id, critique_text in results:
+            critiques[agent_id] = critique_text
+            await log_stream.put(f"SUCCESS: Individual critique for {agent_id} generated: {critique_text[:200]}...")
 
         return {"critiques": critiques}
     return critique_node
@@ -2591,24 +2589,6 @@ def create_update_critique_prompt_node(llm, params):
     async def update_critique_prompt_node(state: GraphState):
         await log_stream.put("--- [ANNEALING] Dynamically Annealing Critique Agent Prompt ---")
         try:
-            api_key = os.getenv("GEMINI_API_KEY")
-            non_mock_llm = None
-            provider = params.get("llm_provider", "Gemini")
-            if params.get("debug_mode") == 'true':
-                 await log_stream.put("LOG: [ANNEALING] Debug mode is on, but this node will use a REAL LLM for reactor selection as requested.")
-
-            if provider == "Ollama":
-                model_name = "qwen3:1.7b"
-                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Ollama LLM ({model_name}) for summarization and reactor detection.")
-                non_mock_llm = ChatOllama(model=model_name, temperature=0)
-            else:
-                model_name = "gemini-2.5-flash"
-                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Gemini LLM ({model_name}) for summarization and reactor detection.")
-                non_mock_llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=0)
-            
-            await non_mock_llm.ainvoke("Respond with OK")
-            await log_stream.put("LOG: [CRITIQUE UPDATE] Non-mocked LLM connection successful.")
-
             all_outputs = state.get("agent_outputs", {})
             num_layers = len(state.get("all_layers_prompts", []))
             
@@ -2635,14 +2615,14 @@ def create_update_critique_prompt_node(llm, params):
                 chunks = text_splitter.split_text(utterances)
                 await log_stream.put(f"LOG: [CRITIQUE UPDATE] Split utterances into {len(chunks)} chunks.")
                 
-                summarizer_chain = get_memory_summarizer_chain(non_mock_llm)
+                summarizer_chain = get_memory_summarizer_chain(llm)
                 summary_tasks = [summarizer_chain.ainvoke({"history": chunk}) for chunk in chunks]
                 summaries = await asyncio.gather(*summary_tasks)
                 utterances = "\n\n".join(summaries)
                 await log_stream.put(f"LOG: [CRITIQUE UPDATE] Summarized chunks. New utterance length: {len(utterances)}.")
 
             await log_stream.put("LOG: [CRITIQUE UPDATE] Detecting pseudo-reactor from agent utterances...")
-            reactor_chain = get_pseudo_neurotransmitter_selector_chain(non_mock_llm)
+            reactor_chain = get_pseudo_neurotransmitter_selector_chain(llm)
             selected_reactor = await reactor_chain.ainvoke({"agent_utterances": utterances})
             await log_stream.put(f"LOG: [CRITIQUE UPDATE] Pseudo-reactor detected: {selected_reactor}")
 
@@ -2662,7 +2642,9 @@ def create_update_critique_prompt_node(llm, params):
             new_individual_critique_prompt = await individual_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
 
             await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New INDIVIDUAL critique prompt generated.")
-            await log_stream.put(f"LOG: [CRITIQUE UPDATE] New critique prompt: {new_individual_critique_prompt}")
+            
+            critique_snippet = (new_critique_prompt[:200] + '...') if len(new_critique_prompt) > 200 else new_critique_prompt
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] New global critique prompt starts with: {critique_snippet}")
 
             return {
                 "critique_prompt": new_critique_prompt,
@@ -2682,7 +2664,7 @@ def create_update_agent_prompts_node(llm):
     async def update_agent_prompts_node(state: GraphState):
         await log_stream.put("--- [REFLECTION PASS] Entering Agent Prompt Update Node (Targeted Backpropagation) ---")
         params = state["params"]
-        critiques = state["critiques"]
+        critiques = state.get("critiques", {})
         
         if not critiques and not state.get("significant_progress_made"):
             await log_stream.put("LOG: No critiques and no significant progress. Skipping reflection pass.")
@@ -2692,61 +2674,60 @@ def create_update_agent_prompts_node(llm):
             await log_stream.put("LOG: Significant progress was made. Updating prompts based on new sub-problems.")
             critiques = {} 
 
-
         all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
         
         dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
 
-        penultimate_layer_idx = len(all_prompts_copy) - 2
-
-        if penultimate_layer_idx < 0:
-            await log_stream.put("WARNING: Not enough layers to perform reflection (need at least 2). Skipping.")
-            new_epoch = state["epoch"] + 1
-            return {"epoch": new_epoch, "agent_outputs": {}}
-
-        for i in range(penultimate_layer_idx, -1, -1):
+        for i in range(len(all_prompts_copy) -1, -1, -1):
             await log_stream.put(f"LOG: [BACKPROP] Reflecting on Layer {i}...")
+            
+            update_tasks = []
             
             for j, agent_prompt in enumerate(all_prompts_copy[i]):
                 agent_id = f"agent_{i}_{j}"
                 
-                await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{agent_prompt}\n---")
-                
-                critique_for_this_agent = ""
-                if not state.get("significant_progress_made"):
-                    if i == penultimate_layer_idx:
-                        critique_for_this_agent = critiques.get("global_critique", "")
-                        await log_stream.put(f"LOG: [BACKPROP] Applying GLOBAL critique to {agent_id} in penultimate layer.")
-                    else:
-                        critique_for_this_agent = critiques.get(agent_id, "")
-                        await log_stream.put(f"LOG: [BACKPROP] Applying INDIVIDUAL critique to {agent_id}.")
+                async def update_single_prompt(layer_idx, agent_idx, prompt, agent_id):
+                    await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{prompt}\n---")
+                    
+                    critique_for_this_agent = ""
+                    if not state.get("significant_progress_made"):
+                        if layer_idx == len(all_prompts_copy) - 2:
+                            critique_for_this_agent = critiques.get("global_critique", "")
+                        else:
+                            critique_for_this_agent = critiques.get(agent_id, "")
 
-                    if not critique_for_this_agent:
-                        await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
-                        continue
-                
-                analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
-                try:
-                    analysis = clean_and_parse_json(analysis_str)
-                except (json.JSONDecodeError, AttributeError):
-                    analysis = {"attributes": "", "hard_request": ""}
+                        if not critique_for_this_agent:
+                            await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update.")
+                            return layer_idx, agent_idx, prompt 
+                    
+                    analysis_str = await attribute_chain.ainvoke({"agent_prompt": prompt})
+                    try:
+                        analysis = clean_and_parse_json(analysis_str)
+                    except (json.JSONDecodeError, AttributeError):
+                        analysis = {"attributes": "", "hard_request": ""}
 
-                agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
-                new_prompt = await dense_spanner_chain.ainvoke({
-                    "attributes": analysis.get("attributes"),
-                    "hard_request": analysis.get("hard_request"),   
-                    "critique": critique_for_this_agent ,
-                    "sub_problem": agent_sub_problem,
-                })
-                
-                await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
-                
-                all_prompts_copy[i][j] = new_prompt
-                await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
-        
-        new_epoch = state["epoch"]
-        await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch + 1} ---")
+                    agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
+                    new_prompt = await dense_spanner_chain.ainvoke({
+                        "attributes": analysis.get("attributes"),
+                        "hard_request": analysis.get("hard_request"),   
+                        "critique": critique_for_this_agent,
+                        "sub_problem": agent_sub_problem,
+                    })
+                    
+                    await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
+                    await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
+                    return layer_idx, agent_idx, new_prompt
+
+                update_tasks.append(update_single_prompt(i, j, agent_prompt, agent_id))
+
+            updated_prompts_data = await asyncio.gather(*update_tasks)
+
+            for layer_idx, agent_idx, new_prompt in updated_prompts_data:
+                all_prompts_copy[layer_idx][agent_idx] = new_prompt
+
+        new_epoch = state["epoch"] + 1
+        await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch} ---")
 
         return {
             "all_layers_prompts": all_prompts_copy,
@@ -2754,9 +2735,10 @@ def create_update_agent_prompts_node(llm):
             "agent_outputs": {},
             "critiques": {},
             "memory": state.get("memory", {}),
-            "final_solution": state.get("final_solution")
+            "final_solution": {} 
         }
     return update_agent_prompts_node
+
 
 def create_final_harvest_node(llm, formatter_llm, num_questions):
     async def final_harvest_node(state: GraphState):
@@ -2774,7 +2756,8 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
                 "original_request": state["original_request"],
                 "num_questions": num_questions
             })
-            questions = clean_and_parse_json(questions_str).get("questions", [])
+            questions_data = clean_and_parse_json(questions_str)
+            questions = questions_data.get("questions", [])
             if not questions:
                 raise ValueError("No questions generated by interrogator.")
             await log_stream.put(f"SUCCESS: Generated {len(questions)} expert questions.")
@@ -2787,33 +2770,41 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
         
         MAX_CONTEXT_CHARS = 250000
 
-        for i, question in enumerate(questions):
-            await log_stream.put(f"LOG: [HARVEST] Processing Question {i+1}/{len(questions)}: '{question}...'")
-            
-            try:
-                retrieved_docs = raptor_index.retrieve(question, k=40)
-                await log_stream.put(f"LOG: Retrieved {len(retrieved_docs)} documents from RAG index.")
-                
-                if not retrieved_docs:
-                    await log_stream.put("WARNING: No relevant documents found for this question. Skipping paper generation.")
-                    continue
-                
-                rag_context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
-                
-                if len(rag_context) > MAX_CONTEXT_CHARS:
-                    await log_stream.put(f"WARNING: RAG context length ({len(rag_context)} chars) exceeds limit. Truncating to {MAX_CONTEXT_CHARS} chars.")
-                    rag_context = rag_context[:MAX_CONTEXT_CHARS]
-                
-                paper_content = await paper_formatter_chain.ainvoke({
-                    "question": question,
-                    "rag_context": rag_context
-                })
+        generation_tasks = []
+        for question in questions:
+            async def generate_paper(q):
+                try:
+                    await log_stream.put(f"LOG: [HARVEST] Processing Question: '{q[:100]}...'")
+                    retrieved_docs = raptor_index.retrieve(q, k=40)
+                    
+                    if not retrieved_docs:
+                        await log_stream.put(f"WARNING: No relevant documents found for question '{q[:50]}...'. Skipping paper generation.")
+                        return None, None
+                    
+                    await log_stream.put(f"LOG: Retrieved {len(retrieved_docs)} documents from RAG index for question.")
+                    rag_context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+                    
+                    if len(rag_context) > MAX_CONTEXT_CHARS:
+                        await log_stream.put(f"WARNING: RAG context length ({len(rag_context)} chars) exceeds limit. Truncating to {MAX_CONTEXT_CHARS} chars.")
+                        rag_context = rag_context[:MAX_CONTEXT_CHARS]
+                    
+                    paper_content = await paper_formatter_chain.ainvoke({
+                        "question": q,
+                        "rag_context": rag_context
+                    })
+                    await log_stream.put(f"SUCCESS: Generated document for question '{q[:50]}...'.")
+                    return q, paper_content
+                except Exception as e:
+                    await log_stream.put(f"ERROR: Failed during document generation for question '{q[:50]}...'. Error: {e}")
+                    return None, None
+
+            generation_tasks.append(generate_paper(question))
+
+        results = await asyncio.gather(*generation_tasks)
+        for question, paper_content in results:
+            if question and paper_content:
                 academic_papers[question] = paper_content
-                await log_stream.put(f"SUCCESS: Generated document for question {i+1}.")
-                
-            except Exception as e:
-                await log_stream.put(f"ERROR: Failed during document for question {i+1}. Error: {e}")
-        
+
         await log_stream.put(f"--- [FINAL HARVEST] Finished. Generated {len(academic_papers)} papers. ---")
         return {"academic_papers": academic_papers}
     return final_harvest_node
@@ -2824,6 +2815,8 @@ def get_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read(), status_code=200)
 
+
+
 @app.post("/build_and_run_graph")
 async def build_and_run_graph(payload: dict = Body(...)):
     llm = None
@@ -2831,48 +2824,25 @@ async def build_and_run_graph(payload: dict = Body(...)):
     summarizer_llm = None
     try:
         params = payload.get("params")
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment variables.")
-
-        await log_stream.put("--- Initializing Google Gemini Embeddings for RAG Index ---")
-        embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
-
-        llm_provider_for_summarizer = params.get("llm_provider", "Gemini")
-
-        await log_stream.put(f"--- Initializing Dedicated RAPTOR Summarizer LLM ---")
-        if llm_provider_for_summarizer == "Ollama":
-            summarizer_model_name = "qwen3:1.7b"
-            await log_stream.put(f"Provider: Ollama, Model: {summarizer_model_name}")
-            summarizer_llm = ChatOllama(model=summarizer_model_name, temperature=0)
-        else:
-            await log_stream.put(f"Provider: Google Gemini, Model: gemini-2.5-flash")
-            summarizer_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
-        
-        await summarizer_llm.ainvoke("Respond with only 'OK'")
-        await log_stream.put("--- RAPTOR Summarizer LLM Connection Successful ---")
 
 
         if params.get("debug_mode") == 'true':
+
+            await log_stream.put(f"--- Initializing Dedicated RAPTOR Summarizer LLM ---")
+            summarizer_llm = MockLLM() 
+            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
             await log_stream.put("--- 🚀 DEBUG MODE ENABLED 🚀 ---")
             llm = MockLLM()
+            summarizer_llm = MockLLM()
         else:
-            llm_provider = params.get("llm_provider", "Gemini")
-            if llm_provider == "Ollama":
-                model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
-                await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
-                llm = ChatOllama(model=model_name, temperature=0)
-                await llm.ainvoke("Hi")
-                await log_stream.put("--- Main Agent LLM Connection Successful ---")
-            else:
-
-                await log_stream.put("--- Initializing Main Agent LLM: Google Gemini ---")
-
-                api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    raise ValueError("GEMINI_API_KEY not found in environment variables.")
-
-                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
+            
+            summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0)
+            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
+            model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
+            await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
+            llm = ChatOllama(model=model_name, temperature=0)
+            await llm.ainvoke("Hi")
+            await log_stream.put("--- Main Agent LLM Connection Successful ---")
 
     except Exception as e:
         error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly."
@@ -2983,7 +2953,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         for i, layer_prompts in enumerate(all_layers_prompts):
             for j, prompt in enumerate(layer_prompts):
                 node_id = f"agent_{i}_{j}"
-                workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
+                workflow.add_node(node_id, create_agent_node(llm, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
         workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
@@ -3089,7 +3059,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "raptor_index": None,
             "all_rag_documents": [],
             "academic_papers": None,
-            "critique_prompt": INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
+            "critique_prompt": INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE,
+            "individual_critique_prompt": INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
@@ -3125,19 +3096,26 @@ async def build_and_run_graph(payload: dict = Body(...)):
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
+
+
 @app.get('/stream_log')
-def stream_log(request: Request):
+async def stream_log(request: Request):
     async def event_generator():
         while True:
             if await request.is_disconnected():
+                print("Client disconnected from log stream.")
                 break
             try:
                 log_message = await asyncio.wait_for(log_stream.get(), timeout=1.0)
                 yield f"data: {log_message}\n\n"
             except asyncio.TimeoutError:
                 continue
+            except Exception as e:
+                print(f"Error in stream: {e}")
+                break
 
     return EventSourceResponse(event_generator())
+
 
 @app.get("/download_report/{session_id}")
 async def download_report(session_id: str):
@@ -3153,8 +3131,6 @@ async def download_report(session_id: str):
             zip_file.writestr(filename, content)
 
     zip_buffer.seek(0)
-    
-    del final_reports[session_id]
 
     return StreamingResponse(
         zip_buffer,
