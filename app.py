@@ -2,9 +2,9 @@ import os
 import re
 import uvicorn
 from fastapi import FastAPI, Request, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
@@ -16,6 +16,9 @@ import asyncio
 from sse_starlette.sse import EventSourceResponse
 import random
 import traceback
+import uuid
+import io
+import zipfile
 from langchain_core.runnables import Runnable
 from langchain_core.runnables.config import RunnableConfig
 from langchain_core.retrievers import BaseRetriever
@@ -30,11 +33,11 @@ from sklearn.cluster import KMeans
 
 load_dotenv()
 
-# --- FastAPI App Setup ---
 app = FastAPI()
 
-# In-memory stream for logs
 log_stream = asyncio.Queue()
+
+final_reports = {}
 
 class RAPTORRetriever(BaseRetriever):
     raptor_index: Any
@@ -52,92 +55,63 @@ class RAPTOR:
         self.tree = {}
         self.all_nodes: Dict[str, Document] = {}
         self.vector_store = None
-        self.checkpoint_path = f"checkpoint_{self.session_id}.json"
 
-    def _save_checkpoint(self, level):
-        state = {
-            "level": level,
-            "tree": {str(k): [node_id for node_id in v] for k, v in self.tree.items()},
-            "all_nodes": {node_id: doc.to_json() for node_id, doc in self.all_nodes.items()},
-        }
-        with open(self.checkpoint_path, 'w') as f:
-            json.dump(state, f)
-        log_stream.put(f"Checkpoint saved for level {level}.")
-
-    def _load_checkpoint(self) -> int:
-        if os.path.exists(self.checkpoint_path):
-            try:
-                with open(self.checkpoint_path, 'r') as f:
-                    state = json.load(f)
-                from langchain_core.load import load
-                self.all_nodes = {node_id: load(doc) for node_id, doc in state["all_nodes"].items()}
-                self.tree = state["tree"]
-                start_level = state["level"]
-                log_stream.put(f"Resuming from checkpoint at level {start_level}.")
-                return start_level
-            except Exception as e:
-                log_stream.put.warning(f"Could not load checkpoint file due to error: {e}. Starting from scratch.")
-                return 0
-        return 0
-
-    def add_documents(self, documents: List[Document]):
-        start_level = self._load_checkpoint()
-        if start_level == 0:
-            log_stream.put("Step 1: Assigning IDs to initial chunks (Level 0)...")
-            level_0_node_ids = []
-            for i, doc in enumerate(documents):
-                node_id = f"0_{i}"
-                self.all_nodes[node_id] = doc
-                level_0_node_ids.append(node_id)
-            self.tree[str(0)] = level_0_node_ids
-            self._save_checkpoint(0)
+    async def add_documents(self, documents: List[Document]):
+        await log_stream.put("Step 1: Assigning IDs to initial chunks (Level 0)...")
+        level_0_node_ids = []
+        for i, doc in enumerate(documents):
+            node_id = f"0_{i}"
+            self.all_nodes[node_id] = doc
+            level_0_node_ids.append(node_id)
+        self.tree[str(0)] = level_0_node_ids
         
-        current_level = start_level
+        current_level = 0
         while len(self.tree[str(current_level)]) > 1:
             next_level = current_level + 1
-            log_stream.put(f"Step 2: Building Level {next_level} of the tree...")
+            await log_stream.put(f"Step 2: Building Level {next_level} of the tree...")
             current_level_node_ids = self.tree[str(current_level)]
             current_level_docs = [self.all_nodes[nid] for nid in current_level_node_ids]
             clustered_indices = self._cluster_nodes(current_level_docs)
             
             next_level_node_ids = []
             num_clusters = len(clustered_indices)
-            summary_progress = st.progress(0, text=f"Summarizing Level {next_level}...")
+            await log_stream.put(f"Summarizing Level {next_level}...")
+            
+            summarization_tasks = []
             for i, indices in enumerate(clustered_indices):
                 cluster_docs = [current_level_docs[j] for j in indices]
-                summary, combined_metadata = self._summarize_cluster(cluster_docs)
-                summary_doc = Document(page_content=summary, metadata=combined_metadata)
-                node_id = f"{next_level}_{i}"
-                self.all_nodes[node_id] = summary_doc
-                next_level_node_ids.append(node_id)
-                summary_progress.progress((i + 1) / num_clusters, text=f"Summarizing cluster {i+1}/{num_clusters} for Level {next_level}...")
+                summarization_tasks.append(self._summarize_cluster(cluster_docs, next_level, i))
             
+            summaries = await asyncio.gather(*summarization_tasks)
+
+            for i, (summary_doc, _) in enumerate(summaries):
+                 node_id = f"{next_level}_{i}"
+                 self.all_nodes[node_id] = summary_doc
+                 next_level_node_ids.append(node_id)
+
             self.tree[str(next_level)] = next_level_node_ids
-            self._save_checkpoint(next_level)
             current_level = next_level
 
-        log_stream.put.write("Step 3: Creating final vector store from all nodes...")
+        await log_stream.put("Step 3: Creating final vector store from all nodes...")
         final_docs = list(self.all_nodes.values())
         self.vector_store = FAISS.from_documents(documents=final_docs, embedding=self.embeddings_model)
-        log_stream.put.write("RAPTOR index built successfully!")
-        if os.path.exists(self.checkpoint_path):
-            os.remove(self.checkpoint_path)
+        await log_stream.put("RAPTOR index built successfully!")
 
     def _cluster_nodes(self, docs: List[Document]) -> List[List[int]]:
         num_docs = len(docs)
 
         if num_docs <= 5:
-            log_stream.put(f"Grouping {num_docs} remaining nodes into a single summary to finalize the tree.")
+            log_stream.put_nowait(f"Grouping {num_docs} remaining nodes into a single summary to finalize the tree.")
             return [list(range(num_docs))]
 
-        log_stream.put(f"Embedding {num_docs} nodes for clustering...")
+        log_stream.put_nowait(f"Embedding {num_docs} nodes for clustering...")
         embeddings = self.embeddings_model.embed_documents([doc.page_content for doc in docs])
         n_clusters = max(2, num_docs // 5)
         
         if n_clusters >= num_docs:
             n_clusters = num_docs - 1
 
-        log_stream.put(f"Clustering {num_docs} nodes into {n_clusters} groups...")
+        log_stream.put_nowait(f"Clustering {num_docs} nodes into {n_clusters} groups...")
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto').fit(embeddings)
         
         clusters = [[] for _ in range(n_clusters)]
@@ -146,18 +120,20 @@ class RAPTOR:
             
         return clusters
 
-    def _summarize_cluster(self, cluster_docs: List[Document]) -> Tuple[str, dict]:
+    async def _summarize_cluster(self, cluster_docs: List[Document], level: int, cluster_index: int) -> Tuple[Document, dict]:
         context = "\n\n---\n\n".join([doc.page_content for doc in cluster_docs])
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content="You are an AI assistant that summarizes academic texts. Create a concise, abstractive summary of the following content, synthesizing the key information."),
             HumanMessage(content="Please summarize the following content:\n\n{context}")
         ])
         chain = prompt | self.llm
-        response = chain.invoke({"context": context})
-        summary = response.content
+        response = await chain.ainvoke({"context": context})
+        summary = response.content if hasattr(response, 'content') else str(response)
         aggregated_sources = list(set(doc.metadata.get("url", "Unknown Source") for doc in cluster_docs))
         combined_metadata = {"sources": aggregated_sources}
-        return summary, combined_metadata
+        summary_doc = Document(page_content=summary, metadata=combined_metadata)
+        await log_stream.put(f"Summarized cluster {cluster_index + 1} for Level {level}...")
+        return summary_doc, combined_metadata
     
     def retrieve(self, query: str, k: int = 5) -> List[Document]:
         return self.vector_store.similarity_search(query, k=k) if self.vector_store else []
@@ -175,13 +151,10 @@ def clean_and_parse_json(llm_output_string):
   Returns:
     A Python dictionary representing the JSON data, or None if parsing fails.
   """
-  # Use a regular expression to find content between ```json and ```
   match = re.search(r"```json\s*([\s\S]*?)\s*```", llm_output_string)
   if match:
-    # If found, use the content within the backticks
     json_string = match.group(1)
   else:
-    # Otherwise, try to find the first '{' and last '}'
     try:
       start_index = llm_output_string.index('{')
       end_index = llm_output_string.rindex('}') + 1
@@ -197,20 +170,20 @@ def clean_and_parse_json(llm_output_string):
     print(f"Problematic string: {json_string}")
     return None
 
-# --- MOCK LLM FOR DEBUGGING ---
-# --- MOCK LLM FOR DEBUGGING ---
 class MockLLM(Runnable):
     """A mock LLM for debugging that returns instant, pre-canned responses."""
 
-    # CORRECTED: Added config parameter to match the Runnable interface
     def invoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         """Synchronous version of ainvoke for Runnable interface compliance."""
-        return asyncio.run(self.ainvoke(input_data, config=config, **kwargs))
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return asyncio.ensure_future(self.ainvoke(input_data, config=config, **kwargs))
+        else:
+            return asyncio.run(self.ainvoke(input_data, config=config, **kwargs))
 
-    # CORRECTED: Added config parameter to match the Runnable interface
     async def ainvoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         prompt = str(input_data).lower()
-        await asyncio.sleep(0.05) # Simulate tiny network latency
+        await asyncio.sleep(0.05)
 
         if "create the system prompt of an agent" in prompt:
             return f"""
@@ -246,15 +219,12 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
                 "skills_used": ["synthesis", "mocking", "debugging"]
             })
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
-            # Covers both global and individual critique prompts
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "analyze the following text for its perplexity" in prompt:
-            # New case for perplexity heuristic
             return str(random.uniform(20.0, 80.0))
         elif "you are a master strategist and problem decomposer" in prompt:
-            # New case for problem decomposition
             num_match = re.search(r'exactly (\d+)', prompt)
             if not num_match:
                 num_match = re.search(r'generate: (\d+)', prompt)
@@ -262,10 +232,9 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             sub_problems = [f"This is mock sub-problem #{i+1} for the main request." for i in range(num)]
             return json.dumps({"sub_problems": sub_problems})
         elif "you are an ai philosopher and progress assessor" in prompt:
-            # New case for progress assessment
              return json.dumps({
                 "reasoning": "The mock solution is novel and shows progress, so we will re-frame.",
-                "significant_progress": random.choice([True, False]) # Randomly trigger for debugging
+                "significant_progress": random.choice([True, False])
             })
         elif "you are a strategic problem re-framer" in prompt:
              return json.dumps({
@@ -273,7 +242,32 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             })
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
-        else: # This is a regular agent node being invoked
+        elif "generate exactly" in prompt and "expert-level questions" in prompt:
+            num_match = re.search(r'exactly (\d+)', prompt)
+            num = int(num_match.group(1)) if num_match else 25
+            questions = [f"This is mock expert question #{i+1} about the original request?" for i in range(num)]
+            return json.dumps({"questions": questions})
+        elif "synthesize the provided research materials into a formal academic paper" in prompt:
+            return """
+# Mock Academic Paper
+## Based on Provided RAG Context
+
+**Abstract:** This document is a mock academic paper generated in debug mode. It synthesizes and formats the information provided in the RAG (Retrieval-Augmented Generation) context to answer a specific research question.
+
+**Introduction:** The purpose of this paper is to structure the retrieved agent outputs and summaries into a coherent academic format. The following sections represent a synthesized view of the data provided.
+
+**Synthesized Findings from Context:**
+The provided context, consisting of various agent solutions and reasoning, has been analyzed. The key findings are summarized below:
+(Note: In debug mode, the actual content is not deeply analyzed, but this structure demonstrates the formatting process.)
+- Finding 1: The primary proposed solution revolves around the concept of '42'.
+- Finding 2: Agent reasoning varies but shows a convergent trend.
+- Finding 3: The mock data indicates a successful, albeit simulated, collaborative process.
+
+**Discussion:** The synthesized findings suggest that the multi-agent system is capable of producing a unified response. The quality of this response in a real-world scenario would depend on the validity of the RAG context.
+
+**Conclusion:** This paper successfully formatted the retrieved RAG data into an academic structure. The process demonstrates the final step of the knowledge harvesting pipeline.
+"""
+        else:
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to an agent.",
                 "proposed_solution": f"This is a mock solution from agent node #{random.randint(100,999)}.",
@@ -283,18 +277,21 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
 
 class GraphState(TypedDict):
     original_request: str
-    decomposed_problems: dict[str, str] # Agent ID -> Sub-problem
+    decomposed_problems: dict[str, str]
     layers: List[dict]
-    critiques: dict[str, str]  # Node ID -> Critique Text
+    critiques: dict[str, str]
     epoch: int
     max_epochs: int
     params: dict
     all_layers_prompts: List[List[str]]
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
-    memory: Annotated[dict, lambda a, b: {**a, **b}] # Node ID -> List of past JSON outputs
+    memory: Annotated[dict, lambda a, b: {**a, **b}]
     final_solution: dict
     perplexity_history: List[float] 
-    significant_progress_made: bool # New: To trigger re-decomposition
+    significant_progress_made: bool
+    raptor_index: Optional[RAPTOR]
+    all_rag_documents: List[Document]
+    academic_papers: Optional[dict]
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -571,6 +568,42 @@ Problem: "{problem}"
 """)
     return prompt | llm | StrOutputParser()
 
+def get_interrogator_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} expert-level questions that exhaustively explore the problem from every possible angle of novelty.
+These questions should be deep, insightful, and designed to push the boundaries of knowledge. They should cover theoretical, practical, philosophical, and unconventional perspectives.
+
+The output must be a JSON object with a single key "questions", which is a list of strings.
+
+Original Request to Interrogate:
+---
+{original_request}
+---
+
+Generate the JSON object with exactly {num_questions} expert-level questions:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_paper_formatter_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a research scientist and academic writer. Your task is to synthesize the provided research materials (RAG context) into a formal academic paper that directly answers the given research question.
+The paper must be well-structured with an abstract, introduction, synthesized findings, a discussion of implications, and a conclusion.
+You must be formal, objective, and rely exclusively on the information provided in the RAG context.
+
+Research Question:
+---
+{question}
+---
+
+Retrieved RAG Context (Research Materials):
+---
+{rag_context}
+---
+
+Now, write the formal academic paper based on the provided materials.
+""")
+    return prompt | llm | StrOutputParser()
+
 def create_agent_node(llm, agent_prompt, node_id):
     """
     Creates a node in the graph that represents an agent.
@@ -584,18 +617,14 @@ def create_agent_node(llm, agent_prompt, node_id):
         """
         await log_stream.put(f"--- [FORWARD PASS] Invoking Agent: {node_id} ---")
         
-        # MODIFIED: Log the full system prompt for data collection
         await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
 
-        # Determine the input for the agent based on its layer
         layer_index = int(node_id.split('_')[1])
         
         if layer_index == 0:
-            # First layer agents receive the original user request
             await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing the original user request.")
             input_data = state["original_request"]
         else:
-            # Subsequent layers receive the outputs from all agents in the previous layer
             prev_layer_index = layer_index - 1
             num_agents_prev_layer = len(state['all_layers_prompts'][prev_layer_index])
             
@@ -608,13 +637,9 @@ def create_agent_node(llm, agent_prompt, node_id):
             await log_stream.put(f"LOG: Agent {node_id} (Layer {layer_index}) is processing {len(prev_layer_outputs)} outputs from Layer {prev_layer_index}.")
             input_data = json.dumps(prev_layer_outputs, indent=2)
 
-        # Make a mutable copy of the memory to work with
         current_memory = state.get("memory", {}).copy()
         agent_memory_history = current_memory.get(node_id, [])
 
-        # --- Memory Summarization Logic ---
-        # Using character count as a proxy for tokens. 256k tokens ~ 1M characters.
-        # Set a threshold to trigger summarization before hitting the limit.
         MEMORY_THRESHOLD_CHARS = 900000
         NUM_RECENT_ENTRIES_TO_KEEP = 10
 
@@ -635,15 +660,12 @@ def create_agent_node(llm, agent_prompt, node_id):
                 "note": f"This is a summary of epochs up to {state['epoch'] - NUM_RECENT_ENTRIES_TO_KEEP -1}."
             }
 
-            # Replace old entries with the new summary
             agent_memory_history = [summary_entry] + recent_entries
             await log_stream.put(f"SUCCESS: Memory for agent {node_id} has been summarized. New memory length: {len(json.dumps(agent_memory_history))} chars.")
 
-        # Construct the memory string for the prompt from the (potentially summarized) history
         memory_str = "\n".join([f"- {json.dumps(mem)}" for mem in agent_memory_history])
 
 
-        # Construct the full prompt for the LLM
         full_prompt = f"""
 System Prompt (Your Persona & Task):
 ---
@@ -663,9 +685,7 @@ Your JSON formatted response:
         response_str = await agent_chain.ainvoke({"input": full_prompt})
         
         try:
-            # The agent is expected to return a JSON string.
             response_json = clean_and_parse_json(response_str)
-            # MODIFIED: Log the entire JSON output, not just a snippet
             await log_stream.put(f"SUCCESS: Agent {node_id} produced output:\n{json.dumps(response_json, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
@@ -677,9 +697,7 @@ Your JSON formatted response:
                 "skills_used": []
             }
             
-        # Append the new output to this agent's memory log
         agent_memory_history.append(response_json)
-        # Update the main memory dictionary with the final, updated history for this agent
         current_memory[node_id] = agent_memory_history
 
         return {
@@ -694,7 +712,6 @@ def create_synthesis_node(llm):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
         synthesis_chain = get_synthesis_chain(llm)
 
-        # The synthesis node is connected to the last layer of agents.
         last_agent_layer_idx = len(state['all_layers_prompts']) - 1
         num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
         
@@ -717,7 +734,6 @@ def create_synthesis_node(llm):
         
         try:
             final_solution = clean_and_parse_json(final_solution_str)
-            # MODIFIED: Log the full final solution
             await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
@@ -725,6 +741,67 @@ def create_synthesis_node(llm):
             
         return {"final_solution": final_solution}
     return synthesis_node
+
+def create_update_rag_index_node(llm, embeddings_model):
+    async def update_rag_index_node(state: GraphState):
+        await log_stream.put("--- [RAG PASS] Updating RAPTOR Index ---")
+        
+        current_epoch_outputs = state.get("agent_outputs", {})
+        if not current_epoch_outputs:
+            await log_stream.put("LOG: No new agent outputs in this epoch to add to RAG index. Skipping.")
+            return {}
+
+        await log_stream.put(f"LOG: Found {len(current_epoch_outputs)} new agent outputs from epoch {state['epoch']} to process for RAG.")
+
+        new_docs = []
+        all_prompts = state.get("all_layers_prompts", [])
+
+        for agent_id, output in current_epoch_outputs.items():
+            try:
+                layer_idx, agent_idx = map(int, agent_id.split('_')[1:])
+                system_prompt = all_prompts[layer_idx][agent_idx]
+                
+                content = (
+                    f"Sub-Problem: {output.get('original_problem', 'N/A')}\n\n"
+                    f"Proposed Solution: {output.get('proposed_solution', 'N/A')}\n\n"
+                    f"Reasoning: {output.get('reasoning', 'N/A')}"
+                )
+                
+                metadata = {
+                    "agent_id": agent_id,
+                    "epoch": state['epoch'],
+                    "system_prompt": system_prompt
+                }
+                
+                new_docs.append(Document(page_content=content, metadata=metadata))
+            except (ValueError, IndexError) as e:
+                await log_stream.put(f"WARNING: Could not process output for {agent_id} to create RAG document. Error: {e}")
+        
+        await log_stream.put(f"LOG: Created {len(new_docs)} new documents for the RAG index.")
+
+        all_rag_documents = state.get("all_rag_documents", []) + new_docs
+        
+        await log_stream.put(f"LOG: Total documents to index: {len(all_rag_documents)}. Rebuilding RAPTOR index...")
+
+        session_id = str(uuid.uuid4())
+        raptor_index = RAPTOR(llm=llm, embeddings_model=embeddings_model, session_id=session_id)
+        
+        try:
+            await raptor_index.add_documents(all_rag_documents)
+            await log_stream.put("SUCCESS: RAPTOR index updated successfully.")
+            return {
+                "raptor_index": raptor_index,
+                "all_rag_documents": all_rag_documents
+            }
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to build RAPTOR index. Error: {e}")
+            await log_stream.put(traceback.format_exc())
+            return {
+                "raptor_index": state.get("raptor_index"),
+                "all_rag_documents": state.get("all_rag_documents")
+            }
+
+    return update_rag_index_node
 
 def create_metrics_node(llm):
     """
@@ -738,7 +815,6 @@ def create_metrics_node(llm):
             await log_stream.put("LOG: No agent outputs to analyze. Skipping perplexity calculation.")
             return {}
 
-        # Combine all reasoning and solution fields into one block of text
         combined_text = "\n\n---\n\n".join(
             f"Agent {agent_id}:\nSolution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
             for agent_id, output in all_outputs.items()
@@ -748,18 +824,15 @@ def create_metrics_node(llm):
         
         try:
             score_str = await perplexity_chain.ainvoke({"text_to_analyze": combined_text})
-            # Clean up the score string and convert to float
             score = float(re.sub(r'[^\d.]', '', score_str))
             await log_stream.put(f"SUCCESS: Calculated perplexity heuristic for Epoch {state['epoch']}: {score}")
         except (ValueError, TypeError) as e:
-            score = 100.0  # Default to max perplexity on error
+            score = 100.0
             await log_stream.put(f"ERROR: Could not parse perplexity score. Defaulting to 100. Raw output: '{score_str}'. Error: {e}")
 
-        # Send metric to the frontend via the log stream
         metric_payload = json.dumps({"epoch": state['epoch'], "perplexity": score})
         await log_stream.put(f"{metric_payload}")
 
-        # Update the history in the state
         new_history = state.get("perplexity_history", []) + [score]
         return {"perplexity_history": new_history}
 
@@ -805,7 +878,6 @@ def create_reframe_and_decompose_node(llm):
         final_solution = state.get("final_solution")
         original_request = state.get("original_request")
 
-        # 1. Re-frame the problem
         reframer_chain = get_problem_reframer_chain(llm)
         new_problem_str = await reframer_chain.ainvoke({
             "original_request": original_request,
@@ -818,10 +890,8 @@ def create_reframe_and_decompose_node(llm):
             await log_stream.put(f"SUCCESS: Problem re-framed to: '{new_problem}'")
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             await log_stream.put(f"ERROR: Failed to re-frame problem. Raw: {new_problem_str}. Error: {e}. Aborting re-frame.")
-            # We return an empty dict, so the graph proceeds to update prompts without changing problems.
             return {}
 
-        # 2. Decompose the new problem
         num_agents_total = sum(len(layer) for layer in state["all_layers_prompts"])
         decomposition_chain = get_problem_decomposition_chain(llm)
         try:
@@ -838,7 +908,6 @@ def create_reframe_and_decompose_node(llm):
             await log_stream.put(f"ERROR: Failed to decompose new problem. Error: {e}. Aborting re-frame.")
             return {}
             
-        # 3. Create the new map and update state
         new_decomposed_problems_map = {}
         problem_idx = 0
         for i, layer in enumerate(state["all_layers_prompts"]):
@@ -847,7 +916,6 @@ def create_reframe_and_decompose_node(llm):
                 new_decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
                 problem_idx += 1
         
-        # The new problem becomes the "original_request" for the next cycle of assessment
         return {
             "decomposed_problems": new_decomposed_problems_map,
             "original_request": new_problem
@@ -867,7 +935,6 @@ def create_critique_node(llm):
         critiques = {}
         tasks = []
         
-        # 1. Generate Global Critique for the penultimate layer
         await log_stream.put("LOG: Generating GLOBAL critique for final solution.")
         global_critique_chain = get_global_critique_chain(llm)
         global_critique_text = await global_critique_chain.ainvoke({
@@ -877,12 +944,11 @@ def create_critique_node(llm):
         critiques["global_critique"] = global_critique_text
         await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text}...")
 
-        # 2. Generate Individual Critiques for all other agents (layers 0 to n-2)
         await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
         individual_critique_chain = get_individual_critique_chain(llm)
         num_layers = len(state['all_layers_prompts'])
         
-        for i in range(num_layers - 1): # Loop through all layers except the last one
+        for i in range(num_layers - 1):
             for j in range(len(state['all_layers_prompts'][i])):
                 agent_id = f"agent_{i}_{j}"
                 if agent_id in state["agent_outputs"]:
@@ -903,7 +969,6 @@ def create_critique_node(llm):
 
                     tasks.append(get_individual_critique(agent_id, agent_output))
         
-        # CORRECTED: Unpack the tasks list into arguments for asyncio.gather
         await asyncio.gather(*tasks)
 
         return {"critiques": critiques}
@@ -921,7 +986,6 @@ def create_update_agent_prompts_node(llm):
             return {"epoch": new_epoch, "agent_outputs": {}}
         elif state.get("significant_progress_made"):
             await log_stream.put("LOG: Significant progress was made. Updating prompts based on new sub-problems.")
-            # Clear critiques so they are not mis-applied from a previous epoch
             critiques = {} 
 
 
@@ -937,18 +1001,15 @@ def create_update_agent_prompts_node(llm):
             new_epoch = state["epoch"] + 1
             return {"epoch": new_epoch, "agent_outputs": {}}
 
-        # Start backpropagation from the penultimate layer up to the input layer
         for i in range(penultimate_layer_idx, -1, -1):
             await log_stream.put(f"LOG: [BACKPROP] Reflecting on Layer {i}...")
             
             for j, agent_prompt in enumerate(all_prompts_copy[i]):
                 agent_id = f"agent_{i}_{j}"
                 
-                # MODIFIED: Log the agent's prompt BEFORE any updates are applied
                 await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{agent_prompt}\n---")
                 
-                critique_for_this_agent = "" # Default to no critique
-                # If we didn't make significant progress, apply critiques. Otherwise, critique is empty.
+                critique_for_this_agent = ""
                 if not state.get("significant_progress_made"):
                     if i == penultimate_layer_idx:
                         critique_for_this_agent = critiques.get("global_critique", "")
@@ -961,15 +1022,13 @@ def create_update_agent_prompts_node(llm):
                         await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
                         continue
                 
-                # Get the agent's old attributes to anchor the update
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
                     analysis = clean_and_parse_json(analysis_str)
                 except (json.JSONDecodeError, AttributeError):
-                    analysis = {"attributes": "", "hard_request": ""} # Fallback
+                    analysis = {"attributes": "", "hard_request": ""}
 
                 agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
-                # Generate the new, refined prompt
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),   
@@ -977,17 +1036,14 @@ def create_update_agent_prompts_node(llm):
                     "sub_problem": agent_sub_problem,
                 })
                 
-                # MODIFIED: Log the agent's prompt AFTER it has been updated
                 await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
                 
-                # Update the prompt in our temporary copy
                 all_prompts_copy[i][j] = new_prompt
                 await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
         
         new_epoch = state["epoch"]
         await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch + 1} ---")
 
-        # Reset agent outputs and critiques for the new epoch
         return {
             "all_layers_prompts": all_prompts_copy,
             "epoch": new_epoch,
@@ -998,8 +1054,67 @@ def create_update_agent_prompts_node(llm):
         }
     return update_agent_prompts_node
 
+def create_final_harvest_node(llm, formatter_llm, num_questions):
+    async def final_harvest_node(state: GraphState):
+        await log_stream.put("--- [FINAL HARVEST] Starting Interrogation and Paper Generation ---")
+        
+        raptor_index = state.get("raptor_index")
+        if not raptor_index or not raptor_index.vector_store:
+            await log_stream.put("ERROR: No valid RAPTOR index found. Cannot perform final harvest.")
+            return {"academic_papers": {}}
 
-# --- FastAPI Endpoints ---
+        await log_stream.put("LOG: [HARVEST] Instantiating interrogator chain to generate expert questions...")
+        interrogator_chain = get_interrogator_chain(llm)
+        try:
+            questions_str = await interrogator_chain.ainvoke({
+                "original_request": state["original_request"],
+                "num_questions": num_questions
+            })
+            questions = clean_and_parse_json(questions_str).get("questions", [])
+            if not questions:
+                raise ValueError("No questions generated by interrogator.")
+            await log_stream.put(f"SUCCESS: Generated {len(questions)} expert questions.")
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to generate questions for harvesting. Error: {e}. Aborting harvest.")
+            return {"academic_papers": {}}
+            
+        paper_formatter_chain = get_paper_formatter_chain(formatter_llm)
+        academic_papers = {}
+        
+        MAX_CONTEXT_CHARS = 250000
+
+        for i, question in enumerate(questions):
+            await log_stream.put(f"LOG: [HARVEST] Processing Question {i+1}/{len(questions)}: '{question[:80]}...'")
+            
+            try:
+                retrieved_docs = raptor_index.retrieve(question, k=40)
+                await log_stream.put(f"LOG: Retrieved {len(retrieved_docs)} documents from RAG index.")
+                
+                if not retrieved_docs:
+                    await log_stream.put("WARNING: No relevant documents found for this question. Skipping paper generation.")
+                    continue
+                
+                rag_context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+                
+                if len(rag_context) > MAX_CONTEXT_CHARS:
+                    await log_stream.put(f"WARNING: RAG context length ({len(rag_context)} chars) exceeds limit. Truncating to {MAX_CONTEXT_CHARS} chars.")
+                    rag_context = rag_context[:MAX_CONTEXT_CHARS]
+                
+                paper_content = await paper_formatter_chain.ainvoke({
+                    "question": question,
+                    "rag_context": rag_context
+                })
+                academic_papers[question] = paper_content
+                await log_stream.put(f"SUCCESS: Generated document for question {i+1}.")
+                
+            except Exception as e:
+                await log_stream.put(f"ERROR: Failed during document for question {i+1}. Error: {e}")
+        
+        await log_stream.put(f"--- [FINAL HARVEST] Finished. Generated {len(academic_papers)} papers. ---")
+        return {"academic_papers": academic_papers}
+    return final_harvest_node
+
+
 @app.get("/", response_class=HTMLResponse)
 def get_index():
     with open("index.html", "r", encoding="utf-8") as f:
@@ -1008,8 +1123,32 @@ def get_index():
 @app.post("/build_and_run_graph")
 async def build_and_run_graph(payload: dict = Body(...)):
     llm = None
+    embeddings_model = None
+    summarizer_llm = None
     try:
         params = payload.get("params")
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables.")
+
+        await log_stream.put("--- Initializing Google Gemini Embeddings for RAG Index ---")
+        embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+
+        llm_provider_for_summarizer = params.get("llm_provider", "Gemini")
+
+        await log_stream.put(f"--- Initializing Dedicated RAPTOR Summarizer LLM ---")
+        if llm_provider_for_summarizer == "Ollama":
+            summarizer_model_name = "qwen3:1.7b"
+            await log_stream.put(f"Provider: Ollama, Model: {summarizer_model_name}")
+            summarizer_llm = ChatOllama(model=summarizer_model_name, temperature=0)
+        else:
+            await log_stream.put(f"Provider: Google Gemini, Model: gemini-2.5-flash")
+            summarizer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
+        
+        await summarizer_llm.ainvoke("Respond with only 'OK'")
+        await log_stream.put("--- RAPTOR Summarizer LLM Connection Successful ---")
+
+
         if params.get("debug_mode") == 'true':
             await log_stream.put("--- 🚀 DEBUG MODE ENABLED 🚀 ---")
             llm = MockLLM()
@@ -1017,15 +1156,12 @@ async def build_and_run_graph(payload: dict = Body(...)):
             llm_provider = params.get("llm_provider", "Gemini")
             if llm_provider == "Ollama":
                 model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
-                await log_stream.put(f"--- Initializing Local LLM: Ollama ({model_name}) ---")
+                await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
                 llm = ChatOllama(model=model_name, temperature=0)
                 await llm.ainvoke("Hi")
-                await log_stream.put("--- Ollama Connection Successful ---")
+                await log_stream.put("--- Main Agent LLM Connection Successful ---")
             else:
-                await log_stream.put("--- Initializing Google Gemini LLM ---")
-                api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    raise ValueError("GEMINI_API_KEY not found in environment variables.")
+                await log_stream.put("--- Initializing Main Agent LLM: Google Gemini ---")
                 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
@@ -1037,6 +1173,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
     user_prompt = params.get("prompt")
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 3))
+    num_questions = int(params.get('num_questions', 25))
 
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
@@ -1047,7 +1184,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
     await log_stream.put(f"Parameters: {params}")
 
     try:
-        # --- Problem Decomposition ---
         await log_stream.put("--- Decomposing Original Problem into Subproblems ---")
         num_agents_per_layer = len(mbti_archetypes)
         total_agents_to_create = num_agents_per_layer * cot_trace_depth
@@ -1067,7 +1203,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             await log_stream.put(f"ERROR: Failed to decompose problem. Error: {e}. Defaulting to using the original prompt for all agents.")
             sub_problems_list = [user_prompt] * total_agents_to_create
 
-        # Map subproblems to agent IDs
         decomposed_problems_map = {}
         problem_idx = 0
         for i in range(cot_trace_depth):
@@ -1076,10 +1211,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 if problem_idx < len(sub_problems_list):
                     decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
                     problem_idx += 1
-                else: # Fallback
+                else:
                     decomposed_problems_map[agent_id] = user_prompt
 
-        # --- Seed Verb Generation ---
         num_mbti_types = len(mbti_archetypes)
         total_verbs_to_generate = word_vector_size * num_mbti_types
         seed_generation_chain = get_seed_generation_chain(llm)
@@ -1089,11 +1223,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
         seeds = {mbti: " ".join(random.sample(all_verbs, word_vector_size)) for mbti in mbti_archetypes}
         await log_stream.put(f"Seed verbs generated: {seeds}")
 
-        # --- Agent Prompt Generation ---
         all_layers_prompts = []
         input_spanner_chain = get_input_spanner_chain(llm, params['prompt_alignment'], params['density'])
         
-        # Layer 0
         await log_stream.put("--- Creating Layer 0 Agents ---")
         layer_0_prompts = []
         for j, (m, gw) in enumerate(seeds.items()):
@@ -1103,7 +1235,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
-        # Subsequent Layers
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
         dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
 
@@ -1129,14 +1260,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
         
-        # --- Graph Definition ---
         workflow = StateGraph(GraphState)
 
-        # Gateway node that increments the epoch
         def epoch_gateway(state: GraphState):
             new_epoch = state.get("epoch", 0) + 1
             state['epoch'] = new_epoch
-            # Clear outputs from previous epoch before starting the new forward pass
             state['agent_outputs'] = {}
             return state
             
@@ -1148,21 +1276,15 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
+        workflow.add_node("update_rag_index", create_update_rag_index_node(summarizer_llm, embeddings_model))
         workflow.add_node("metrics", create_metrics_node(llm))
-        workflow.add_node("progress_assessor", create_progress_assessor_node(llm)) # New Node
-        workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm)) # New Node
+        workflow.add_node("progress_assessor", create_progress_assessor_node(llm))
+        workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
-
-        # Add a final node to capture the state before ending
-        def package_final_state(state: GraphState):
-            """This node is a clean exit point. It captures the state from the final
-            forward pass before the graph terminates."""
-            return state
-        workflow.add_node("package_results", package_final_state)
+        workflow.add_node("final_harvest", create_final_harvest_node(llm, summarizer_llm, num_questions))
 
 
-        # --- Graph Connections ---
         await log_stream.put("--- Connecting Graph Nodes ---")
         
         workflow.set_entry_point("epoch_gateway")
@@ -1187,11 +1309,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        # MODIFIED: New conditional logic for progress assessment
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Capturing final state and ending execution.")
-                return "package_results"
+                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final harvest.")
+                return "final_harvest"
             
             if state.get("significant_progress_made"):
                 await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
@@ -1206,13 +1327,16 @@ async def build_and_run_graph(payload: dict = Body(...)):
             {
                 "reframe": "reframe_and_decompose",
                 "critique": "critique",
-                "package_results": "package_results"
+                "final_harvest": "final_harvest"
             }
         )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
-        workflow.add_edge("synthesis", "metrics")
-        await log_stream.put("CONNECT: synthesis -> metrics")
+        workflow.add_edge("synthesis", "update_rag_index")
+        await log_stream.put("CONNECT: synthesis -> update_rag_index")
+
+        workflow.add_edge("update_rag_index", "metrics")
+        await log_stream.put("CONNECT: update_rag_index -> metrics")
         
         workflow.add_edge("metrics", "progress_assessor")
         await log_stream.put("CONNECT: metrics -> progress_assessor")
@@ -1226,15 +1350,14 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
 
-        workflow.add_edge("package_results", END)
-        await log_stream.put("CONNECT: package_results -> END")
+        workflow.add_edge("final_harvest", END)
+        await log_stream.put("CONNECT: final_harvest -> END")
         
-        # --- Graph Execution ---
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
         ascii_art = graph.get_graph().draw_ascii()
-        await log_stream.put(f"{ascii_art}")
+        await log_stream.put(f"__start__{ascii_art}")
 
         initial_state = {
             "original_request": user_prompt,
@@ -1244,7 +1367,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "params": params, "all_layers_prompts": all_layers_prompts,
             "agent_outputs": {}, "memory": {}, "final_solution": None,
             "perplexity_history": [],
-            "significant_progress_made": False # New: Initialize flag
+            "significant_progress_made": False,
+            "raptor_index": None,
+            "all_rag_documents": [],
+            "academic_papers": None
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
@@ -1258,33 +1384,19 @@ async def build_and_run_graph(payload: dict = Body(...)):
         final_state_value = list(final_state.values())[0] if final_state else {}
         await log_stream.put("--- Execution Finished ---")
         
-        final_solution = final_state_value.get("final_solution", {"error": "No final solution found in the final state."})
+        academic_papers = final_state_value.get("academic_papers", {})
 
-        # MODIFIED: Package hidden layer outputs with their final system prompts
-        hidden_layer_outputs = {}
-        final_prompts = final_state_value.get("all_layers_prompts", [])
+        session_id = str(uuid.uuid4())
+        if academic_papers:
+            final_reports[session_id] = academic_papers
+            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created. Session ID: {session_id}")
+        else:
+            await log_stream.put("WARNING: No academic papers were generated in the final harvest.")
 
-        if "agent_outputs" in final_state_value and final_prompts:
-            for agent_id, output in final_state_value["agent_outputs"].items():
-                try:
-                    parts = agent_id.split('_')
-                    layer_index = int(parts[1])
-                    agent_index_in_layer = int(parts[2])
-
-                    # The last layer's output goes into synthesis, so we only show the ones before it.
-                    if layer_index < (cot_trace_depth - 1):
-                        system_prompt = final_prompts[layer_index][agent_index_in_layer]
-                        hidden_layer_outputs[agent_id] = {
-                            "output": output,
-                            "system_prompt": system_prompt
-                        }
-                except (IndexError, ValueError) as e:
-                    await log_stream.put(f"WARNING: Could not process hidden output for {agent_id}. Error: {e}")
 
         return JSONResponse(content={
             "message": "Graph execution complete.", 
-            "final_solution": final_solution,
-            "hidden_layer_outputs": hidden_layer_outputs
+            "session_id": session_id if academic_papers else None
         })
 
     except Exception as e:
@@ -1307,6 +1419,29 @@ def stream_log(request: Request):
                 continue
 
     return EventSourceResponse(event_generator())
+
+@app.get("/download_report/{session_id}")
+async def download_report(session_id: str):
+    papers = final_reports.get(session_id)
+    if not papers:
+        return JSONResponse(content={"error": "Report not found or expired."}, status_code=404)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for i, (question, content) in enumerate(papers.items()):
+            safe_question = re.sub(r'[^\w\s-]', '', question).strip().replace(' ', '_')
+            filename = f"paper_{i+1}_{safe_question[:50]}.md"
+            zip_file.writestr(filename, content)
+
+    zip_buffer.seek(0)
+    
+    del final_reports[session_id]
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=NOA_Report_{session_id}.zip"}
+    )
 
 
 if __name__ == "__main__":
