@@ -11,7 +11,6 @@ NoA is a research platform that challenges the paradigm of centralized, propriet
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
-By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a framework or solution to a multifactorial problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
 ## Changelog
 
