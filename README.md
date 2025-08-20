@@ -6,6 +6,11 @@ I've been thinking a lot about how we, as people, develop ideas. It's rarely a s
 
 I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
 
+## ⚠️ Alpha Software - We Need Your Help! ⚠️
+Please be aware that NoA is currently in an alpha stage. It is experimental research software, and you may encounter bugs, unexpected behavior, or breaking changes.
+
+Your feedback is invaluable. If you run into issues, have ideas, or want to contribute, please **open an issue** on our GitHub repository. Helping us identify and squash bugs is one of the most important contributions you can make right now!
+
 ## **Is true "deep thinking" only for trillion-dollar companies?**
 NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
@@ -14,9 +19,11 @@ https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
 ## Changelog
 
+*   **Interactive RAG Chat & Diagnostic Tool:** The process now pauses after the final epoch, allowing you to directly **chat with the generated RAG index**. This powerful diagnostic feature lets you interrogate the massive "cube of thinking text" from all hidden layers, ask follow-up questions, and gain extra insights beyond the automated academic questions. Your entire chat conversation is then archived and included in the final knowledge harvest, enriching the final report.
+
 *   **Final Knowledge Harvest & RAG:** The run doesn't just end with a final answer anymore. All agent outputs from all epochs are now archived into a multi-layered RAPTOR (Recursive Abstractive Processing over Trees of RAG) index. Upon completion, an `interrogator` agent generates a series of expert-level questions about the original problem, and a `paper_formatter` agent uses the RAG index to write a formal academic-style paper answering each question. The final output is now a downloadable ZIP file containing this collection of research papers.
 
-*   **Dynamic Critique Annealing:** The network previosuly static "loss function" now evolves. A new meta-process analyzes the collective output of the hidden-layer agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompt of the critique agent, changing its persona (e.g., from a 'senior manager' to a 'cynical philosopher-king') to provide a different style of feedback for the next epoch.
+*   **Dynamic Critique Annealing:** The network previously static "loss function" now evolves. A new meta-process analyzes the collective output of the hidden-layer agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompt of the critique agent, changing its persona (e.g., from a 'senior manager' to a 'cynical philosopher-king') to provide a different style of feedback for the next epoch.
 
 *   **Dynamic Problem Re-framing:** The network can now assess its own progress. If it determines it has made a "significant breakthrough," it formulates a new, more advanced problem that builds upon its success. This turns the process from simple refinement into a genuine journey of discovery.
 
@@ -79,9 +86,11 @@ When the final epoch is complete, the process is not over. The network enters a 
 
 1.  **Archival and RAG Indexing**: An `archive_epoch_outputs` node gathers every single agent output from every epoch of the entire run. This collection of documents is then used to build a comprehensive, multi-layered RAPTOR RAG index, creating a searchable knowledge base of the entire thought process.
 
-2.  **Interrogation and Synthesis**: A `final_harvest` node takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
+2.  **Pause for Interactive Chat**: At this point, the network pauses. The user is presented with a chat interface, allowing them to directly query the newly created RAG index. This serves as a powerful diagnostic tool, enabling the user to probe the network's collective "mind," ask clarifying questions, and explore threads of reasoning before the final summarization.
 
-3.  **Generating the Final Report**: The `paper_formatter` synthesizes the retrieved context into a formal, academic-style markdown document. The final output of the entire run is a downloadable ZIP archive containing this collection of research papers, representing the network's total accumulated knowledge on the topic.
+3.  **Interrogation and Synthesis**: When the user concludes the chat session, the entire conversation is converted into documents and added to the knowledge base, which is re-indexed. A `final_harvest` node then takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
+
+4.  **Generating the Final Report**: The `paper_formatter` synthesizes the retrieved context into a formal, academic-style markdown document. The final output of the entire run is a downloadable ZIP archive containing this collection of research papers, representing the network's total accumulated knowledge on the topic.
 
 ## Vision & Long-Term Roadmap: Training a World Language Model
 
@@ -147,9 +156,13 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 
 4.  **Install and Run Ollama**: This application requires a running Ollama server for local inference.
     *   Follow the official instructions to install Ollama.
-    *   Download a model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
+    *   Download the primary model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
         ```bash
         ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
+        ```
+    *   **Download the compulsory summarization model.** NoA requires `qwen3:1.7b` for its internal summarization tasks (memory, RAG indexing). This is not optional.
+        ```bash
+        ollama pull qwen3:1.7b
         ```
     *   Ensure the Ollama application is running in the background.
 
@@ -166,7 +179,8 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 2.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
 3.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
 4.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
-5.  **Download the Final Report**: Once all epochs are complete, the final harvest phase will run. A download link for a ZIP file containing the generated research papers will appear.
+5.  **Chat and Diagnose**: Once the epochs are complete, the GUI will present a chat interface. Use this to directly query the RAG index of the network's entire thought process. Ask follow-up questions and probe for deeper insights.
+6.  **Harvest and Download**: When you are finished chatting, click the "HARVEST" button. This will incorporate your chat history and generate the final report. A download link for a ZIP file containing the research papers will appear.
 
 ## Let's Collaborate: Building a P2P Network
 
