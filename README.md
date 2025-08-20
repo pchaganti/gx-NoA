@@ -105,24 +105,8 @@ These are the core research avenues we are actively exploring to enhance the net
 *   **Develop More Sophisticated Metrics**: While perplexity provides a starting point, we plan to research and implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions over time.
 *   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
 
-## Vision & Long-Term Roadmap: Training a World Language Model
 
-Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of a more socially driven kind of thought.
-
-Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**. A WLM, as we envision it, moves beyond predicting the next token. It would be a model trained on the fundamental patterns of collaboration, critique, and social intelligence. By training a foundation model on thousands of these solution-mining runs, we hypothesize it could develop a more robust, generalized reasoning capability.
-
-## Research & Development Goals
-
-### Mid-Term Research Goals
-*   **Implement Cyclical Hierarchical Sparse Connections:** Explore a more sophisticated architecture to see the emergence of "leader" agents and specialized "micro-teams," improving scalability.
-*   **Give Agents Tools:** Look into frameworks like open-source command-line tools to give each "neuron" an execution environment so it can code and perform actions, though this adds significant complexity.
-*   **Scale to a "World-of-Agents"**: On more powerful hardware, use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
-*   **Enhance Combinatorial Heuristics**: Research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically.
-*   **Develop More Sophisticated Metrics**: Implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions.
-*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances to collectively "mine" a solution.
-*   **Conduct High-VRAM Scalability Tests:** Benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic.
-
-## Hyperparameters Explained: Tuning Your Solution Mining Rig ⚙️
+## Hyperparameters Explained: Tuning Your Theory Crafting Mining Rig ⚙️
 
 
 The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
