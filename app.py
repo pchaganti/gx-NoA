@@ -39,6 +39,8 @@ log_stream = asyncio.Queue()
 final_reports = {}
 active_sessions = {}
 
+#below: deep, esoteric and obscure pseudoscience stuff
+
 reactor_list = [
 
     "( Se ~ Fi )",
