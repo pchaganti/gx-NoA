@@ -26,8 +26,7 @@ https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
 *   **Better Memory for the Long Haul - Dynamic Summarization:** To support extra-long mining sessions, a specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights without overflowing the context window.
 
-*   **Opening the Black Box - Richer Data Collection:** We're now logging the final evolved system prompts and JSON outputs for the hidden-layer agents, providing a much richer dataset for understanding the process.
-
+  
 
 ## The Core Idea: Qualitative Backpropagation
 
