@@ -14,7 +14,11 @@ Your feedback is invaluable. If you run into issues, have ideas, or want to cont
 ## **Is true "deep thinking" only for trillion-dollar companies?**
 NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
-https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
+
+
+
+https://github.com/user-attachments/assets/5f6e406d-ad76-4662-9d51-91b8658b9088
+
 
 
 ## Changelog
