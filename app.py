@@ -18,6 +18,15 @@ import random
 import traceback
 from langchain_core.runnables import Runnable
 from langchain_core.runnables.config import RunnableConfig
+from langchain_core.retrievers import BaseRetriever
+from typing import Dict, Any, TypedDict, Annotated, Tuple
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.messages import SystemMessage, HumanMessage
+from sklearn.cluster import KMeans
+
 
 load_dotenv()
 
@@ -26,6 +35,135 @@ app = FastAPI()
 
 # In-memory stream for logs
 log_stream = asyncio.Queue()
+
+class RAPTORRetriever(BaseRetriever):
+    raptor_index: Any
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        return self.raptor_index.retrieve(query)
+
+
+
+class RAPTOR:
+    def __init__(self, llm, embeddings_model, session_id, chunk_size=1000, chunk_overlap=200):
+        self.llm = llm
+        self.embeddings_model = embeddings_model
+        self.session_id = session_id
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        self.tree = {}
+        self.all_nodes: Dict[str, Document] = {}
+        self.vector_store = None
+        self.checkpoint_path = f"checkpoint_{self.session_id}.json"
+
+    def _save_checkpoint(self, level):
+        state = {
+            "level": level,
+            "tree": {str(k): [node_id for node_id in v] for k, v in self.tree.items()},
+            "all_nodes": {node_id: doc.to_json() for node_id, doc in self.all_nodes.items()},
+        }
+        with open(self.checkpoint_path, 'w') as f:
+            json.dump(state, f)
+        log_stream.put(f"Checkpoint saved for level {level}.")
+
+    def _load_checkpoint(self) -> int:
+        if os.path.exists(self.checkpoint_path):
+            try:
+                with open(self.checkpoint_path, 'r') as f:
+                    state = json.load(f)
+                from langchain_core.load import load
+                self.all_nodes = {node_id: load(doc) for node_id, doc in state["all_nodes"].items()}
+                self.tree = state["tree"]
+                start_level = state["level"]
+                log_stream.put(f"Resuming from checkpoint at level {start_level}.")
+                return start_level
+            except Exception as e:
+                log_stream.put.warning(f"Could not load checkpoint file due to error: {e}. Starting from scratch.")
+                return 0
+        return 0
+
+    def add_documents(self, documents: List[Document]):
+        start_level = self._load_checkpoint()
+        if start_level == 0:
+            log_stream.put("Step 1: Assigning IDs to initial chunks (Level 0)...")
+            level_0_node_ids = []
+            for i, doc in enumerate(documents):
+                node_id = f"0_{i}"
+                self.all_nodes[node_id] = doc
+                level_0_node_ids.append(node_id)
+            self.tree[str(0)] = level_0_node_ids
+            self._save_checkpoint(0)
+        
+        current_level = start_level
+        while len(self.tree[str(current_level)]) > 1:
+            next_level = current_level + 1
+            log_stream.put(f"Step 2: Building Level {next_level} of the tree...")
+            current_level_node_ids = self.tree[str(current_level)]
+            current_level_docs = [self.all_nodes[nid] for nid in current_level_node_ids]
+            clustered_indices = self._cluster_nodes(current_level_docs)
+            
+            next_level_node_ids = []
+            num_clusters = len(clustered_indices)
+            summary_progress = st.progress(0, text=f"Summarizing Level {next_level}...")
+            for i, indices in enumerate(clustered_indices):
+                cluster_docs = [current_level_docs[j] for j in indices]
+                summary, combined_metadata = self._summarize_cluster(cluster_docs)
+                summary_doc = Document(page_content=summary, metadata=combined_metadata)
+                node_id = f"{next_level}_{i}"
+                self.all_nodes[node_id] = summary_doc
+                next_level_node_ids.append(node_id)
+                summary_progress.progress((i + 1) / num_clusters, text=f"Summarizing cluster {i+1}/{num_clusters} for Level {next_level}...")
+            
+            self.tree[str(next_level)] = next_level_node_ids
+            self._save_checkpoint(next_level)
+            current_level = next_level
+
+        log_stream.put.write("Step 3: Creating final vector store from all nodes...")
+        final_docs = list(self.all_nodes.values())
+        self.vector_store = FAISS.from_documents(documents=final_docs, embedding=self.embeddings_model)
+        log_stream.put.write("RAPTOR index built successfully!")
+        if os.path.exists(self.checkpoint_path):
+            os.remove(self.checkpoint_path)
+
+    def _cluster_nodes(self, docs: List[Document]) -> List[List[int]]:
+        num_docs = len(docs)
+
+        if num_docs <= 5:
+            log_stream.put(f"Grouping {num_docs} remaining nodes into a single summary to finalize the tree.")
+            return [list(range(num_docs))]
+
+        log_stream.put(f"Embedding {num_docs} nodes for clustering...")
+        embeddings = self.embeddings_model.embed_documents([doc.page_content for doc in docs])
+        n_clusters = max(2, num_docs // 5)
+        
+        if n_clusters >= num_docs:
+            n_clusters = num_docs - 1
+
+        log_stream.put(f"Clustering {num_docs} nodes into {n_clusters} groups...")
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto').fit(embeddings)
+        
+        clusters = [[] for _ in range(n_clusters)]
+        for i, label in enumerate(kmeans.labels_):
+            clusters[label].append(i)
+            
+        return clusters
+
+    def _summarize_cluster(self, cluster_docs: List[Document]) -> Tuple[str, dict]:
+        context = "\n\n---\n\n".join([doc.page_content for doc in cluster_docs])
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content="You are an AI assistant that summarizes academic texts. Create a concise, abstractive summary of the following content, synthesizing the key information."),
+            HumanMessage(content="Please summarize the following content:\n\n{context}")
+        ])
+        chain = prompt | self.llm
+        response = chain.invoke({"context": context})
+        summary = response.content
+        aggregated_sources = list(set(doc.metadata.get("url", "Unknown Source") for doc in cluster_docs))
+        combined_metadata = {"sources": aggregated_sources}
+        return summary, combined_metadata
+    
+    def retrieve(self, query: str, k: int = 5) -> List[Document]:
+        return self.vector_store.similarity_search(query, k=k) if self.vector_store else []
+    
+    def as_retriever(self) -> BaseRetriever:
+        return RAPTORRetriever(raptor_index=self)
 
 def clean_and_parse_json(llm_output_string):
   """
