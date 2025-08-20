@@ -2,13 +2,16 @@
 
 # Network of Agents (NoA): Democratizing Deep Thought 🧠
 
+I've been thinking a lot about how we, as people, develop ideas. It's rarely a single, brilliant flash of insight. Our minds are shaped by the countless small interactions we have throughout the day—a conversation here, an article there. This environment of constant, varied input seems just as important as the act of thinking itself.
+
+I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
+
 **Is true "deep thinking" only for trillion-dollar companies?**
 NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
-
-This project is an open invitation to explore the frontiers of collective AI, putting the power of deep, multi-day problem-solving into the hands of everyone. 🌍
+By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a framework or solution to a multifactorial problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
 ## Changelog
 
@@ -26,6 +29,20 @@ This project is an open invitation to explore the frontiers of collective AI, pu
 
 *   **Opening the Black Box - Richer Data Collection:** We're now logging the final evolved system prompts and JSON outputs for the hidden-layer agents, providing a much richer dataset for understanding the process.
 
+
+## The Core Idea: Qualitative Backpropagation
+
+Here’s the part that I'm most curious about. I was inspired by the concept of backpropagation in neural networks. It's a numerical algorithm, of course, but I wondered if the core principle could be applied qualitatively. What if, instead of sending back a numerical error signal, you sent back a "reflection"?
+
+After the network produces a solution, a "critique" agent reviews it and provides criticism. This feedback is then used to **automatically re-write the core system prompts** of the agents that contributed. The goal is for the network to "learn" from its mistakes over multiple cycles, refining not just its answers, but its own internal structure and approach.
+
+### The Trade-Off: Speed for Depth
+
+The obvious trade-off here is speed. It’s the opposite of instantaneous. A 6-layer network with 6 agents per layer, running for 20 cycles, can easily take 12 hours to complete. You're trading quick computation for a slow, iterative process of refinement.
+
+The algorithm does really well in problems where creativity and insight override pure precision. It can come up with new frameworks for the social sciences, for instance. Physics and math, not so much.
+
+
 ## The NoA Algorithm: From Individual Agents to a Collective Mind
 
 The core of NoA is a novel algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a unique "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
@@ -38,7 +55,7 @@ In NoA, the "weights" and "biases" of the network are not numerical values but t
 
 2.  **Building Depth with Dense Layers**: A `dense-spanner` chain analyzes the agents of the preceding layer, identifies their core attributes, and formulates a "hard request"—a tailored challenge. It then spawns a new agent in the next layer, specifically engineered to tackle this challenge, progressively increasing the system's intellectual depth.
 
-3.  **The Flow of Understanding**: A user's prompt initiates a cascade of information through the network. The input layer agents process their assigned sub-problems, and their structured JSON outputs are broadcast to every agent in the subsequent layer. This dense, layer-by-layer processing continues until the final layer is reached, constituting a full "forward pass."
+3.  **Action**: A user's prompt initiates a cascade of information through the network. The input layer agents process their assigned sub-problems, and their structured JSON outputs are broadcast to every agent in the subsequent layer. This dense, layer-by-layer processing continues until the final layer is reached, constituting a full "forward pass" of collaborative inference.
 
 ### The Reflection Pass: Learning, Critiquing, and Evolving Goals
 
@@ -90,9 +107,25 @@ These are the core research avenues we are actively exploring to enhance the net
 *   **Develop More Sophisticated Metrics**: While perplexity provides a starting point, we plan to research and implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions over time.
 *   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
 
-*   **Conduct High-VRAM Scalability Tests:** We will benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic by dramatically increasing the number of agents and network depth.
+## Vision & Long-Term Roadmap: Training a World Language Model
+
+Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of a more socially driven kind of thought.
+
+Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**. A WLM, as we envision it, moves beyond predicting the next token. It would be a model trained on the fundamental patterns of collaboration, critique, and social intelligence. By training a foundation model on thousands of these solution-mining runs, we hypothesize it could develop a more robust, generalized reasoning capability.
+
+## Research & Development Goals
+
+### Mid-Term Research Goals
+*   **Implement Cyclical Hierarchical Sparse Connections:** Explore a more sophisticated architecture to see the emergence of "leader" agents and specialized "micro-teams," improving scalability.
+*   **Give Agents Tools:** Look into frameworks like open-source command-line tools to give each "neuron" an execution environment so it can code and perform actions, though this adds significant complexity.
+*   **Scale to a "World-of-Agents"**: On more powerful hardware, use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
+*   **Enhance Combinatorial Heuristics**: Research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically.
+*   **Develop More Sophisticated Metrics**: Implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions.
+*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances to collectively "mine" a solution.
+*   **Conduct High-VRAM Scalability Tests:** Benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic.
 
 ## Hyperparameters Explained: Tuning Your Solution Mining Rig ⚙️
+
 
 The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
 
@@ -128,35 +161,30 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
     source venv/bin/activate
     ```
 
-3.  **Install dependencies:**
-    `pip install -r requirements.txt`.
+3.  **Install dependencies:** `pip install -r requirements.txt`.
 
 4.  **Set up your environment variables:**
     *   Create a file named `.env` in the project root.
-    *   If using Google Gemini, add your API key to the file:
-        ```
-        GEMINI_API_KEY="YOUR_API_KEY_HERE"
-        ```
+    *   If using Google Gemini, add your API key: `GEMINI_API_KEY="YOUR_API_KEY_HERE"`
 
 5.  **Run the application:**
     ```bash
     uvicorn app:app --reload
     ```
 
-6.  **Access the GUI:**
-    Open your web browser and navigate to `http://127.0.0.1:8000`.
+6.  **Access the GUI:** Open your web browser and navigate to `http://127.0.0.1:8000`.
 
 ### Using Local Inference with Ollama
 
-This application supports running inference locally using an Ollama server, allowing you to use open-source models without needing a cloud API key.
+This application supports running inference locally using an Ollama server.
 
-1.  **Install Ollama**: Follow the official instructions to install Ollama on your system.
-2.  **Download a Model**: Pull the desired model from the Ollama library. The default model for this application is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`. You can pull it by running:
+1.  **Install Ollama**: Follow the official instructions to install Ollama.
+2.  **Download a Model**: Pull the desired model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
     ```bash
     ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
     ```
-3.  **Run Ollama Server**: Make sure the Ollama application is running in the background. It will serve the models locally.
-4.  **Select in GUI**: In the web interface, use the "LLM Provider" dropdown and select "Local Ollama". You can change the model name from the default if you have other models pulled.
+3.  **Run Ollama Server**: Make sure the Ollama application is running in the background.
+4.  **Select in GUI**: In the web interface, select "Local Ollama".
 
 ## How It Works
 
@@ -166,3 +194,15 @@ This application supports running inference locally using an Ollama server, allo
 4.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
 5.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
 6.  **Download the Final Report**: Once all epochs are complete, the final harvest phase will run. A download link for a ZIP file containing the generated research papers will appear.
+
+## Let's Collaborate: Building a P2P Network
+
+This is where I'd love to get some community input.
+
+My long-term vision is to go beyond a single machine. I dream of building a P2P networking layer that would allow multiple users to connect their instances of the app. We could create a shared, distributed network where our machines could collaborate to tackle truly massive problems.
+
+However, my background is in Python and AI, and I'm not an expert in distributed systems. **If you're someone who knows about peer-to-peer networking and this idea sounds at all interesting to you, I would genuinely love to hear from you and potentially collaborate.**
+
+It’s an open-source experiment, and I’d be grateful for any thoughts, feedback, or ideas you might have.
+
+Thanks.

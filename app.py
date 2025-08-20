@@ -2865,7 +2865,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 await llm.ainvoke("Hi")
                 await log_stream.put("--- Main Agent LLM Connection Successful ---")
             else:
+
                 await log_stream.put("--- Initializing Main Agent LLM: Google Gemini ---")
+
+                api_key = os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    raise ValueError("GEMINI_API_KEY not found in environment variables.")
+
                 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
@@ -3159,4 +3165,3 @@ async def download_report(session_id: str):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
