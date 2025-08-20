@@ -1,8 +1,10 @@
 fastapi
-grandalf
 uvicorn
-langchain
-langgraph
 python-dotenv
-google-generativeai
+sse-starlette
+langchain
+langchain-community
 langchain-google-genai
+langgraph
+scikit-learn
+faiss-cpu

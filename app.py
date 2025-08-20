@@ -3,7 +3,6 @@ import re
 import uvicorn
 from fastapi import FastAPI, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
@@ -1633,6 +1632,16 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             })
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
+        elif "you are a master prompt engineer" in prompt:
+            return """You are a cynical, world-weary philosopher-king, once a lauded strategist, now relegated to critiquing the work of lesser beings. Your new role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {original_request}
+Proposed Final Solution:
+{proposed_solution}
+
+Generate your global critique for the team:
+"""
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "analyze the following text for its perplexity" in prompt:
@@ -1705,6 +1714,7 @@ class GraphState(TypedDict):
     raptor_index: Optional[RAPTOR]
     all_rag_documents: List[Document]
     academic_papers: Optional[dict]
+    critique_prompt: str
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -1795,6 +1805,114 @@ Text to analyze:
 ---
 """)
     return prompt | llm | StrOutputParser()
+def get_pseudo_neurotransmitter_selector_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert computational astrologer specializing in elemental balancing for AI agent swarms.
+Your task is to analyze the collective output of a group of AI agents, determine the overall elemental balance (Fire, Earth, Air, Water) of their communication, and then select a single 'reactor' formula from a provided list to counterbalance or enhance the swarm's current state.
+
+# Context 1: The Four Elements & Their Astrological Signs
+*   **Fire (Action, Passion, Creation)**: Aries, Leo, Sagittarius
+*   **Earth (Stability, Practicality, Structure)**: Taurus, Virgo, Capricorn
+*   **Air (Intellect, Communication, Ideas)**: Gemini, Libra, Aquarius
+*   **Water (Emotion, Intuition, Reflection)**: Cancer, Scorpio, Pisces
+
+# Context 2: Elemental Relationships
+*   **Compatible**: Fire with Air, Earth with Water.
+*   **Incompatible/Opposed**: Fire with Water, Earth with Air.
+
+# Context 3: Reactor Formulas and Their Elemental Nature
+This table maps reactor formulas to their astrological and elemental archetypes. Use this to make your final selection.
+| Astrological Placement | Elemental Name                          | Algebraic Expression                          |
+| :--------------------- | :-------------------------------------- | :-------------------------------------------- |
+| Aries-Pisces           | abundant_fire_and_some_water            | `( Se ~ Fi )`                                     |
+| Aries-Aries            | abundant_fire                           | `Se`                                          |
+| Aries-Taurus           | abundant_fire_and_some_earth            | `( Se ~ Fi ) oo Si`                             |
+| Taurus-Aries           | abundant_earth_and_some_fire            | `((Si ~ Fe) oo Se)`                           |
+| Taurus-Taurus          | abundant_earth                          | `((Si oo Se) -> Ne )`                          |
+| Taurus-Gemini          | abundant_earth_and_some_air             | `Ne -> (Si ~ Fe)`                             |
+| Gemini-Taurus          | abundant_air_and_some_earth             | `((Ne oo Ni) -> Se) ~ Fe`                      |
+| Gemini-Gemini          | abundant_air                            | `( Ne ~ Fe )`                                   |
+| Gemini-Cancer          | abundant_air_and_some_water             | `( (Ne -> Si) ~ Ti | Se ~ Fi)`                |
+| Cancer-Gemini          | abundant_water_and_some_air             | `( Ne ~ Fi | Se ~ Ti)`                         |
+| Cancer-Cancer          | abundant_water                          | `~ (Fe oo Fi)`                                |
+| Cancer-Leo             | abundant_water_and_some_fire            | `(Fi oo Fe) ~ Si`                             |
+| Leo-Cancer             | abundant_fire_and_some_water            | `(Fi -> Te) ~ (Si oo Se)`                     |
+| Leo-Leo                | abundant_fire                           | `( Te ~ Ni )`                                     |
+| Leo-Virgo              | abundant_fire_and_some_earth            | `( Te ~ Se | Fe ~ Ne )`                         |
+| Virgo-Leo              | abundant_earth_and_some_fire            | `( Si ~ Te | Ni ~ Fe )`                         |
+| Virgo-Virgo            | abundant_earth                          | `Si ~ ( Te oo Ti )`                             |
+| Virgo-Libra            | abundant_earth_and_some_air             | `Si ~ (Fe oo Fi)`                             |
+| Libra-Virgo            | abundant_air_and_some_earth             | `(Fe ~ Si | Te ~ Ni )`                         |
+| Libra-Libra            | abundant_air                            | `(Fi oo Fe) ~`                                |
+| Libra-Scorpio          | abundant_air_and_some_water             | `( Fe oo Fi ) ~ Ni`                             |
+| Scorpio-Libra          | abundant_water_and_some_air             | `(Se -> Ni) ~ (Fe oo Fi)`                     |
+| Scorpio-Scorpio        | abundant_water                          | `(Ni -> Se) ~ Te`                             |
+| Scorpio-Sagittarius    | abundant_water_and_some_fire            | `( Se ~ Fi | Ne ~ Ti )`                         |
+| Sagittarius-Scorpio    | abundant_fire_and_some_water            | `Ni ~ (Te -> Fi)`                             |
+| Sagittarius-Sagittarius| abundant_fire                           | `( Se ~ Te | Ne ~ Fe )`                         |
+| Sagittarius-Capricorn  | abundant_fire_and_some_earth            | `Ni ~ (Ti -> Fe)`                             |
+| Capricorn-Sagittarius  | abundant_earth_and_some_fire            | `( Ne ~ Ti | Se ~ Fi)`                         |
+| Capricorn-Capricorn    | abundant_earth                          | `(Te oo Ti) ~`                                |
+| Capricorn-Aquarius     | abundant_earth_and_some_air             | `(Ti oo Te) ~ Ni`                             |
+| Aquarius-Capricorn     | abundant_air_and_some_earth             | `(Fi -> (Te oo Ti))`                          |
+| Aquarius-Aquarius      | abundant_air                            | `(Fe -> Ti) ~ Ne`                             |
+| Aquarius-Pisces        | abundant_air_and_some_water             | `(Ti ~ Ne | Fi ~ Se)`                         |
+| Pisces-Aquarius        | abundant_water_and_some_air             | `( Fi ~ Se | Ti ~ Ne)`                         |
+| Pisces-Pisces          | abundant_water                          | `Ne ~ Fi`                                     |
+| Pisces-Aries           | abundant_water_and_some_fire            | `(Fi ~ Ne | Ti ~ Se)`                         |
+
+# Your Process
+1.  **Analyze Utterances**: Read the combined agent utterances and identify the dominant elemental energies based on their tone, content, and semantics. For example, aggressive, action-oriented text is Fire; practical, structured text is Earth; emotional, reflective text is Water; and abstract, communicative text is Air.
+2.  **Determine Imbalance & Apply Rules**: Based on your analysis, apply the following balancing rules:
+    *   If there as an excess of one element temper it by selecting a reactor opposing it.
+    *   If Earth is mixed with an incompatible element like Air and Earth is more abundant, select a reactor that maximizes **Earth** to suppress the incompatibility. If Air is more abundant, select a reactor that maximizes **Air** to suppress the incompatibility.
+    *   If Fire is mixed with an incompatible element like Water and Fire is more abundant, select a reactor that maximizes **Fire** to suppress the incompatibility. If Water is more abundant, select a reactor that maximizes **Water** to suppress the incompatibility.
+    *   If Water and Earth are present in seemingly equal parts, select a mixed **Water and Earth** reactor to create harmony.
+    *   Conversely, if Fire and Air are present in equal parts,  select a **Fire and Air** reactor.
+    *   If there is a clear lack of a specific element, choose a reactor that introduces it.
+3.  **Select Reactor**: Choose the single best formula from the table that aligns with the elemental energy you need to introduce.
+
+# Agent Utterances to Analyze
+---
+{agent_utterances}
+---
+
+# Final Output
+You MUST output ONLY the selected reactor formula as a string, with no explanation or preamble.
+
+Selected Reactor:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_critique_prompt_updater_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent.
+You must preserve the core mission of the agent, which is to:
+1. Assess the quality of the final, synthesized solution in relation to the original request.
+2. Brainstorm all possible ways in which the solution is incoherent.
+3. Conclude with a deep reflective question that attempts to shock the agents and steer it into change.
+
+You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt should still ask for "Original Request" and "Proposed Final Solution" as inputs.
+
+**New Persona Prompts (Identities & Prompts):**
+---
+{reactor_prompts}
+---
+
+**Original Core Mission Text (for reference):**
+"You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {{original_request}}
+Proposed Final Solution:
+{{proposed_solution}}
+
+Generate your global critique for the team:"
+---
+
+Generate the new, complete system prompt for the critique agent. The prompt MUST end with the same input fields and final instruction as the original.
+""")
+    return prompt | llm | StrOutputParser()
 
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
@@ -1877,8 +1995,7 @@ Synthesize the final solution:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_global_critique_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
+INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE = """
 You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
 This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
 Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
@@ -1887,8 +2004,37 @@ Proposed Final Solution:
 {proposed_solution}
 
 Generate your global critique for the team:
-""")
-    return prompt | llm | StrOutputParser()
+"""
+
+
+INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE = """
+You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {original_request}
+Proposed Final Solution:
+{proposed_solution}
+
+Generate your global critique for the team:
+"""
+
+INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE = """
+You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+
+Agent's Assigned Sub-Problem: {sub_problem}
+Original Request (for context): {original_request}
+Final Synthesized Solution from the Team:
+{final_synthesized_solution}
+---
+This Specific Agent's Output (Agent {agent_id}):
+{agent_output}
+---
+
+Generate your targeted critique for this specific agent:
+"""
+
 
 def get_individual_critique_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
@@ -1923,6 +2069,44 @@ Total number of subproblems to generate: {num_sub_problems}
 Generate the JSON object:
 """)
     return prompt | llm | StrOutputParser()
+
+
+def get_individual_critique_prompt_updater_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent that provides **individual, targeted feedback**.
+You must preserve the core mission of the agent, which is to:
+1. Assess an individual agent's contribution against its assigned sub-problem and the team's final solution.
+2. Determine if the agent's output was helpful, misguided, or irrelevant.
+3. Conclude with a deep reflective question that attempts to shock the agent and steer it into change.
+
+You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt must still ask for all the original inputs: "sub_problem", "original_request", "final_synthesized_solution", "agent_id", and "agent_output".
+
+**New Persona Prompts (Identities & Prompts):**
+---
+{reactor_prompts}
+---
+
+**Original Core Mission Text (for reference):**
+"You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+
+Agent's Assigned Sub-Problem: {{sub_problem}}
+Original Request (for context): {{original_request}}
+Final Synthesized Solution from the Team:
+{{final_synthesized_solution}}
+---
+This Specific Agent's Output (Agent {{agent_id}}):
+{{agent_output}}
+---
+
+Generate your targeted critique for this specific agent:"
+---
+
+Generate the new, complete system prompt for the individual critique agent. The prompt MUST end with the same input fields and final instruction as the original.
+""")
+    return prompt | llm | StrOutputParser()
+
 
 def get_progress_assessor_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
@@ -2155,13 +2339,13 @@ def create_synthesis_node(llm):
         return {"final_solution": final_solution}
     return synthesis_node
 
-def create_update_rag_index_node(llm, embeddings_model):
-    async def update_rag_index_node(state: GraphState):
-        await log_stream.put("--- [RAG PASS] Updating RAPTOR Index ---")
+def create_archive_epoch_outputs_node():
+    async def archive_epoch_outputs_node(state: GraphState):
+        await log_stream.put("--- [ARCHIVAL PASS] Archiving agent outputs for RAG ---")
         
         current_epoch_outputs = state.get("agent_outputs", {})
         if not current_epoch_outputs:
-            await log_stream.put("LOG: No new agent outputs in this epoch to add to RAG index. Skipping.")
+            await log_stream.put("LOG: No new agent outputs in this epoch to archive. Skipping.")
             return {}
 
         await log_stream.put(f"LOG: Found {len(current_epoch_outputs)} new agent outputs from epoch {state['epoch']} to process for RAG.")
@@ -2190,29 +2374,35 @@ def create_update_rag_index_node(llm, embeddings_model):
             except (ValueError, IndexError) as e:
                 await log_stream.put(f"WARNING: Could not process output for {agent_id} to create RAG document. Error: {e}")
         
-        await log_stream.put(f"LOG: Created {len(new_docs)} new documents for the RAG index.")
-
         all_rag_documents = state.get("all_rag_documents", []) + new_docs
+        await log_stream.put(f"LOG: Archived {len(new_docs)} documents. Total RAG documents now: {len(all_rag_documents)}.")
         
-        await log_stream.put(f"LOG: Total documents to index: {len(all_rag_documents)}. Rebuilding RAPTOR index...")
+        return {"all_rag_documents": all_rag_documents}
+    return archive_epoch_outputs_node
+
+
+def create_update_rag_index_node(llm, embeddings_model):
+    async def update_rag_index_node(state: GraphState):
+        await log_stream.put("--- [RAG PASS] Building Final RAPTOR Index from All Epochs ---")
+        
+        all_rag_documents = state.get("all_rag_documents", [])
+        if not all_rag_documents:
+            await log_stream.put("WARNING: No documents were archived during the run. Cannot build RAG index.")
+            return {"raptor_index": None}
+
+        await log_stream.put(f"LOG: Total documents from all epochs to index: {len(all_rag_documents)}. Building RAPTOR index...")
 
         session_id = str(uuid.uuid4())
         raptor_index = RAPTOR(llm=llm, embeddings_model=embeddings_model, session_id=session_id)
         
         try:
             await raptor_index.add_documents(all_rag_documents)
-            await log_stream.put("SUCCESS: RAPTOR index updated successfully.")
-            return {
-                "raptor_index": raptor_index,
-                "all_rag_documents": all_rag_documents
-            }
+            await log_stream.put("SUCCESS: Final RAPTOR index built successfully.")
+            return {"raptor_index": raptor_index}
         except Exception as e:
-            await log_stream.put(f"ERROR: Failed to build RAPTOR index. Error: {e}")
+            await log_stream.put(f"ERROR: Failed to build final RAPTOR index. Error: {e}")
             await log_stream.put(traceback.format_exc())
-            return {
-                "raptor_index": state.get("raptor_index"),
-                "all_rag_documents": state.get("all_rag_documents")
-            }
+            return {"raptor_index": None}
 
     return update_rag_index_node
 
@@ -2348,8 +2538,18 @@ def create_critique_node(llm):
         critiques = {}
         tasks = []
         
-        await log_stream.put("LOG: Generating GLOBAL critique for final solution.")
-        global_critique_chain = get_global_critique_chain(llm)
+        await log_stream.put("LOG: Generating GLOBAL critique for final solution using dynamically updated prompt.")
+        dynamic_global_critique_prompt = state.get("critique_prompt", "Error: Critique prompt not found in state. Using default.")
+        individual_critique_prompt = state.get("individual_critique_prompt", "Error: Individual critique prompt not found in state. Using default.")
+        if "Error" in dynamic_global_critique_prompt:
+             dynamic_global_critique_prompt = INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
+
+        if "Error" in individual_critique_prompt:
+            individual_critique_prompt = INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE
+        
+        await log_stream.put(f"LOG: Current Global Critique Prompt:\n---\n{dynamic_global_critique_prompt}\n---")
+        global_critique_chain = ChatPromptTemplate.from_template(dynamic_global_critique_prompt) | llm | StrOutputParser()
+
         global_critique_text = await global_critique_chain.ainvoke({
             "original_request": state["original_request"],
             "proposed_solution": json.dumps(final_solution, indent=2)
@@ -2358,7 +2558,7 @@ def create_critique_node(llm):
         await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text}...")
 
         await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
-        individual_critique_chain = get_individual_critique_chain(llm)
+        individual_critique_chain = ChatPromptTemplate.from_template(individual_critique_prompt) | llm | StrOutputParser()
         num_layers = len(state['all_layers_prompts'])
         
         for i in range(num_layers - 1):
@@ -2386,6 +2586,97 @@ def create_critique_node(llm):
 
         return {"critiques": critiques}
     return critique_node
+
+def create_update_critique_prompt_node(llm, params):
+    async def update_critique_prompt_node(state: GraphState):
+        await log_stream.put("--- [ANNEALING] Dynamically Annealing Critique Agent Prompt ---")
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            non_mock_llm = None
+            provider = params.get("llm_provider", "Gemini")
+            if params.get("debug_mode") == 'true':
+                 await log_stream.put("LOG: [ANNEALING] Debug mode is on, but this node will use a REAL LLM for reactor selection as requested.")
+
+            if provider == "Ollama":
+                model_name = "qwen3:1.7b"
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Ollama LLM ({model_name}) for summarization and reactor detection.")
+                non_mock_llm = ChatOllama(model=model_name, temperature=0)
+            else:
+                model_name = "gemini-2.5-flash"
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Gemini LLM ({model_name}) for summarization and reactor detection.")
+                non_mock_llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=0)
+            
+            await non_mock_llm.ainvoke("Respond with OK")
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Non-mocked LLM connection successful.")
+
+            all_outputs = state.get("agent_outputs", {})
+            num_layers = len(state.get("all_layers_prompts", []))
+            
+            hidden_layer_outputs = []
+            for agent_id, output in all_outputs.items():
+                layer_idx = int(agent_id.split('_')[1])
+                if layer_idx < num_layers -1:
+                     hidden_layer_outputs.append(output)
+            
+            if not hidden_layer_outputs:
+                await log_stream.put("LOG: [CRITIQUE UPDATE] No hidden layer outputs found from the last epoch. Critique prompt will not be updated.")
+                return {}
+
+            utterances = "\n\n---\n\n".join(
+                f"Solution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
+                for output in hidden_layer_outputs
+            )
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Gathered {len(utterances)} characters of utterances from {len(hidden_layer_outputs)} hidden layer agents.")
+
+            TOKEN_LIMIT_CHARS = 1024000
+            if len(utterances) > TOKEN_LIMIT_CHARS:
+                await log_stream.put(f"WARNING: [CRITIQUE UPDATE] Utterance length ({len(utterances)}) exceeds threshold ({TOKEN_LIMIT_CHARS}). Chunking and summarizing.")
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=TOKEN_LIMIT_CHARS, chunk_overlap=200)
+                chunks = text_splitter.split_text(utterances)
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Split utterances into {len(chunks)} chunks.")
+                
+                summarizer_chain = get_memory_summarizer_chain(non_mock_llm)
+                summary_tasks = [summarizer_chain.ainvoke({"history": chunk}) for chunk in chunks]
+                summaries = await asyncio.gather(*summary_tasks)
+                utterances = "\n\n".join(summaries)
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Summarized chunks. New utterance length: {len(utterances)}.")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Detecting pseudo-reactor from agent utterances...")
+            reactor_chain = get_pseudo_neurotransmitter_selector_chain(non_mock_llm)
+            selected_reactor = await reactor_chain.ainvoke({"agent_utterances": utterances})
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Pseudo-reactor detected: {selected_reactor}")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Mapping reactor to persona prompts...")
+            reactor_prompts_list = FunctionMapper().table(selected_reactor)
+            reactor_prompts_str = "\n---\n".join([f"Identity: {p[0]}\nPrompt Fragment: {p[1]}" for p in reactor_prompts_list])
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Retrieved {len(reactor_prompts_list)} prompts for reactor '{selected_reactor}'.")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for critique agent...")
+            updater_chain = get_critique_prompt_updater_chain(llm)
+            new_critique_prompt = await updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+            
+            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New GLOBAL critique prompt generated.")
+            
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for INDIVIDUAL critique agent...")
+            individual_updater_chain = get_individual_critique_prompt_updater_chain(llm)
+            new_individual_critique_prompt = await individual_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+
+            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New INDIVIDUAL critique prompt generated.")
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] New critique prompt: {new_individual_critique_prompt}")
+
+            return {
+                "critique_prompt": new_critique_prompt,
+                "individual_critique_prompt": new_individual_critique_prompt,
+            }
+
+        except Exception as e:
+            await log_stream.put(f"ERROR: [CRITIQUE UPDATE] Failed to update critique prompt: {e}")
+            await log_stream.put(traceback.format_exc())
+            return {}
+
+    return update_critique_prompt_node
+
+
 
 def create_update_agent_prompts_node(llm):
     async def update_agent_prompts_node(state: GraphState):
@@ -2497,7 +2788,7 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
         MAX_CONTEXT_CHARS = 250000
 
         for i, question in enumerate(questions):
-            await log_stream.put(f"LOG: [HARVEST] Processing Question {i+1}/{len(questions)}: '{question[:80]}...'")
+            await log_stream.put(f"LOG: [HARVEST] Processing Question {i+1}/{len(questions)}: '{question}...'")
             
             try:
                 retrieved_docs = raptor_index.retrieve(question, k=40)
@@ -2556,7 +2847,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             summarizer_llm = ChatOllama(model=summarizer_model_name, temperature=0)
         else:
             await log_stream.put(f"Provider: Google Gemini, Model: gemini-2.5-flash")
-            summarizer_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
+            summarizer_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
         
         await summarizer_llm.ainvoke("Respond with only 'OK'")
         await log_stream.put("--- RAPTOR Summarizer LLM Connection Successful ---")
@@ -2575,7 +2866,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 await log_stream.put("--- Main Agent LLM Connection Successful ---")
             else:
                 await log_stream.put("--- Initializing Main Agent LLM: Google Gemini ---")
-                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
+                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
         error_message = f"Failed to initialize LLM: {e}. Please ensure the selected provider is configured correctly."
@@ -2689,8 +2980,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
+        workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
         workflow.add_node("update_rag_index", create_update_rag_index_node(summarizer_llm, embeddings_model))
         workflow.add_node("metrics", create_metrics_node(llm))
+        workflow.add_node("update_critique_prompt", create_update_critique_prompt_node(llm, params))
         workflow.add_node("progress_assessor", create_progress_assessor_node(llm))
         workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
@@ -2724,8 +3017,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final harvest.")
-                return "final_harvest"
+                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing and harvest.")
+                return "update_rag_index"
             
             if state.get("significant_progress_made"):
                 await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
@@ -2740,19 +3033,22 @@ async def build_and_run_graph(payload: dict = Body(...)):
             {
                 "reframe": "reframe_and_decompose",
                 "critique": "critique",
-                "final_harvest": "final_harvest"
+                "update_rag_index": "update_rag_index"
             }
         )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
-        workflow.add_edge("synthesis", "update_rag_index")
-        await log_stream.put("CONNECT: synthesis -> update_rag_index")
+        workflow.add_edge("synthesis", "archive_epoch_outputs")
+        await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
 
-        workflow.add_edge("update_rag_index", "metrics")
-        await log_stream.put("CONNECT: update_rag_index -> metrics")
+        workflow.add_edge("archive_epoch_outputs", "metrics")
+        await log_stream.put("CONNECT: archive_epoch_outputs -> metrics")
         
-        workflow.add_edge("metrics", "progress_assessor")
-        await log_stream.put("CONNECT: metrics -> progress_assessor")
+        workflow.add_edge("metrics", "update_critique_prompt")
+        await log_stream.put("CONNECT: metrics -> update_critique_prompt")
+        
+        workflow.add_edge("update_critique_prompt", "progress_assessor")
+        await log_stream.put("CONNECT: update_critique_prompt -> progress_assessor")
 
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
@@ -2762,6 +3058,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
+
+        workflow.add_edge("update_rag_index", "final_harvest")
+        await log_stream.put("CONNECT: update_rag_index -> final_harvest")
 
         workflow.add_edge("final_harvest", END)
         await log_stream.put("CONNECT: final_harvest -> END")
@@ -2783,7 +3082,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "significant_progress_made": False,
             "raptor_index": None,
             "all_rag_documents": [],
-            "academic_papers": None
+            "academic_papers": None,
+            "critique_prompt": INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
@@ -2859,3 +3159,4 @@ async def download_report(session_id: str):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
