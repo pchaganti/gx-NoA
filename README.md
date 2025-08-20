@@ -6,12 +6,11 @@ I've been thinking a lot about how we, as people, develop ideas. It's rarely a s
 
 I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
 
-**Is true "deep thinking" only for trillion-dollar companies?**
-NoA is a research platform that challenges the paradigm of centralized, proprietary AI by exploring a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
+## **Is true "deep thinking" only for trillion-dollar companies?**
+NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
-By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a framework or solution to a multifactorial problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
 ## Changelog
 
@@ -27,8 +26,7 @@ By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:
 
 *   **Better Memory for the Long Haul - Dynamic Summarization:** To support extra-long mining sessions, a specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights without overflowing the context window.
 
-*   **Opening the Black Box - Richer Data Collection:** We're now logging the final evolved system prompts and JSON outputs for the hidden-layer agents, providing a much richer dataset for understanding the process.
-
+  
 
 ## The Core Idea: Qualitative Backpropagation
 
@@ -107,24 +105,8 @@ These are the core research avenues we are actively exploring to enhance the net
 *   **Develop More Sophisticated Metrics**: While perplexity provides a starting point, we plan to research and implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions over time.
 *   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
 
-## Vision & Long-Term Roadmap: Training a World Language Model
 
-Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of a more socially driven kind of thought.
-
-Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**. A WLM, as we envision it, moves beyond predicting the next token. It would be a model trained on the fundamental patterns of collaboration, critique, and social intelligence. By training a foundation model on thousands of these solution-mining runs, we hypothesize it could develop a more robust, generalized reasoning capability.
-
-## Research & Development Goals
-
-### Mid-Term Research Goals
-*   **Implement Cyclical Hierarchical Sparse Connections:** Explore a more sophisticated architecture to see the emergence of "leader" agents and specialized "micro-teams," improving scalability.
-*   **Give Agents Tools:** Look into frameworks like open-source command-line tools to give each "neuron" an execution environment so it can code and perform actions, though this adds significant complexity.
-*   **Scale to a "World-of-Agents"**: On more powerful hardware, use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
-*   **Enhance Combinatorial Heuristics**: Research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically.
-*   **Develop More Sophisticated Metrics**: Implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions.
-*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances to collectively "mine" a solution.
-*   **Conduct High-VRAM Scalability Tests:** Benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic.
-
-## Hyperparameters Explained: Tuning Your Solution Mining Rig ⚙️
+## Hyperparameters Explained: Tuning Your Theory Crafting Mining Rig ⚙️
 
 
 The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
