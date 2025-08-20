@@ -1731,6 +1731,8 @@ The provided context, consisting of various agent solutions and reasoning, has b
             yield result
 
 class GraphState(TypedDict):
+
+    current_problem: str
     original_request: str
     decomposed_problems: dict[str, str]
     layers: List[dict]
@@ -2153,10 +2155,17 @@ Original Problem:
 {original_request}
 ---
 
+Current problem:
+---
+{current_problem}
+---
+                                            
+
 The Breakthrough Solution:
 ---
 {final_solution}
 ---
+                                              
 
 Your output must be a JSON object with a single key: "new_problem".
 
@@ -2512,7 +2521,8 @@ def create_reframe_and_decompose_node(llm):
         reframer_chain = get_problem_reframer_chain(llm)
         new_problem_str = await reframer_chain.ainvoke({
             "original_request": original_request,
-            "final_solution": json.dumps(final_solution, indent=2)
+            "final_solution": json.dumps(final_solution, indent=2),
+            "current_problem": state.get("current_problem")
         })
         try:
             new_problem_data = clean_and_parse_json(new_problem_str)
@@ -2550,7 +2560,8 @@ def create_reframe_and_decompose_node(llm):
         
         return {
             "decomposed_problems": new_decomposed_problems_map,
-            "original_request": new_problem
+            "original_request": original_request,
+            'current_problem': new_problem
         }
     return reframe_and_decompose_node
 
