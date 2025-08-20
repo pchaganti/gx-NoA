@@ -179,6 +179,65 @@
         #download-log-button:hover:not(:disabled), .download-paper-button:hover:not(:disabled), #download-report-button:hover:not(:disabled) {
             background-color: #3a3b44;
         }
+        #chat-messages {
+            height: 400px;
+            background-color: #000;
+            border: 1px solid var(--secondary-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .chat-message {
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            max-width: 80%;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: var(--accent-color);
+            color: var(--text-color);
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+        .ai-message {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+            white-space: pre-wrap;
+        }
+        #chat-form {
+            display: flex;
+            gap: 1rem;
+        }
+        #chat-input {
+            flex-grow: 1;
+            min-height: 50px;
+            height: 50px;
+            margin-bottom: 0;
+            resize: none;
+        }
+        #chat-send-button {
+            width: auto;
+            margin-bottom: 0;
+            align-self: flex-end;
+        }
+        #harvest-button {
+            width: auto;
+            padding: 0.5rem 1.5rem;
+            margin-bottom: 0;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #28a745;
+        }
+        #harvest-button:hover:not(:disabled) {
+            background-color: #218838;
+        }
 
     </style>
 </head>
@@ -241,6 +300,18 @@
         <h2>Average Perplexity per Epoch</h2>
         <canvas id="perplexityChart"></canvas>
     </div>
+    <!-- NEW: Container for Chat -->
+    <div class="container hidden" id="chat-container">
+        <div class="header-with-button">
+            <h2>Chat with the hidden layer (diagnose, or get specific answers for your request) </h2>
+            <button id="harvest-button">HARVEST</button>
+        </div>
+        <div id="chat-messages"></div>
+        <form id="chat-form">
+            <textarea id="chat-input" placeholder="Ask a question about the generated knowledge..." required></textarea>
+            <button type="submit" id="chat-send-button">Send</button>
+        </form>
+    </div>
     <div class="container">
         <div class="header-with-button">
             <h2>Real-time Graph Activity</h2>
@@ -278,8 +349,6 @@
     const runButton = document.getElementById('run-button');
     const logContainer = document.getElementById('log-container');
     const graphContainer = document.getElementById('graph-container');
-    const llmProviderSelect = "Ollama";
-
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
     const downloadLogButton = document.getElementById('download-log-button');
@@ -287,11 +356,19 @@
     const downloadReportButton = document.getElementById('download-report-button');
     const perplexityChartContainer = document.getElementById('perplexity-chart-container');
     const perplexityChartCanvas = document.getElementById('perplexityChart').getContext('2d');
+    const graphArchitectureSection = document.getElementById('graph-architecture');
+    const chatContainer = document.getElementById('chat-container');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const harvestButton = document.getElementById('harvest-button');
+
 
     let fullLogContent = '';
     let perplexityChart = null;
     let allPerplexityValues = [];
     let allLbelsData = [];
+    let currentSessionId = null;
 
     debugModeCheckbox.addEventListener('change', (e) => {
         const isDebug = e.target.checked;
@@ -303,7 +380,6 @@
         if (downloadLogButton.disabled) {
             downloadLogButton.disabled = false;
         }
-        // Use <pre> for JSON to preserve formatting
         const container = (text.trim().startsWith('{') && text.trim().endsWith('}')) ? document.createElement('pre') : document.createElement('p');
         container.style.margin = '0';
         container.style.lineHeight = '1.4';
@@ -369,6 +445,110 @@
         });
     };
 
+    const handleChatSubmit = async (e) => {
+        e.preventDefault();
+        const message = chatInput.value.trim();
+        if (!message || !currentSessionId) return;
+
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'chat-message user-message';
+        userMsgDiv.textContent = message;
+        chatMessages.appendChild(userMsgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        chatInput.value = '';
+        chatInput.disabled = true;
+
+        const aiMsgDiv = document.createElement('div');
+        aiMsgDiv.className = 'chat-message ai-message';
+        aiMsgDiv.textContent = '...';
+        chatMessages.appendChild(aiMsgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId, message: message })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                aiMsgDiv.textContent = `Error: ${errorText}`;
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let aiResponseText = '';
+            aiMsgDiv.textContent = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                aiResponseText += chunk;
+                aiMsgDiv.textContent = aiResponseText;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        } catch (error) {
+            aiMsgDiv.textContent = `Error: ${error.message}`;
+        } finally {
+            chatInput.disabled = false;
+            chatInput.focus();
+        }
+    };
+
+    const handleHarvestClick = async () => {
+        if (!currentSessionId) return;
+
+        harvestButton.disabled = true;
+        chatInput.disabled = true;
+        harvestButton.textContent = 'Harvesting...';
+        addLogMessage(`--- [HARVEST] User initiated final harvest for session ${currentSessionId} ---`, { color: 'yellow' });
+
+        try {
+            const response = await fetch('/harvest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                addLogMessage(`Error during harvest: ${result.message}`, { color: 'red' });
+                if (result.traceback) {
+                    addLogMessage(result.traceback, { isHTML: false });
+                }
+                return;
+            }
+            
+            addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+
+            if (result.session_id) {
+                addLogMessage(`Report generated successfully. Session ID: ${result.session_id}`, { color: 'cyan' });
+                reportContainer.classList.remove('hidden');
+                downloadReportButton.onclick = () => {
+                    window.location.href = `/download_report/${result.session_id}`;
+                };
+            } else {
+                 addLogMessage(`⚠️ Server finished but no downloadable report was generated.`, { color: 'orange' });
+            }
+
+            chatContainer.classList.add('hidden');
+            graphArchitectureSection.classList.remove('hidden');
+            
+        } catch (error) {
+            addLogMessage(`Client-side error during harvest: ${error.message}`, { color: 'red' });
+        } finally {
+            harvestButton.disabled = false;
+            harvestButton.textContent = 'HARVEST';
+            runButton.disabled = false;
+            runButton.textContent = 'Build and Run Graph';
+            currentSessionId = null;
+        }
+    };
+
     graphParamsForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(graphParamsForm);
@@ -401,7 +581,6 @@
         allPerplexityValues = [];
         allLbelsData = [];
 
-
         addLogMessage('Sending request to build and run graph...');
         try {
             const response = await fetch('/build_and_run_graph', {
@@ -418,23 +597,21 @@
                     pre.textContent = result.traceback;
                     logContainer.appendChild(pre);
                 }
+                runButton.disabled = false;
+                runButton.textContent = 'Build and Run Graph';
                 return;
             }
-            addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-
-            if (result.session_id) {
-                addLogMessage(`Report generated successfully. Session ID: ${result.session_id}`, { color: 'cyan' });
-                reportContainer.classList.remove('hidden');
-                downloadReportButton.onclick = () => {
-                    window.location.href = `/download_report/${result.session_id}`;
-                };
-            } else {
-                 addLogMessage(`⚠️ Server finished but no downloadable report was generated.`, { color: 'orange' });
+            
+            if (result.message === "Chat is now active.") {
+                addLogMessage(`<strong>✅ RAG Index ready. Chat is now active.</strong>`, { isHTML: true, color: 'lime' });
+                currentSessionId = result.session_id;
+                graphArchitectureSection.classList.add('hidden');
+                chatContainer.classList.remove('hidden');
+                chatInput.focus();
             }
 
         } catch (error) {
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
-        } finally {
             runButton.disabled = false;
             runButton.textContent = 'Build and Run Graph';
         }
@@ -466,6 +643,16 @@
         addLogMessage("Error: Connection to server log stream lost. Please refresh and try again.", { color: 'red' });
         eventSource.close();
     };
+
+    chatForm.addEventListener('submit', handleChatSubmit);
+    harvestButton.addEventListener('click', handleHarvestClick);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+    });
+
 </script>
 </body>
 </html>
