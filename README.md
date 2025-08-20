@@ -7,14 +7,28 @@ I've been thinking a lot about how we, as people, develop ideas. It's rarely a s
 I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
 
 **Is true "deep thinking" only for trillion-dollar companies?**
-
-NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents—like individual neurons in a larger network—that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️
-
-By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a framework or solution to a multifactorial problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
+NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
 https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
-This project is an open invitation to explore the frontiers of collective AI, putting the power of deep, multi-day problem-solving into the hands of everyone. 🌍
+By leveraging efficient local models (like `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a framework or solution to a multifactorial problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
+
+## Changelog
+
+*   **Final Knowledge Harvest & RAG:** The run doesn't just end with a final answer anymore. All agent outputs from all epochs are now archived into a multi-layered RAPTOR (Recursive Abstractive Processing over Trees of RAG) index. Upon completion, an `interrogator` agent generates a series of expert-level questions about the original problem, and a `paper_formatter` agent uses the RAG index to write a formal academic-style paper answering each question. The final output is now a downloadable ZIP file containing this collection of research papers.
+
+*   **Dynamic Critique Annealing:** The network previosuly static "loss function" now evolves. A new meta-process analyzes the collective output of the hidden-layer agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompt of the critique agent, changing its persona (e.g., from a 'senior manager' to a 'cynical philosopher-king') to provide a different style of feedback for the next epoch.
+
+*   **Dynamic Problem Re-framing:** The network can now assess its own progress. If it determines it has made a "significant breakthrough," it formulates a new, more advanced problem that builds upon its success. This turns the process from simple refinement into a genuine journey of discovery.
+
+*   **Divide and Conquer - Automatic Problem Decomposition:** NoA now starts by breaking down the user's initial problem into smaller, granular sub-problems. Each agent is assigned a unique piece of the puzzle, ensuring a more focused and diverse approach from the start.
+
+*   **Keeping an Eye on Things - Perplexity Metrics & Chart:** A new `metrics` node calculates the average perplexity of all agent outputs after each epoch. We plot this on a live chart in the GUI, giving you a visual heuristic for the network's coherence over time.
+
+*   **Better Memory for the Long Haul - Dynamic Summarization:** To support extra-long mining sessions, a specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights without overflowing the context window.
+
+*   **Opening the Black Box - Richer Data Collection:** We're now logging the final evolved system prompts and JSON outputs for the hidden-layer agents, providing a much richer dataset for understanding the process.
+
 
 ## The Core Idea: Qualitative Backpropagation
 
@@ -28,17 +42,18 @@ The obvious trade-off here is speed. It’s the opposite of instantaneous. A 6-l
 
 The algorithm does really well in problems where creativity and insight override pure precision. It can come up with new frameworks for the social sciences, for instance. Physics and math, not so much.
 
+
 ## The NoA Algorithm: From Individual Agents to a Collective Mind
 
-The core of NoA is a novel algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving and a unique "reflection pass" for learning and goal evolution.
+The core of NoA is a novel algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a unique "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
 
 ### The Forward Pass
 
 In NoA, the "weights" and "biases" of the network are not numerical values but the rich, descriptive personas of its agents, defined in natural language.
 
-1.  **Input Layer & Decomposition**: The process starts with a user's high-level problem. A `master strategist` node first **decomposes this problem into smaller, distinct sub-problems**. NoA then generates abstract "seed verbs" and assigns them to diverse MBTI personality archetypes. An `input-spanner` chain forges the first layer of agents, each with a unique persona, a specialized career, a distinct set of skills, and its own **assigned sub-problem**. This ensures both cognitive and functional diversity from the very beginning.
+1.  **Input Layer & Decomposition**: The process starts with a user's high-level problem. A `master strategist` node first **decomposes this problem into smaller, distinct sub-problems**. NoA then generates abstract "seed verbs" and assigns them to diverse MBTI personality archetypes. An `input-spanner` chain forges the first layer of agents, each with a unique persona, a specialized career, a distinct set of skills, and its own **assigned sub-problem**.
 
-2.  **Building Depth with Dense Layers**: To create a truly deep and specialized network, a `dense-spanner` chain analyzes the agents of the preceding layer. It identifies their core attributes and formulates a "hard request"—a tailored challenge designed to push the boundaries of that agent's expertise. It then spawns a new agent in the next layer, specifically engineered to tackle this challenge. This process mirrors the creation of specialized hidden layers in a neural network, progressively increasing the system's intellectual depth.
+2.  **Building Depth with Dense Layers**: A `dense-spanner` chain analyzes the agents of the preceding layer, identifies their core attributes, and formulates a "hard request"—a tailored challenge. It then spawns a new agent in the next layer, specifically engineered to tackle this challenge, progressively increasing the system's intellectual depth.
 
 3.  **Action**: A user's prompt initiates a cascade of information through the network. The input layer agents process their assigned sub-problems, and their structured JSON outputs are broadcast to every agent in the subsequent layer. This dense, layer-by-layer processing continues until the final layer is reached, constituting a full "forward pass" of collaborative inference.
 
@@ -46,25 +61,51 @@ In NoA, the "weights" and "biases" of the network are not numerical values but t
 
 This is where NoA truly differs from a simple multi-agent system. The reflection pass is a multi-stage process where the network assesses its own performance and decides how to adapt.
 
-1.  **Synthesis and Metrics**: After the forward pass, a `synthesis_node` merges the outputs from the final agent layer into a single, coherent solution. Immediately after, a `metrics_node` analyzes all agent outputs from the epoch to calculate a perplexity score, offering a quantitative glimpse into the network's state.
+1.  **Synthesis and Metrics**: After the forward pass, a `synthesis_node` merges the outputs from the final agent layer into a single, coherent solution. Immediately after, a `metrics_node` analyzes all agent outputs from the epoch to calculate a perplexity score.
 
-2.  **The Crossroads of Progress**: The synthesized solution is then passed to a `progress_assessor` node. This AI philosopher acts as a critical juncture, evaluating whether the solution represents "significant progress" based on novelty, coherence, and forward momentum. This decision dictates the entire course of the next epoch.
+2.  **Dynamic Annealing of Critique**: Before any critique is generated, an `update_critique_prompt` node analyzes the tone and content of the hidden-layer agents' outputs. It uses a unique heuristic to select a new persona (e.g., a wise mentor, a harsh drill sergeant) and dynamically rewrites the system prompt for the critique agent. This ensures the *style* of feedback adapts to the network's current state.
 
-3.  **Path A: The "Eureka!" Path (Significant Progress)**: If a breakthrough is achieved, the network's goal shifts from refinement to advancement. A `problem_reframer` node formulates a **new, more challenging problem** that builds on the recent success. This new problem is then decomposed and assigned to the agents. In this path, direct critique is bypassed in favor of a new mission.
+3.  **The Crossroads of Progress**: The synthesized solution is passed to a `progress_assessor` node. This AI philosopher evaluates whether the solution represents "significant progress" based on novelty, coherence, and forward momentum. This decision dictates the course of the next epoch.
 
-4.  **Path B: The "Refinement" Path (No Significant Progress)**: If the solution is not a major leap forward, the system focuses on iterative improvement. A `critique_chain` scrutinizes the solution and generates a global, constructive critique. It also generates targeted, individual critiques for each agent in the hidden layers, assessing their contribution relative to their sub-problem.
+4.  **Path A: The "Eureka!" Path (Significant Progress)**: If a breakthrough is achieved, the network's goal shifts to advancement. A `problem_reframer` node formulates a **new, more challenging problem** that builds on the recent success. This new problem is then decomposed and assigned to the agents.
 
-5.  **Updating the "Neural" Weights**: This feedback—either a new mission or a detailed critique—propagates backward through the network. An `update_agent_prompts_node` uses this signal to modify each agent's core system prompt, refining their skills, attributes, and roles. This is how the network learns and adapts—not through a central controller, but through a distributed process of assessment, challenge, and evolution.
+5.  **Path B: The "Refinement" Path (No Significant Progress)**: If the solution is not a major leap forward, the system focuses on iterative improvement. The dynamically-configured `critique_chain` scrutinizes the solution and generates global and individual critiques.
+
+6.  **Updating the "Neural" Weights**: This feedback—either a new mission or a detailed critique—propagates backward through the network. An `update_agent_prompts_node` uses this signal to modify each agent's core system prompt, refining their skills, attributes, and roles.
 
 This entire cycle is one "epoch." By running multiple epochs, the network engages in a process of collective sense-making that can now not only deepen its understanding but also evolve its own objectives.
 
-## Changelog
+### The Final Harvest Pass: Consolidating Knowledge
 
-*   **Dynamic Problem Re-framing:** This is the big one. The network now has a new ability to assess its own progress at the end of an epoch. If it decides it has made a "significant breakthrough," it doesn't just continue to refine the old solution. Instead, it **formulates a new, more advanced problem** that builds upon its success. It essentially gives itself a harder challenge, turning the process from simple refinement into a genuine journey of discovery.
-*   **Divide and Conquer - Automatic Problem Decomposition:** Instead of every agent in the first layer tackling the same high-level prompt, NoA now starts by breaking down the user's initial problem into smaller, more granular sub-problems. Each agent is assigned a unique piece of the puzzle from the very beginning, ensuring a more focused and diverse approach right out of the gate.
-*   **Keeping an Eye on Things - Perplexity Metrics & Chart:** We've added a new `metrics` node that calculates the average perplexity of all agent outputs after each epoch. We now plot this on a live chart in the GUI, giving you a visual heuristic for the network's coherence over time.
-*   **Better Memory for the Long Haul - Dynamic Summarization:** To support those extra-long, multi-day mining sessions, we've implemented a memory summarizer. If an agent's memory log gets too long, a specialized chain now automatically creates a concise summary of its older memories.
-*   **Opening the Black Box - Richer Data Collection:** We're now logging and displaying much more data from the final run, including the final evolved system prompts and JSON outputs for the hidden-layer agents.
+When the final epoch is complete, the process is not over. The network enters a final phase to extract and structure the knowledge it has generated.
+
+1.  **Archival and RAG Indexing**: An `archive_epoch_outputs` node gathers every single agent output from every epoch of the entire run. This collection of documents is then used to build a comprehensive, multi-layered RAPTOR RAG index, creating a searchable knowledge base of the entire thought process.
+
+2.  **Interrogation and Synthesis**: A `final_harvest` node takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
+
+3.  **Generating the Final Report**: The `paper_formatter` synthesizes the retrieved context into a formal, academic-style markdown document. The final output of the entire run is a downloadable ZIP archive containing this collection of research papers, representing the network's total accumulated knowledge on the topic.
+
+## Vision & Long-Term Roadmap: Training a World Language Model
+
+Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of thought. It includes the initial agent personas, the layer-by-layer Chain-of-Thought (CoT) traces, the critiques, the diff of how each agent's core prompts evolved, and now, a complete RAG index of the entire process.
+
+We conceptualize these collected traces as a new form of data: **powerful, multi-factorial, and multi-dimensional data for training next-generation reasoning models.** Unlike traditional datasets which capture static information, this data captures the *dynamics* of reasoning. It shows how diverse viewpoints clash, converge, and synthesize a solution.
+
+Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**.
+
+A WLM, as we envision it, moves beyond predicting the next token. It would be a model trained on the fundamental patterns of collaboration, critique, and collective intelligence. It would learn the implicit "language" of how diverse agents interact to build something greater than the sum of their parts. By training a foundation model on thousands of these solution-mining runs, we hypothesize it could develop a more robust, generalized reasoning capability—one that intrinsically understands context, causality, and problem decomposition from a systemic perspective.
+
+This represents the grand ambition of the NoA project: to not only solve hard problems but to create a data flywheel that can be used to forge a new paradigm of reasoning AI.
+
+## Mid-Term Research Goals
+
+These are the core research avenues we are actively exploring to enhance the network's capabilities.
+
+
+*   **Enhance Combinatorial Heuristics**: The philosophical underpinning of NoA is that complex solutions emerge from the combinatorial power of language. The current "pseudo-neurotransmitter" system is a first step. We plan to research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically and generate novel solutions.
+
+*   **Develop More Sophisticated Metrics**: While perplexity provides a starting point, we plan to research and implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions over time.
+*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
 
 ## Vision & Long-Term Roadmap: Training a World Language Model
 
@@ -80,18 +121,20 @@ Our ultimate objective is to use this emergent data to train a true **"World Lan
 *   **Scale to a "World-of-Agents"**: On more powerful hardware, use complex **"institutional directives"** as the foundational vectors, allowing the network to model and solve large-scale societal or organizational problems.
 *   **Enhance Combinatorial Heuristics**: Research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically.
 *   **Develop More Sophisticated Metrics**: Implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions.
-
-### Immediate Development Goals
 *   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances to collectively "mine" a solution.
 *   **Conduct High-VRAM Scalability Tests:** Benchmark the system on a high-end machine with at least 128GB of VRAM to test the upper limits of the metaheuristic.
 
 ## Hyperparameters Explained: Tuning Your Solution Mining Rig ⚙️
 
-*   **`CoT trace depth`**: The number of layers in your agent network.
-*   **`Number of epochs`**: One full cycle of a forward pass (inference) and a reflection pass (learning).
-*   **`Vector word size`**: The number of "seed verbs" for initial agent creation.
-*   **`Prompt alignment` (0.1 - 2.0)**: Controls how strongly an agent's career is influenced by the user's prompt.
-*   **`Density` (0.1 - 2.0)**: Modulates the influence of the previous layer when creating new agents.
+
+The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
+
+*   **`CoT trace depth`**: The number of layers in your agent network. Deeper networks allow for more steps of abstraction.
+*   **`Number of epochs`**: One full cycle of a forward pass (inference) and a reflection pass (learning). More epochs allow the network more time to "mine" a solution.
+*   **`Vector word size`**: The number of "seed verbs" for initial agent creation. A larger size provides a richer starting point.
+*   **`Number of Questions for Final Harvest`**: The number of expert-level questions the `interrogator` agent will generate to create the final report.
+*   **`Prompt alignment` (0.1 - 2.0)**: Controls how strongly an agent's career is influenced by the user's prompt. Higher values lead to more specialization.
+*   **`Density` (0.1 - 2.0)**: Modulates the influence of the previous layer when creating new agents. High density leads to refinement; low density encourages novelty.
 *   **`Learning rate` (0.1 - 2.0)**: Controls the magnitude of change an agent makes to its prompt in response to critique.
 
 ## Technical Setup
@@ -146,11 +189,11 @@ This application supports running inference locally using an Ollama server.
 ## How It Works
 
 1.  **Choose your LLM**: Select between Google Gemini or Local Ollama.
-2.  **Architect the Network**: Use the GUI to set the hyperparameters.
-3.  **Pose a Problem**: Enter the high-level prompt you want the network to solve.
-4.  **Build and Run**: Click "Build and Run Graph" to initiate the process.
-5.  **Observe the Emergence**: Monitor the process in the real-time log viewer.
-6.  **Receive the Synthesized Result**: Once all epochs are complete, the final answer is displayed.
+2.  **Architect the Network**: Use the GUI to set the hyperparameters that define your network's structure and learning capacity.
+3.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
+4.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
+5.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
+6.  **Download the Final Report**: Once all epochs are complete, the final harvest phase will run. A download link for a ZIP file containing the generated research papers will appear.
 
 ## Let's Collaborate: Building a P2P Network
 

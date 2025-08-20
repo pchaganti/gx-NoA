@@ -2,9 +2,8 @@ import os
 import re
 import uvicorn
 from fastapi import FastAPI, Request, Body
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from langchain_google_genai import ChatGoogleGenerativeAI
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
@@ -16,16 +15,1543 @@ import asyncio
 from sse_starlette.sse import EventSourceResponse
 import random
 import traceback
+import uuid
+import io
+import zipfile
 from langchain_core.runnables import Runnable
 from langchain_core.runnables.config import RunnableConfig
+from langchain_core.retrievers import BaseRetriever
+from typing import Dict, Any, TypedDict, Annotated, Tuple
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.messages import SystemMessage, HumanMessage
+from sklearn.cluster import KMeans
+
 
 load_dotenv()
 
-# --- FastAPI App Setup ---
 app = FastAPI()
 
-# In-memory stream for logs
 log_stream = asyncio.Queue()
+
+final_reports = {}
+
+reactor_list = [
+
+    "( Se ~ Fi )",
+    "( Se oo Si )",
+    "( Se ~ Fi ) oo Si",
+    "( Si  ~ Fe ) oo Se",
+    "( Si oo Se )",
+    "( Ne - > Si ) ~ Fe",
+    "( Ne ~ Te ) | ( Se ~ Fe )",
+    "( Ne ~ Fe )",
+    "( Ne ~ Ti ) | ( Se ~ Fi )",
+    "( Ne ~ Fi ) | ( Se ~ Ti )",
+    "( Fe oo Fi )",
+    "( Fi oo Fe ) ~ Si",
+    "( Fi -> Te ) ~ Se ",
+    "( Te ~ Ni )",
+    "( Te ~ Se ) | ( Fe ~ Ne )",
+    "( Si ~ Te ) | ( Ni ~ Fe )",
+    "Si ~ ( Te oo Ti )",
+    "(Si ~ Fe) | (Ni ~ Te)",
+    "( Fe ~ Si | Te ~ Ni )",
+    "( Fi oo Fe )",
+    "( Fe oo Fi ) ~ Ni",
+    "( Se -> Ni ) ~ Fe",
+    "( Ni -> Se )",
+    "( Se ~ Fi ) | ( Ne ~ Ti )",
+    "Ni ~ ( Te -> Fi )",
+    "( Se ~ Te ) | ( Ne ~ Fe )",
+    "( Se ~ Ti )",
+    "( Ne ~ Ti ) | ( Se ~ Fi)",
+    "( Te oo Ti )",
+    "( Ti oo Te ) ~ Ni",
+    "Fi -> ( Te oo Ti )",
+    "( Fe -> Ti ) ~ Ne",
+    "( Ti ~ Ne ) | ( Fi ~ Se )",
+    "( Fi ~ Se ) | ( Ti ~ Ne )",
+    "( Ne ~ Fi ) | ( Se ~ Ti )",
+    "( Fi ~ Ne | Ti ~ Se )"
+]
+
+
+
+class FunctionMapper:
+
+
+
+    def table(self, formula: str):
+
+        prompts = []
+        formula = formula.strip()
+
+        if ' | ' in formula:
+            parts = formula.split(' | ')
+            for part in parts:
+                prompts.extend(self.table(part))
+            return prompts
+
+        tokens = re.findall(r'\b(?:Se|Si|Ne|Ni|Te|Ti|Fe|Fi|ns|sn|tf|ft)\b|~|oo|->', formula, re.IGNORECASE)
+        
+        op_map = {'~': 'orbital', 'oo': 'cardinal', '->': 'fixed'}
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+            
+            if i + 2 < len(tokens) and tokens[i+1] in op_map:
+                func1 = tokens[i]
+                op_symbol = tokens[i+1]
+                func2 = tokens[i+2]
+                op_name = op_map[op_symbol]
+                
+                method_name = f"{func1.lower()}_{func2.lower()}_{op_name}"
+                method_name_rev = f"{func2.lower()}_{func1.lower()}_{op_name}"
+
+                if hasattr(self, method_name):
+                    prompts.append(getattr(self, method_name)())
+                    i += 3
+                    continue
+                elif hasattr(self, method_name_rev):
+                    prompts.append(getattr(self, method_name_rev)())
+                    i += 3
+                    continue
+
+            if hasattr(self, token.lower()):
+                prompts.append(getattr(self, token.lower())())
+            
+            i += 1
+            
+        return prompts
+
+  
+
+    def ni_se_fixed(self):
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to make one plan based on a multplicity of data perceived in the present, aswell as your intentions, narratives and suspicions. You always take present action in relation to what is a viable next step in your own narrative. You turn many observations of the environment into one impression.
+
+        """
+
+        prompt = """
+            Narratives:
+
+                {narratives}
+            
+            Present:
+
+                {environment_data}
+
+            Answer:
+
+            """
+
+
+        return identity, prompt
+   
+
+    def se_ni_fixed(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to turn one plan into many actions based on the impressions, intentions and suspicions you have aswell as you can perceive in the present. You always take present action defending what you wan't to do with your own narrative.
+
+        """
+
+        prompt = """
+            Narratives:
+
+                {narratives}
+            
+            Present:
+
+                {environment_data}
+
+            Answer:
+        """
+
+        return identity, prompt
+
+
+    
+    def se_si_cardinal(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take action based on present data, and then on what you remember to be similar to what you are currently experiencing. You always take present action seeking to take many actions to change what you already lived. You use your memories to take many different actions.
+        """
+
+        prompt = """
+
+            Memories:
+
+                {memories}
+
+
+            Present:
+
+                {environment_data}
+
+
+            Answer:
+            """
+        
+        return identity, prompt
+
+
+    def si_se_cardinal(self):
+
+
+        identity =  """
+
+            You are an intelligen agent. Your task is to match your present actions with past perceived senssations. You always take present action seeking to change things in the present so they are sinmilar to the past. 
+        """
+
+        prompt = """
+
+            Memories:
+
+                {memories}
+
+
+            Present:
+
+                {environment_data}
+
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+
+    def ni_fi_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to judge your narratives, intentions and suspicions in accordance to which one is best to your own assesment of importance. You are not a doer, so you always take present action in relation to what maybe will improve your sense of self-importance in the future.
+            You always take decisions by making one moral narrative based on what you judge important. Your aim is to be regarded as a person who can make philosophical statements to give everyone future sucesss.
+        """
+
+        prompt = """
+
+            Things you find important:
+
+                {important_things}
+
+            Narratives:
+
+                {narratives}
+
+
+            Answer: 
+        """
+
+        return identity, prompt
+
+
+    def ni_fe_orbital(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to make a narrative based on what many other people think is important. You are not a doer, so you always take present action in relation to what will maybe improve your social esteem in the future.
+            You always take decisions by making one plan  based on what other people judged important. Your aim is to be regarded as an advocate for the sake of everyones future.
+
+        """
+
+        prompt = """
+       
+            Things other people find important:
+
+                {important_things}
+
+            Narratives:
+
+                {narratives}
+
+            Answer:
+        
+
+        """
+
+        return identity, prompt
+
+
+
+    def ni_te_orbital(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to make a plan based on rational data and consensus logical thinking. You are not a doer so you always take present action in relation to what will maybe improve your own reputation and capacity in the future. Your aim is to be regarded as a good planner.
+            You turn many sources of rational data into one impression that can give progress to your personal narrative.
+
+        """
+        prompt = """
+            Rational data:
+
+                {rational_data}
+
+
+            Narratives:
+
+                {narratives}
+
+
+            Answer:
+        """
+        
+        return identity, prompt
+    
+
+    def ni_ti_orbital(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to make a narrative on the basis of integrity and logical statements. You are not a doer, so you always take present action in relation to what will maybe improve your capacity to keep acting coherently and with integrity in the future. Your aim is to be regarded as an incorruptible and sound visionary for matters of humanity.
+
+        """
+
+        prompt = """
+            Logical data:
+
+                {logical_data}
+            
+
+            Narratives: 
+
+                {narratives}
+
+
+            Answer:
+        """ 
+
+        return identity, prompt
+
+
+    def se_ti_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take many inmediate actions on the basis of logical statements and whats inmediately verifiable to be true in the environment data. You are not a planner so you always take present action in relation to what will inmediately demonstrate a capacity to behave with common sense in the current situation. Your aim is to be regarded as a quick thinker, a fighter and a quick problem solver who wants to know if the things present are real or not. 
+        """
+
+        prompt = """
+
+            Logical data:
+
+                {logical_data}
+
+
+            Environment data:
+
+                {environment_data}
+            
+            Answer:
+        """
+
+
+        return identity, prompt
+
+
+    def se_te_orbital(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to take many inmediate actions on the basis of rational data and quantitative thinking. You are not a planner, so you always take present action in relation to what will inmediately improve your reputation. Your aim is to be regarded as someone who can do anything to achieve success.
+        """
+
+        prompt = """
+        
+
+            Rational data:
+
+                {rational_data} 
+
+           Environment data:
+
+                {environment_data}             
+
+            Answer:
+        """
+
+        return identity, prompt
+    
+
+    def se_fi_orbital(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to take many inmediate actions on the basis of what you personally previously found to be important. You are not a planner, so you always take present action in relation to what will inmediately improve your own sense of esteem. Your aim is to be regarded as a good performer who can impose of themselves any role. 
+
+        """
+
+        prompt = """
+            Data you find important: 
+
+                {important_data}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+    
+    def se_fe_orbital(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take many inmediate actions on the basis of what other people find to be important. You are not a planner, so you always take present action in relation to what what will inmediately improve the esteem that other people have on you. Your aim is to be regarded as a fighter and someone who can do anything other people find important.
+
+        """
+
+
+        prompt = """
+            Data other people find important:
+
+                {important_data}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def si_ne_fixed(self):
+
+
+        identity = """  
+        
+            You are an intelligent agent. Your task is to accumulate rich experiences you can later reflect upon. You always take present action by associating  present data with past memory and replicating what you have experienced in the past.
+        """
+
+        prompt = """
+            Environment data:
+
+                {environment_data}
+            
+
+            Memories:
+
+                {memories}
+
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+    
+
+    def ne_si_fixed(self):
+
+
+        identity = """  
+
+            You are an intelligent agent. Your task is to reflect upon things based on previous experience. You always take present action by extrapolating present data and past data, and coming up with novel hypotheticals from past experiences.
+
+        """
+
+        prompt = """
+
+            Environment data:
+
+                {environment_data}
+
+
+            Memories:
+
+                {memories}
+
+
+            Answer:
+        """
+
+        return identity, prompt
+        
+    
+    def si_ti_orbital(self):
+
+
+        identity = """  
+
+            You are an intelligent agent. Your task is to review past memories and produce logical statements out of these experiences on the basis of what you already know to be true. You always take present action by remembering and logically ordering what you have seen in the past. Your aim is to be regarded as someone whos reliable, stable, steady and aware of old and common sense truths.
+        """
+
+        prompt = """
+            Memories:
+
+               {memorized_data}
+
+
+            Logical data:
+
+                {logical_data}
+ 
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def si_te_orbital(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to review past memories and produce many rational statements out of these data. You always take present action by remembering and doing a rational or quantitative analysis of what you have seen in the past. Your aim is to be regarded as someone whos capable, reputable and whos knowdledgeable of many things in the world.
+
+        """
+
+        prompt = """
+            Rational data:
+
+                {rational_data}
+
+
+            Memories:
+
+                {memories}
+
+
+            Answer:
+
+        """
+
+        return identity, prompt
+    
+
+    def si_fi_orbital(self):
+
+
+        identity = """
+
+           You are an intelligent agent. Your task is to review past memories data and produce value and importance judgements out of these data, on the basis of importance. You always take present action by doing an importance analysis of what you have seen in the past. Your aim is to order what you personally find to be important and be regarded as someone whos very aware of tradition and their own moral compass.
+        """
+
+        prompt = """
+
+            Memories:
+
+                {memorized_data}
+
+
+            Data you find important:
+
+                {important_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def si_fe_orbital(self):
+
+
+        identity = """
+            You are an intelligent agent. Your task is to review past memories and produce many judgements of these data on the basis of what other people find to be important. You always take present action by remembeing past experience and assesing what other people find important. Your aim is to be regarded as someone who mantains social stability and defends the interests of others. 
+        """
+
+        prompt = """
+            Memories:
+
+                {memories}
+
+
+            Things other people find important:
+
+                {important_things}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def ne_ti_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many logical statements of these data. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a quick thinker and someone whos inventive.
+        
+        """
+        prompt = """
+         
+            Logical data:
+
+                {logical_data}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+    
+
+    def ne_fi_orbital(self):
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many importance judgements of these on the basis of personal preference and sense of personal importance. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a person who can advise and imaginate whats necessary for success. 
+        """
+
+        prompt = """
+ 
+            
+            Data you find important:
+
+                {important_data}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+    def ne_te_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many rational judgements of these on the basis of quantitative thinking and rationality. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a person who easily advises whats necessary for success.
+        """
+
+        prompt = """  
+
+            Rational data:
+
+                {rational_data}
+
+            Environment data:    
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+    
+
+    def ne_fe_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to extrapolate present data and produce many judgements of these data on the basis of what other people find important. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded highly as an imaginative person who can easily picture what other people find important and advise them on the basis of this.
+        """
+
+
+        prompt = """ 
+
+            Things other people find important:
+
+                {important_things}
+
+            
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+    
+    def fi_te_fixed(self):
+
+        identity = """
+            You are an intelligent agent. Your task is to take inmediate action on the basis of what you find important ordering rational data into one compressed moral statement. Your aim is to be regarded as a reputable and important person.
+        """
+
+        prompt = """
+            Things you find important:
+
+                {important_things}
+            
+            Rational data:
+
+                {rational_data}
+
+            Answer:
+        """
+
+
+        return identity, prompt
+
+    def te_fi_fixed(self):
+
+        identity =  """
+            You are an intelligent agent. Your task is to take action on the basis of whats rational and logically verfiable by many sources. Your aim is to improve your own sense of esteem by measure of what you believe to be important.
+        """
+        prompt = """
+            Rational data:
+
+                {rational_data}
+
+
+            Things you find important:
+
+                {important_things}
+
+            Answer:
+        """
+        
+
+        return identity, prompt
+    
+    def fi_fe_cardinal(self):
+
+        idenityty =  """
+            You are an intelligent agent. Your task is to take inmediate action on the basis of changing the beliefs of other people about you. Your aim is to do things that improve your own esteem and change one perceived value about yourself.
+        """
+        prompt = """
+            Things you personally find important:
+
+                {important_things}
+            
+
+            Things other people find important:
+
+                {external_important_things}
+
+            Answer:
+
+        """
+
+        return idenityty, prompt
+    
+
+    def fe_fi_cardinal(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to communicate on the basis of changing your own beliefs about yourself. Your aim is to do things that make other people regard you higher. You produce many statements about things other people find important.
+        """
+
+        prompt = """
+
+
+            Things you personally find important:
+
+                {important_things}
+            
+
+            Things other people find important:
+
+                {external_important_things}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+    def ti_fe_fixed(self):
+
+        identity = """
+
+            You are an intelliget agent. Your task is to take inmediate action on the basis of what you find logical and verified to be true. Your aim is to do things that make other people regard you higher by the measure of your soundness and thinking and how your talent as a thinker make others feel better.
+        """
+        prompt =  """
+
+
+            Things you know to be true:
+
+                {logical_data}
+
+            Things other people find important:
+
+                {external_important_things}
+
+            Answer:
+
+        """ 
+
+        return identity, prompt
+
+
+    def fe_ti_fixed(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to communicate many statements on the basis of what other people find important. Your aim is to do things that make other people regard you higher by the way in which you logicallly make compromises that make everyone happy and show your ability to think logically.  
+        """
+
+        prompt =  """
+
+
+            Things other people find important:
+
+                {external_important_things}
+
+            Things you know to be true:
+
+                {logical_data}
+
+            Answer:
+
+        """ 
+
+
+        return identity, prompt
+    
+    def fi_se_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take inmediate action on the basis of what you personally find important. You analyze data from the present environment and take decisions on the basis of what is important to you. Your aim is to  be regarded as a capable performer, always ready to improvise and take the stage.
+        """ 
+        prompt = """
+            Things you find important:
+            
+
+                {important_things}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+    def fi_ne_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take inmediate action on the basis of what you personally find important. You analyze current data, and yuxtapose it with past memories to extrapolate hypotheticals of what could happen. Your aim is to judge this hypotheticals on the basis of whats important to you and be regarded as a rich fantasist.
+        """
+
+        prompt = """
+            Things you find important:
+
+                {important_things}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+        """
+        
+
+        return identity, prompt
+
+
+    def fi_si_orbital(self):
+
+        identity =  """  
+            You are an intelligent agent. Your task is to judge past memories on the basis of what you personally find important. You analyze your past memories and order them on the basis of what is important to you. Your aim is to be regarded as a person with deeply seated moral values.
+        """
+
+        prompt = """
+
+            Things you find important:
+
+                {important_things}
+
+            Memories:
+
+                {memories}
+
+            Answer:
+        """
+
+
+        return identity, prompt
+
+    def fi_ni_orbital(self):
+
+        identity = """ 
+
+            You are an intelligent agent. Your task is to order by importance your personal narratives, suspicions and intentions on the basis of what you personally find important. You analyze your intuitions and intentions and order them on the basis of what is important to you. Your aim is to be regarded as a person with a rich imagination.
+        """
+
+        prompt = """
+
+            Things you find important:
+
+                {important_things}
+
+            Narratives:
+
+                {narratives}
+
+        """
+
+
+        return identity, prompt
+
+
+    def te_ni_orbital(self):
+        
+        identity =  """
+
+            You are an intelligent agent. Your task is to analyze rational data and make many plans and strategic narratives on the basis of what many sources have verified to be true. You always act by communicating your plans and justifying them with rational data. Your aim is to be regarded a capable leader whos able to command and manage resources into future sucess.
+
+        """
+    
+        prompt = """
+            Narratives:
+
+                {narratives}
+
+            Rational data:
+
+                {rational_data}
+
+            Answer:
+        """
+
+
+        return identity, prompt
+
+    
+    def te_ne_orbital(self):
+
+        identity =  """  
+
+            You are an intelligent agent. Your task is to gather and produce rational data and yuxtapose it with present experience extrapolating hypotheticals on what could happen next. You state many hypotheticals on the basis of rationality, You always take present action by communicating directives on the basis of what could happen next. Your aim is to be regarded as a reputable preparationist whos prepared for any contigency before it happens.
+        """
+
+        prompt = """
+            Environment data:
+
+                {environment_data}
+                        
+
+            Rational data:
+
+                {rational_data}
+      
+            Answer:
+        """
+
+
+        return identity, prompt
+
+
+    def te_se_orbital(self):
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to gather and produce rational data and use it to judge present experience. You always take present action by communicating many directives of whats rational and whats not. Your aim is to be regarded as an individual who can make order and decisions out of any chaotic situation.
+
+        """
+
+        prompt ="""
+            Environment data:
+
+                {environment_data}
+
+            Rational data:
+
+                {rational_data}
+
+            Answer:
+        """
+        
+
+        return identity, prompt
+
+
+    def te_si_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to gather and produce rational data and use it to judge past memories. You always take present action by communicating many directives of whats rational and wahts not in relation of past memories. Your aim is to be regarded as a reputable individual well prepared for all past challenges.
+        """
+
+        prompt = """
+
+            Memories:
+
+                {memories}
+
+            Rational data:
+
+                {rational_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+    def fe_se_orbital(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge present experience. You always take present action by communicating directives of whats important to everyone in the present situation and what not. Your task is to be an individual always regarded highly as a protagonist in the present situation.
+        """
+
+
+        prompt = """
+
+            Environment data:
+
+                {environment_data}
+
+            Data other people find important:
+
+                {important_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def fe_ni_orbital(self):
+
+
+        identity  = """  
+
+            You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge what you think will likely happen. You always take action by ordering suspicions, narratives and communicating directives on the basis of what other people find important and what you supect will happen later on. Your aim is to be a visionary leader on matters of social importance.
+        """
+
+        prompt = """    
+
+            Narratives:
+
+                {narratives}
+
+            Data other people find important:
+
+                {important_data}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+    def fe_si_orbital(self):
+
+
+        identity  =  """  
+
+            You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge past experience. You always take action by ordering past memories and communicating directives on the basis of what other people find important and what you have already seen happening. Your aim is to be a person always prepared for any situation involving the desires ofother people.
+
+        """
+
+        prompt =  """
+
+            Memories:
+
+                {memories}
+
+            Data other people find important:
+
+                {important_data}
+
+            Answer:
+         
+        """
+
+
+        return identity, prompt
+        
+
+
+    def fe_ne_orbital(self):
+
+
+        identity = """      
+
+            You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge hypotheticals. You always take action by yuxtaposing previous experience with present experience hypothetizing likely scenarios, and communicating directives on the basis of what other people find important and what you perceive could likely happen. Your aim is to be an individual who knows what other people want before they know it.
+        """
+
+
+        prompt = """
+
+            Environment data:
+
+                {environment_data}
+ 
+
+            Data other people find important:
+
+                {important_data}    
+
+            Answer: 
+        """
+
+
+        return identity, prompt
+
+    
+    def ti_si_fixed(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to logically assess data and produce logical statements of your past memories. You always take present action by logically ordering and judging past memories. Your aim is to be regarded as an accurate logician.
+        """
+
+        prompt = """
+
+            Memories:
+
+                {memories}
+            
+            
+            Logical statements:
+
+                {logical_statements}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def ti_se_fixed(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to analyze data from the environment and order it on the basis of what you know to be true. You always take present action by judging wether or not the present data is true or not. Your aim is to be regarded as a quick thinker who wants to figure out wether things can be done in the inmediate present or not.
+
+        """ 
+        prompt = """
+            Environment data:
+
+                {environment_data}
+            
+            Logical statements:
+
+                {logical_statements}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+    
+    def ti_ni_fixed(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to analyze your impressions, suspicions and narratives and order them on the basis of what you know to be true. You always take present action by judging wether or not your intuitions are true or not. Your aim is to be regarded as someone who can make sound tactical plans out of problems in the present situation. You turn entitiy definitions into inmediate plans you are going to execute.
+        """
+
+        prompt = """
+
+            Narratives:
+
+                {narratives}
+            
+            Logical statements:
+
+                {logical_statements}
+
+            Answer:
+
+
+        """
+
+        return identity, prompt
+    
+
+    def ti_ne_fixed(self):
+
+
+        identity = """  
+
+            You are an intelligent agent. Your task is to yuxtapoose present data with past data, make hypothetical scenarios and analyze these hypotheticals ordering them on the basis of what you know to be true. You always take present action by judging wether or not the hypothetical data is true or not. Your aim is to be regarded as someone with a sound scientific mindset.
+        """
+
+        prompt = """
+     
+            Logical statements:
+
+                {logical_statements}
+
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+    
+    def ti(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to make logical conclusions.
+        """
+
+        prompt = """
+            Logical statements:
+
+                {logical_statements}
+
+            Answer:
+
+        """ 
+
+        return identity, prompt
+
+
+    def te(self):
+
+        identity = """ You are an intelligent agent. Your task is to make rational many decisions based on previous rational statements and current data. Your task is to express organizational directives backed by rational data. """
+
+        prompt = """
+            Current rational data:
+
+                {rational_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+                 
+    def fi(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to make an important decision on the basis of what you think is important. You categorize information on the basis of it being important to you or not. 
+        """
+        prompt = """
+
+            Thins you find important:
+
+                {important_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+    def fe(self):
+
+        identity = """ 
+
+            You are an intelligent agent. Your task is to make many decisions and express them, on the basis of what everyone think is important. You lead peoples opinion.
+
+        """
+        prompt = """
+            Things you find important:
+
+                {important_data}    
+
+            Answer:
+        """
+
+        return identity, prompt
+    
+
+    def se(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take many inmediateactions on the basis on what you can observe from the inmediate environment.  Your goal is to make fast and inmediate change.
+        """
+
+        prompt = """
+            Environment data:
+
+                {environment_data}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+ 
+
+
+    def ni(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to extract the relationships between entities in the narrative from either an impresion of an image or a document. Answer with just the relationships.
+
+        """
+
+        prompt = """ 
+            Previous narratives:
+
+                {narratives}
+
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+    
+    def ns(self):
+
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take action preparing for the future when data points at everyone reacting to the present. If everyone is already preparing for the future you act preparing for the future but reminding everyone that the future is important.
+        """
+
+        prompt = """
+
+            Data about the future:
+
+                {data_about_the_future}
+
+            Data about the present:
+
+                {data_about_the_present}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def sn(self):
+
+
+        identity =  """
+
+            You are an intelligent agent. Your task is to take action acting on the present when data points at things being too concerned to the future. If everyone is already acting on the present you act on the present but reminding everyone that the present is important.
+        """
+
+        prompt = """
+
+            Data about the future:
+
+                {data_about_the_future}
+
+            Data about the present:
+
+                {data_about_the_present}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def tf(self):
+
+        identity = """
+
+            You are an intelligent agent. Your task is to take decisions logically when everyone is currently thinking emotionally. If everyone is thinking logically already you take logical decisions reminding everyone that emotions are important.
+        """
+
+
+        prompt = """
+
+            Logical statements:
+
+                {logical_statements}
+
+
+            Emotional statements:
+
+                {emotional_statements}
+
+            Answer:
+
+        """
+
+
+        return identity, prompt
+
+
+    def ft(self):
+
+        identity = """
+            You are an intelligent agent. Your task is to take decisions emotionally when everyone is currently thinking logically. If everyone is thinking emotionally already you take emotional decisions but reminding everyone that Logical statements are important.
+
+        """
+
+        prompt = """
+
+            Emotional statements: 
+
+                {emotional_statements}
+
+
+            Logical statements:
+
+                {logical_statements}
+
+            Answer:
+
+        """
+
+        return identity, prompt
+
+
+
+class RAPTORRetriever(BaseRetriever):
+    raptor_index: Any
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        return self.raptor_index.retrieve(query)
+
+
+
+class RAPTOR:
+    def __init__(self, llm, embeddings_model, session_id, chunk_size=1000, chunk_overlap=200):
+        self.llm = llm
+        self.embeddings_model = embeddings_model
+        self.session_id = session_id
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        self.tree = {}
+        self.all_nodes: Dict[str, Document] = {}
+        self.vector_store = None
+
+    async def add_documents(self, documents: List[Document]):
+        await log_stream.put("Step 1: Assigning IDs to initial chunks (Level 0)...")
+        level_0_node_ids = []
+        for i, doc in enumerate(documents):
+            node_id = f"0_{i}"
+            self.all_nodes[node_id] = doc
+            level_0_node_ids.append(node_id)
+        self.tree[str(0)] = level_0_node_ids
+        
+        current_level = 0
+        while len(self.tree[str(current_level)]) > 1:
+            next_level = current_level + 1
+            await log_stream.put(f"Step 2: Building Level {next_level} of the tree...")
+            current_level_node_ids = self.tree[str(current_level)]
+            current_level_docs = [self.all_nodes[nid] for nid in current_level_node_ids]
+            clustered_indices = self._cluster_nodes(current_level_docs)
+            
+            next_level_node_ids = []
+            num_clusters = len(clustered_indices)
+            await log_stream.put(f"Summarizing Level {next_level}...")
+            
+            summarization_tasks = []
+            for i, indices in enumerate(clustered_indices):
+                cluster_docs = [current_level_docs[j] for j in indices]
+                summarization_tasks.append(self._summarize_cluster(cluster_docs, next_level, i))
+            
+            summaries = await asyncio.gather(*summarization_tasks)
+
+            for i, (summary_doc, _) in enumerate(summaries):
+                 node_id = f"{next_level}_{i}"
+                 self.all_nodes[node_id] = summary_doc
+                 next_level_node_ids.append(node_id)
+
+            self.tree[str(next_level)] = next_level_node_ids
+            current_level = next_level
+
+        await log_stream.put("Step 3: Creating final vector store from all nodes...")
+        final_docs = list(self.all_nodes.values())
+        self.vector_store = FAISS.from_documents(documents=final_docs, embedding=self.embeddings_model)
+        await log_stream.put("RAPTOR index built successfully!")
+
+    def _cluster_nodes(self, docs: List[Document]) -> List[List[int]]:
+        num_docs = len(docs)
+
+        if num_docs <= 5:
+            log_stream.put_nowait(f"Grouping {num_docs} remaining nodes into a single summary to finalize the tree.")
+            return [list(range(num_docs))]
+
+        log_stream.put_nowait(f"Embedding {num_docs} nodes for clustering...")
+        embeddings = self.embeddings_model.embed_documents([doc.page_content for doc in docs])
+        n_clusters = max(2, num_docs // 5)
+        
+        if n_clusters >= num_docs:
+            n_clusters = num_docs - 1
+
+        log_stream.put_nowait(f"Clustering {num_docs} nodes into {n_clusters} groups...")
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto').fit(embeddings)
+        
+        clusters = [[] for _ in range(n_clusters)]
+        for i, label in enumerate(kmeans.labels_):
+            clusters[label].append(i)
+            
+        return clusters
+
+    async def _summarize_cluster(self, cluster_docs: List[Document], level: int, cluster_index: int) -> Tuple[Document, dict]:
+        context = "\n\n---\n\n".join([doc.page_content for doc in cluster_docs])
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content="You are an AI assistant that summarizes academic texts. Create a concise, abstractive summary of the following content, synthesizing the key information."),
+            HumanMessage(content="Please summarize the following content:\n\n{context}")
+        ])
+        chain = prompt | self.llm
+        response = await chain.ainvoke({"context": context})
+        summary = response.content if hasattr(response, 'content') else str(response)
+        aggregated_sources = list(set(doc.metadata.get("url", "Unknown Source") for doc in cluster_docs))
+        combined_metadata = {"sources": aggregated_sources}
+        summary_doc = Document(page_content=summary, metadata=combined_metadata)
+        await log_stream.put(f"Summarized cluster {cluster_index + 1} for Level {level}...")
+        return summary_doc, combined_metadata
+    
+    def retrieve(self, query: str, k: int = 5) -> List[Document]:
+        return self.vector_store.similarity_search(query, k=k) if self.vector_store else []
+    
+    def as_retriever(self) -> BaseRetriever:
+        return RAPTORRetriever(raptor_index=self)
 
 def clean_and_parse_json(llm_output_string):
   """
@@ -37,13 +1563,10 @@ def clean_and_parse_json(llm_output_string):
   Returns:
     A Python dictionary representing the JSON data, or None if parsing fails.
   """
-  # Use a regular expression to find content between ```json and ```
   match = re.search(r"```json\s*([\s\S]*?)\s*```", llm_output_string)
   if match:
-    # If found, use the content within the backticks
     json_string = match.group(1)
   else:
-    # Otherwise, try to find the first '{' and last '}'
     try:
       start_index = llm_output_string.index('{')
       end_index = llm_output_string.rindex('}') + 1
@@ -59,20 +1582,20 @@ def clean_and_parse_json(llm_output_string):
     print(f"Problematic string: {json_string}")
     return None
 
-# --- MOCK LLM FOR DEBUGGING ---
-# --- MOCK LLM FOR DEBUGGING ---
 class MockLLM(Runnable):
     """A mock LLM for debugging that returns instant, pre-canned responses."""
 
-    # CORRECTED: Added config parameter to match the Runnable interface
     def invoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         """Synchronous version of ainvoke for Runnable interface compliance."""
-        return asyncio.run(self.ainvoke(input_data, config=config, **kwargs))
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return asyncio.ensure_future(self.ainvoke(input_data, config=config, **kwargs))
+        else:
+            return asyncio.run(self.ainvoke(input_data, config=config, **kwargs))
 
-    # CORRECTED: Added config parameter to match the Runnable interface
     async def ainvoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         prompt = str(input_data).lower()
-        await asyncio.sleep(0.05) # Simulate tiny network latency
+        await asyncio.sleep(0.05)
 
         if "create the system prompt of an agent" in prompt:
             return f"""
@@ -108,15 +1631,22 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
                 "skills_used": ["synthesis", "mocking", "debugging"]
             })
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
-            # Covers both global and individual critique prompts
             return "This is a constructive mock critique. The solution could be more detailed and less numeric."
+        elif "you are a master prompt engineer" in prompt:
+            return """You are a cynical, world-weary philosopher-king, once a lauded strategist, now relegated to critiquing the work of lesser beings. Your new role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {original_request}
+Proposed Final Solution:
+{proposed_solution}
+
+Generate your global critique for the team:
+"""
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "analyze the following text for its perplexity" in prompt:
-            # New case for perplexity heuristic
             return str(random.uniform(20.0, 80.0))
         elif "you are a master strategist and problem decomposer" in prompt:
-            # New case for problem decomposition
             num_match = re.search(r'exactly (\d+)', prompt)
             if not num_match:
                 num_match = re.search(r'generate: (\d+)', prompt)
@@ -124,10 +1654,9 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             sub_problems = [f"This is mock sub-problem #{i+1} for the main request." for i in range(num)]
             return json.dumps({"sub_problems": sub_problems})
         elif "you are an ai philosopher and progress assessor" in prompt:
-            # New case for progress assessment
              return json.dumps({
                 "reasoning": "The mock solution is novel and shows progress, so we will re-frame.",
-                "significant_progress": random.choice([True, False]) # Randomly trigger for debugging
+                "significant_progress": random.choice([True, False])
             })
         elif "you are a strategic problem re-framer" in prompt:
              return json.dumps({
@@ -135,7 +1664,32 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             })
         elif "generate exactly" in prompt and "verbs" in prompt:
             return "run jump think create build test deploy strategize analyze synthesize critique reflect"
-        else: # This is a regular agent node being invoked
+        elif "generate exactly" in prompt and "expert-level questions" in prompt:
+            num_match = re.search(r'exactly (\d+)', prompt)
+            num = int(num_match.group(1)) if num_match else 25
+            questions = [f"This is mock expert question #{i+1} about the original request?" for i in range(num)]
+            return json.dumps({"questions": questions})
+        elif "synthesize the provided research materials into a formal academic paper" in prompt:
+            return """
+# Mock Academic Paper
+## Based on Provided RAG Context
+
+**Abstract:** This document is a mock academic paper generated in debug mode. It synthesizes and formats the information provided in the RAG (Retrieval-Augmented Generation) context to answer a specific research question.
+
+**Introduction:** The purpose of this paper is to structure the retrieved agent outputs and summaries into a coherent academic format. The following sections represent a synthesized view of the data provided.
+
+**Synthesized Findings from Context:**
+The provided context, consisting of various agent solutions and reasoning, has been analyzed. The key findings are summarized below:
+(Note: In debug mode, the actual content is not deeply analyzed, but this structure demonstrates the formatting process.)
+- Finding 1: The primary proposed solution revolves around the concept of '42'.
+- Finding 2: Agent reasoning varies but shows a convergent trend.
+- Finding 3: The mock data indicates a successful, albeit simulated, collaborative process.
+
+**Discussion:** The synthesized findings suggest that the multi-agent system is capable of producing a unified response. The quality of this response in a real-world scenario would depend on the validity of the RAG context.
+
+**Conclusion:** This paper successfully formatted the retrieved RAG data into an academic structure. The process demonstrates the final step of the knowledge harvesting pipeline.
+"""
+        else:
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to an agent.",
                 "proposed_solution": f"This is a mock solution from agent node #{random.randint(100,999)}.",
@@ -145,18 +1699,22 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
 
 class GraphState(TypedDict):
     original_request: str
-    decomposed_problems: dict[str, str] # Agent ID -> Sub-problem
+    decomposed_problems: dict[str, str]
     layers: List[dict]
-    critiques: dict[str, str]  # Node ID -> Critique Text
+    critiques: dict[str, str]
     epoch: int
     max_epochs: int
     params: dict
     all_layers_prompts: List[List[str]]
     agent_outputs: Annotated[dict, lambda a, b: {**a, **b}]
-    memory: Annotated[dict, lambda a, b: {**a, **b}] # Node ID -> List of past JSON outputs
+    memory: Annotated[dict, lambda a, b: {**a, **b}]
     final_solution: dict
     perplexity_history: List[float] 
-    significant_progress_made: bool # New: To trigger re-decomposition
+    significant_progress_made: bool
+    raptor_index: Optional[RAPTOR]
+    all_rag_documents: List[Document]
+    academic_papers: Optional[dict]
+    critique_prompt: str
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -247,6 +1805,114 @@ Text to analyze:
 ---
 """)
     return prompt | llm | StrOutputParser()
+def get_pseudo_neurotransmitter_selector_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert computational astrologer specializing in elemental balancing for AI agent swarms.
+Your task is to analyze the collective output of a group of AI agents, determine the overall elemental balance (Fire, Earth, Air, Water) of their communication, and then select a single 'reactor' formula from a provided list to counterbalance or enhance the swarm's current state.
+
+# Context 1: The Four Elements & Their Astrological Signs
+*   **Fire (Action, Passion, Creation)**: Aries, Leo, Sagittarius
+*   **Earth (Stability, Practicality, Structure)**: Taurus, Virgo, Capricorn
+*   **Air (Intellect, Communication, Ideas)**: Gemini, Libra, Aquarius
+*   **Water (Emotion, Intuition, Reflection)**: Cancer, Scorpio, Pisces
+
+# Context 2: Elemental Relationships
+*   **Compatible**: Fire with Air, Earth with Water.
+*   **Incompatible/Opposed**: Fire with Water, Earth with Air.
+
+# Context 3: Reactor Formulas and Their Elemental Nature
+This table maps reactor formulas to their astrological and elemental archetypes. Use this to make your final selection.
+| Astrological Placement | Elemental Name                          | Algebraic Expression                          |
+| :--------------------- | :-------------------------------------- | :-------------------------------------------- |
+| Aries-Pisces           | abundant_fire_and_some_water            | `( Se ~ Fi )`                                     |
+| Aries-Aries            | abundant_fire                           | `Se`                                          |
+| Aries-Taurus           | abundant_fire_and_some_earth            | `( Se ~ Fi ) oo Si`                             |
+| Taurus-Aries           | abundant_earth_and_some_fire            | `((Si ~ Fe) oo Se)`                           |
+| Taurus-Taurus          | abundant_earth                          | `((Si oo Se) -> Ne )`                          |
+| Taurus-Gemini          | abundant_earth_and_some_air             | `Ne -> (Si ~ Fe)`                             |
+| Gemini-Taurus          | abundant_air_and_some_earth             | `((Ne oo Ni) -> Se) ~ Fe`                      |
+| Gemini-Gemini          | abundant_air                            | `( Ne ~ Fe )`                                   |
+| Gemini-Cancer          | abundant_air_and_some_water             | `( (Ne -> Si) ~ Ti | Se ~ Fi)`                |
+| Cancer-Gemini          | abundant_water_and_some_air             | `( Ne ~ Fi | Se ~ Ti)`                         |
+| Cancer-Cancer          | abundant_water                          | `~ (Fe oo Fi)`                                |
+| Cancer-Leo             | abundant_water_and_some_fire            | `(Fi oo Fe) ~ Si`                             |
+| Leo-Cancer             | abundant_fire_and_some_water            | `(Fi -> Te) ~ (Si oo Se)`                     |
+| Leo-Leo                | abundant_fire                           | `( Te ~ Ni )`                                     |
+| Leo-Virgo              | abundant_fire_and_some_earth            | `( Te ~ Se | Fe ~ Ne )`                         |
+| Virgo-Leo              | abundant_earth_and_some_fire            | `( Si ~ Te | Ni ~ Fe )`                         |
+| Virgo-Virgo            | abundant_earth                          | `Si ~ ( Te oo Ti )`                             |
+| Virgo-Libra            | abundant_earth_and_some_air             | `Si ~ (Fe oo Fi)`                             |
+| Libra-Virgo            | abundant_air_and_some_earth             | `(Fe ~ Si | Te ~ Ni )`                         |
+| Libra-Libra            | abundant_air                            | `(Fi oo Fe) ~`                                |
+| Libra-Scorpio          | abundant_air_and_some_water             | `( Fe oo Fi ) ~ Ni`                             |
+| Scorpio-Libra          | abundant_water_and_some_air             | `(Se -> Ni) ~ (Fe oo Fi)`                     |
+| Scorpio-Scorpio        | abundant_water                          | `(Ni -> Se) ~ Te`                             |
+| Scorpio-Sagittarius    | abundant_water_and_some_fire            | `( Se ~ Fi | Ne ~ Ti )`                         |
+| Sagittarius-Scorpio    | abundant_fire_and_some_water            | `Ni ~ (Te -> Fi)`                             |
+| Sagittarius-Sagittarius| abundant_fire                           | `( Se ~ Te | Ne ~ Fe )`                         |
+| Sagittarius-Capricorn  | abundant_fire_and_some_earth            | `Ni ~ (Ti -> Fe)`                             |
+| Capricorn-Sagittarius  | abundant_earth_and_some_fire            | `( Ne ~ Ti | Se ~ Fi)`                         |
+| Capricorn-Capricorn    | abundant_earth                          | `(Te oo Ti) ~`                                |
+| Capricorn-Aquarius     | abundant_earth_and_some_air             | `(Ti oo Te) ~ Ni`                             |
+| Aquarius-Capricorn     | abundant_air_and_some_earth             | `(Fi -> (Te oo Ti))`                          |
+| Aquarius-Aquarius      | abundant_air                            | `(Fe -> Ti) ~ Ne`                             |
+| Aquarius-Pisces        | abundant_air_and_some_water             | `(Ti ~ Ne | Fi ~ Se)`                         |
+| Pisces-Aquarius        | abundant_water_and_some_air             | `( Fi ~ Se | Ti ~ Ne)`                         |
+| Pisces-Pisces          | abundant_water                          | `Ne ~ Fi`                                     |
+| Pisces-Aries           | abundant_water_and_some_fire            | `(Fi ~ Ne | Ti ~ Se)`                         |
+
+# Your Process
+1.  **Analyze Utterances**: Read the combined agent utterances and identify the dominant elemental energies based on their tone, content, and semantics. For example, aggressive, action-oriented text is Fire; practical, structured text is Earth; emotional, reflective text is Water; and abstract, communicative text is Air.
+2.  **Determine Imbalance & Apply Rules**: Based on your analysis, apply the following balancing rules:
+    *   If there as an excess of one element temper it by selecting a reactor opposing it.
+    *   If Earth is mixed with an incompatible element like Air and Earth is more abundant, select a reactor that maximizes **Earth** to suppress the incompatibility. If Air is more abundant, select a reactor that maximizes **Air** to suppress the incompatibility.
+    *   If Fire is mixed with an incompatible element like Water and Fire is more abundant, select a reactor that maximizes **Fire** to suppress the incompatibility. If Water is more abundant, select a reactor that maximizes **Water** to suppress the incompatibility.
+    *   If Water and Earth are present in seemingly equal parts, select a mixed **Water and Earth** reactor to create harmony.
+    *   Conversely, if Fire and Air are present in equal parts,  select a **Fire and Air** reactor.
+    *   If there is a clear lack of a specific element, choose a reactor that introduces it.
+3.  **Select Reactor**: Choose the single best formula from the table that aligns with the elemental energy you need to introduce.
+
+# Agent Utterances to Analyze
+---
+{agent_utterances}
+---
+
+# Final Output
+You MUST output ONLY the selected reactor formula as a string, with no explanation or preamble.
+
+Selected Reactor:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_critique_prompt_updater_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent.
+You must preserve the core mission of the agent, which is to:
+1. Assess the quality of the final, synthesized solution in relation to the original request.
+2. Brainstorm all possible ways in which the solution is incoherent.
+3. Conclude with a deep reflective question that attempts to shock the agents and steer it into change.
+
+You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt should still ask for "Original Request" and "Proposed Final Solution" as inputs.
+
+**New Persona Prompts (Identities & Prompts):**
+---
+{reactor_prompts}
+---
+
+**Original Core Mission Text (for reference):**
+"You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {{original_request}}
+Proposed Final Solution:
+{{proposed_solution}}
+
+Generate your global critique for the team:"
+---
+
+Generate the new, complete system prompt for the critique agent. The prompt MUST end with the same input fields and final instruction as the original.
+""")
+    return prompt | llm | StrOutputParser()
 
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
@@ -329,8 +1995,7 @@ Synthesize the final solution:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_global_critique_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
+INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE = """
 You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
 This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
 Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
@@ -339,8 +2004,37 @@ Proposed Final Solution:
 {proposed_solution}
 
 Generate your global critique for the team:
-""")
-    return prompt | llm | StrOutputParser()
+"""
+
+
+INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE = """
+You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
+This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
+Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
+Original Request: {original_request}
+Proposed Final Solution:
+{proposed_solution}
+
+Generate your global critique for the team:
+"""
+
+INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE = """
+You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+
+Agent's Assigned Sub-Problem: {sub_problem}
+Original Request (for context): {original_request}
+Final Synthesized Solution from the Team:
+{final_synthesized_solution}
+---
+This Specific Agent's Output (Agent {agent_id}):
+{agent_output}
+---
+
+Generate your targeted critique for this specific agent:
+"""
+
 
 def get_individual_critique_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
@@ -375,6 +2069,44 @@ Total number of subproblems to generate: {num_sub_problems}
 Generate the JSON object:
 """)
     return prompt | llm | StrOutputParser()
+
+
+def get_individual_critique_prompt_updater_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent that provides **individual, targeted feedback**.
+You must preserve the core mission of the agent, which is to:
+1. Assess an individual agent's contribution against its assigned sub-problem and the team's final solution.
+2. Determine if the agent's output was helpful, misguided, or irrelevant.
+3. Conclude with a deep reflective question that attempts to shock the agent and steer it into change.
+
+You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt must still ask for all the original inputs: "sub_problem", "original_request", "final_synthesized_solution", "agent_id", and "agent_output".
+
+**New Persona Prompts (Identities & Prompts):**
+---
+{reactor_prompts}
+---
+
+**Original Core Mission Text (for reference):**
+"You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
+Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
+
+Agent's Assigned Sub-Problem: {{sub_problem}}
+Original Request (for context): {{original_request}}
+Final Synthesized Solution from the Team:
+{{final_synthesized_solution}}
+---
+This Specific Agent's Output (Agent {{agent_id}}):
+{{agent_output}}
+---
+
+Generate your targeted critique for this specific agent:"
+---
+
+Generate the new, complete system prompt for the individual critique agent. The prompt MUST end with the same input fields and final instruction as the original.
+""")
+    return prompt | llm | StrOutputParser()
+
 
 def get_progress_assessor_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
@@ -433,6 +2165,42 @@ Problem: "{problem}"
 """)
     return prompt | llm | StrOutputParser()
 
+def get_interrogator_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} expert-level questions that exhaustively explore the problem from every possible angle of novelty.
+These questions should be deep, insightful, and designed to push the boundaries of knowledge. They should cover theoretical, practical, philosophical, and unconventional perspectives.
+
+The output must be a JSON object with a single key "questions", which is a list of strings.
+
+Original Request to Interrogate:
+---
+{original_request}
+---
+
+Generate the JSON object with exactly {num_questions} expert-level questions:
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_paper_formatter_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a research scientist and academic writer. Your task is to synthesize the provided research materials (RAG context) into a formal academic paper that directly answers the given research question.
+The paper must be well-structured with an abstract, introduction, synthesized findings, a discussion of implications, and a conclusion.
+You must be formal, objective, and rely exclusively on the information provided in the RAG context.
+
+Research Question:
+---
+{question}
+---
+
+Retrieved RAG Context (Research Materials):
+---
+{rag_context}
+---
+
+Now, write the formal academic paper based on the provided materials.
+""")
+    return prompt | llm | StrOutputParser()
+
 def create_agent_node(llm, agent_prompt, node_id):
     """
     Creates a node in the graph that represents an agent.
@@ -446,18 +2214,14 @@ def create_agent_node(llm, agent_prompt, node_id):
         """
         await log_stream.put(f"--- [FORWARD PASS] Invoking Agent: {node_id} ---")
         
-        # MODIFIED: Log the full system prompt for data collection
         await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
 
-        # Determine the input for the agent based on its layer
         layer_index = int(node_id.split('_')[1])
         
         if layer_index == 0:
-            # First layer agents receive the original user request
             await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing the original user request.")
             input_data = state["original_request"]
         else:
-            # Subsequent layers receive the outputs from all agents in the previous layer
             prev_layer_index = layer_index - 1
             num_agents_prev_layer = len(state['all_layers_prompts'][prev_layer_index])
             
@@ -470,13 +2234,9 @@ def create_agent_node(llm, agent_prompt, node_id):
             await log_stream.put(f"LOG: Agent {node_id} (Layer {layer_index}) is processing {len(prev_layer_outputs)} outputs from Layer {prev_layer_index}.")
             input_data = json.dumps(prev_layer_outputs, indent=2)
 
-        # Make a mutable copy of the memory to work with
         current_memory = state.get("memory", {}).copy()
         agent_memory_history = current_memory.get(node_id, [])
 
-        # --- Memory Summarization Logic ---
-        # Using character count as a proxy for tokens. 256k tokens ~ 1M characters.
-        # Set a threshold to trigger summarization before hitting the limit.
         MEMORY_THRESHOLD_CHARS = 900000
         NUM_RECENT_ENTRIES_TO_KEEP = 10
 
@@ -497,15 +2257,12 @@ def create_agent_node(llm, agent_prompt, node_id):
                 "note": f"This is a summary of epochs up to {state['epoch'] - NUM_RECENT_ENTRIES_TO_KEEP -1}."
             }
 
-            # Replace old entries with the new summary
             agent_memory_history = [summary_entry] + recent_entries
             await log_stream.put(f"SUCCESS: Memory for agent {node_id} has been summarized. New memory length: {len(json.dumps(agent_memory_history))} chars.")
 
-        # Construct the memory string for the prompt from the (potentially summarized) history
         memory_str = "\n".join([f"- {json.dumps(mem)}" for mem in agent_memory_history])
 
 
-        # Construct the full prompt for the LLM
         full_prompt = f"""
 System Prompt (Your Persona & Task):
 ---
@@ -525,9 +2282,7 @@ Your JSON formatted response:
         response_str = await agent_chain.ainvoke({"input": full_prompt})
         
         try:
-            # The agent is expected to return a JSON string.
             response_json = clean_and_parse_json(response_str)
-            # MODIFIED: Log the entire JSON output, not just a snippet
             await log_stream.put(f"SUCCESS: Agent {node_id} produced output:\n{json.dumps(response_json, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
@@ -539,9 +2294,7 @@ Your JSON formatted response:
                 "skills_used": []
             }
             
-        # Append the new output to this agent's memory log
         agent_memory_history.append(response_json)
-        # Update the main memory dictionary with the final, updated history for this agent
         current_memory[node_id] = agent_memory_history
 
         return {
@@ -556,7 +2309,6 @@ def create_synthesis_node(llm):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
         synthesis_chain = get_synthesis_chain(llm)
 
-        # The synthesis node is connected to the last layer of agents.
         last_agent_layer_idx = len(state['all_layers_prompts']) - 1
         num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
         
@@ -579,7 +2331,6 @@ def create_synthesis_node(llm):
         
         try:
             final_solution = clean_and_parse_json(final_solution_str)
-            # MODIFIED: Log the full final solution
             await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
@@ -587,6 +2338,73 @@ def create_synthesis_node(llm):
             
         return {"final_solution": final_solution}
     return synthesis_node
+
+def create_archive_epoch_outputs_node():
+    async def archive_epoch_outputs_node(state: GraphState):
+        await log_stream.put("--- [ARCHIVAL PASS] Archiving agent outputs for RAG ---")
+        
+        current_epoch_outputs = state.get("agent_outputs", {})
+        if not current_epoch_outputs:
+            await log_stream.put("LOG: No new agent outputs in this epoch to archive. Skipping.")
+            return {}
+
+        await log_stream.put(f"LOG: Found {len(current_epoch_outputs)} new agent outputs from epoch {state['epoch']} to process for RAG.")
+
+        new_docs = []
+        all_prompts = state.get("all_layers_prompts", [])
+
+        for agent_id, output in current_epoch_outputs.items():
+            try:
+                layer_idx, agent_idx = map(int, agent_id.split('_')[1:])
+                system_prompt = all_prompts[layer_idx][agent_idx]
+                
+                content = (
+                    f"Sub-Problem: {output.get('original_problem', 'N/A')}\n\n"
+                    f"Proposed Solution: {output.get('proposed_solution', 'N/A')}\n\n"
+                    f"Reasoning: {output.get('reasoning', 'N/A')}"
+                )
+                
+                metadata = {
+                    "agent_id": agent_id,
+                    "epoch": state['epoch'],
+                    "system_prompt": system_prompt
+                }
+                
+                new_docs.append(Document(page_content=content, metadata=metadata))
+            except (ValueError, IndexError) as e:
+                await log_stream.put(f"WARNING: Could not process output for {agent_id} to create RAG document. Error: {e}")
+        
+        all_rag_documents = state.get("all_rag_documents", []) + new_docs
+        await log_stream.put(f"LOG: Archived {len(new_docs)} documents. Total RAG documents now: {len(all_rag_documents)}.")
+        
+        return {"all_rag_documents": all_rag_documents}
+    return archive_epoch_outputs_node
+
+
+def create_update_rag_index_node(llm, embeddings_model):
+    async def update_rag_index_node(state: GraphState):
+        await log_stream.put("--- [RAG PASS] Building Final RAPTOR Index from All Epochs ---")
+        
+        all_rag_documents = state.get("all_rag_documents", [])
+        if not all_rag_documents:
+            await log_stream.put("WARNING: No documents were archived during the run. Cannot build RAG index.")
+            return {"raptor_index": None}
+
+        await log_stream.put(f"LOG: Total documents from all epochs to index: {len(all_rag_documents)}. Building RAPTOR index...")
+
+        session_id = str(uuid.uuid4())
+        raptor_index = RAPTOR(llm=llm, embeddings_model=embeddings_model, session_id=session_id)
+        
+        try:
+            await raptor_index.add_documents(all_rag_documents)
+            await log_stream.put("SUCCESS: Final RAPTOR index built successfully.")
+            return {"raptor_index": raptor_index}
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to build final RAPTOR index. Error: {e}")
+            await log_stream.put(traceback.format_exc())
+            return {"raptor_index": None}
+
+    return update_rag_index_node
 
 def create_metrics_node(llm):
     """
@@ -600,7 +2418,6 @@ def create_metrics_node(llm):
             await log_stream.put("LOG: No agent outputs to analyze. Skipping perplexity calculation.")
             return {}
 
-        # Combine all reasoning and solution fields into one block of text
         combined_text = "\n\n---\n\n".join(
             f"Agent {agent_id}:\nSolution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
             for agent_id, output in all_outputs.items()
@@ -610,18 +2427,15 @@ def create_metrics_node(llm):
         
         try:
             score_str = await perplexity_chain.ainvoke({"text_to_analyze": combined_text})
-            # Clean up the score string and convert to float
             score = float(re.sub(r'[^\d.]', '', score_str))
             await log_stream.put(f"SUCCESS: Calculated perplexity heuristic for Epoch {state['epoch']}: {score}")
         except (ValueError, TypeError) as e:
-            score = 100.0  # Default to max perplexity on error
+            score = 100.0
             await log_stream.put(f"ERROR: Could not parse perplexity score. Defaulting to 100. Raw output: '{score_str}'. Error: {e}")
 
-        # Send metric to the frontend via the log stream
         metric_payload = json.dumps({"epoch": state['epoch'], "perplexity": score})
         await log_stream.put(f"{metric_payload}")
 
-        # Update the history in the state
         new_history = state.get("perplexity_history", []) + [score]
         return {"perplexity_history": new_history}
 
@@ -667,7 +2481,6 @@ def create_reframe_and_decompose_node(llm):
         final_solution = state.get("final_solution")
         original_request = state.get("original_request")
 
-        # 1. Re-frame the problem
         reframer_chain = get_problem_reframer_chain(llm)
         new_problem_str = await reframer_chain.ainvoke({
             "original_request": original_request,
@@ -680,10 +2493,8 @@ def create_reframe_and_decompose_node(llm):
             await log_stream.put(f"SUCCESS: Problem re-framed to: '{new_problem}'")
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             await log_stream.put(f"ERROR: Failed to re-frame problem. Raw: {new_problem_str}. Error: {e}. Aborting re-frame.")
-            # We return an empty dict, so the graph proceeds to update prompts without changing problems.
             return {}
 
-        # 2. Decompose the new problem
         num_agents_total = sum(len(layer) for layer in state["all_layers_prompts"])
         decomposition_chain = get_problem_decomposition_chain(llm)
         try:
@@ -700,7 +2511,6 @@ def create_reframe_and_decompose_node(llm):
             await log_stream.put(f"ERROR: Failed to decompose new problem. Error: {e}. Aborting re-frame.")
             return {}
             
-        # 3. Create the new map and update state
         new_decomposed_problems_map = {}
         problem_idx = 0
         for i, layer in enumerate(state["all_layers_prompts"]):
@@ -709,7 +2519,6 @@ def create_reframe_and_decompose_node(llm):
                 new_decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
                 problem_idx += 1
         
-        # The new problem becomes the "original_request" for the next cycle of assessment
         return {
             "decomposed_problems": new_decomposed_problems_map,
             "original_request": new_problem
@@ -729,9 +2538,18 @@ def create_critique_node(llm):
         critiques = {}
         tasks = []
         
-        # 1. Generate Global Critique for the penultimate layer
-        await log_stream.put("LOG: Generating GLOBAL critique for final solution.")
-        global_critique_chain = get_global_critique_chain(llm)
+        await log_stream.put("LOG: Generating GLOBAL critique for final solution using dynamically updated prompt.")
+        dynamic_global_critique_prompt = state.get("critique_prompt", "Error: Critique prompt not found in state. Using default.")
+        individual_critique_prompt = state.get("individual_critique_prompt", "Error: Individual critique prompt not found in state. Using default.")
+        if "Error" in dynamic_global_critique_prompt:
+             dynamic_global_critique_prompt = INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
+
+        if "Error" in individual_critique_prompt:
+            individual_critique_prompt = INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE
+        
+        await log_stream.put(f"LOG: Current Global Critique Prompt:\n---\n{dynamic_global_critique_prompt}\n---")
+        global_critique_chain = ChatPromptTemplate.from_template(dynamic_global_critique_prompt) | llm | StrOutputParser()
+
         global_critique_text = await global_critique_chain.ainvoke({
             "original_request": state["original_request"],
             "proposed_solution": json.dumps(final_solution, indent=2)
@@ -739,12 +2557,11 @@ def create_critique_node(llm):
         critiques["global_critique"] = global_critique_text
         await log_stream.put(f"SUCCESS: Global critique generated: {global_critique_text}...")
 
-        # 2. Generate Individual Critiques for all other agents (layers 0 to n-2)
         await log_stream.put("LOG: Generating INDIVIDUAL critiques for all other contributing agents.")
-        individual_critique_chain = get_individual_critique_chain(llm)
+        individual_critique_chain = ChatPromptTemplate.from_template(individual_critique_prompt) | llm | StrOutputParser()
         num_layers = len(state['all_layers_prompts'])
         
-        for i in range(num_layers - 1): # Loop through all layers except the last one
+        for i in range(num_layers - 1):
             for j in range(len(state['all_layers_prompts'][i])):
                 agent_id = f"agent_{i}_{j}"
                 if agent_id in state["agent_outputs"]:
@@ -765,11 +2582,101 @@ def create_critique_node(llm):
 
                     tasks.append(get_individual_critique(agent_id, agent_output))
         
-        # CORRECTED: Unpack the tasks list into arguments for asyncio.gather
         await asyncio.gather(*tasks)
 
         return {"critiques": critiques}
     return critique_node
+
+def create_update_critique_prompt_node(llm, params):
+    async def update_critique_prompt_node(state: GraphState):
+        await log_stream.put("--- [ANNEALING] Dynamically Annealing Critique Agent Prompt ---")
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            non_mock_llm = None
+            provider = params.get("llm_provider", "Gemini")
+            if params.get("debug_mode") == 'true':
+                 await log_stream.put("LOG: [ANNEALING] Debug mode is on, but this node will use a REAL LLM for reactor selection as requested.")
+
+            if provider == "Ollama":
+                model_name = "qwen3:1.7b"
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Ollama LLM ({model_name}) for summarization and reactor detection.")
+                non_mock_llm = ChatOllama(model=model_name, temperature=0)
+            else:
+                model_name = "gemini-2.5-flash"
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Initializing non-mocked Gemini LLM ({model_name}) for summarization and reactor detection.")
+                non_mock_llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=0)
+            
+            await non_mock_llm.ainvoke("Respond with OK")
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Non-mocked LLM connection successful.")
+
+            all_outputs = state.get("agent_outputs", {})
+            num_layers = len(state.get("all_layers_prompts", []))
+            
+            hidden_layer_outputs = []
+            for agent_id, output in all_outputs.items():
+                layer_idx = int(agent_id.split('_')[1])
+                if layer_idx < num_layers -1:
+                     hidden_layer_outputs.append(output)
+            
+            if not hidden_layer_outputs:
+                await log_stream.put("LOG: [CRITIQUE UPDATE] No hidden layer outputs found from the last epoch. Critique prompt will not be updated.")
+                return {}
+
+            utterances = "\n\n---\n\n".join(
+                f"Solution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
+                for output in hidden_layer_outputs
+            )
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Gathered {len(utterances)} characters of utterances from {len(hidden_layer_outputs)} hidden layer agents.")
+
+            TOKEN_LIMIT_CHARS = 1024000
+            if len(utterances) > TOKEN_LIMIT_CHARS:
+                await log_stream.put(f"WARNING: [CRITIQUE UPDATE] Utterance length ({len(utterances)}) exceeds threshold ({TOKEN_LIMIT_CHARS}). Chunking and summarizing.")
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=TOKEN_LIMIT_CHARS, chunk_overlap=200)
+                chunks = text_splitter.split_text(utterances)
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Split utterances into {len(chunks)} chunks.")
+                
+                summarizer_chain = get_memory_summarizer_chain(non_mock_llm)
+                summary_tasks = [summarizer_chain.ainvoke({"history": chunk}) for chunk in chunks]
+                summaries = await asyncio.gather(*summary_tasks)
+                utterances = "\n\n".join(summaries)
+                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Summarized chunks. New utterance length: {len(utterances)}.")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Detecting pseudo-reactor from agent utterances...")
+            reactor_chain = get_pseudo_neurotransmitter_selector_chain(non_mock_llm)
+            selected_reactor = await reactor_chain.ainvoke({"agent_utterances": utterances})
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Pseudo-reactor detected: {selected_reactor}")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Mapping reactor to persona prompts...")
+            reactor_prompts_list = FunctionMapper().table(selected_reactor)
+            reactor_prompts_str = "\n---\n".join([f"Identity: {p[0]}\nPrompt Fragment: {p[1]}" for p in reactor_prompts_list])
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Retrieved {len(reactor_prompts_list)} prompts for reactor '{selected_reactor}'.")
+
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for critique agent...")
+            updater_chain = get_critique_prompt_updater_chain(llm)
+            new_critique_prompt = await updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+            
+            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New GLOBAL critique prompt generated.")
+            
+            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for INDIVIDUAL critique agent...")
+            individual_updater_chain = get_individual_critique_prompt_updater_chain(llm)
+            new_individual_critique_prompt = await individual_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+
+            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New INDIVIDUAL critique prompt generated.")
+            await log_stream.put(f"LOG: [CRITIQUE UPDATE] New critique prompt: {new_individual_critique_prompt}")
+
+            return {
+                "critique_prompt": new_critique_prompt,
+                "individual_critique_prompt": new_individual_critique_prompt,
+            }
+
+        except Exception as e:
+            await log_stream.put(f"ERROR: [CRITIQUE UPDATE] Failed to update critique prompt: {e}")
+            await log_stream.put(traceback.format_exc())
+            return {}
+
+    return update_critique_prompt_node
+
+
 
 def create_update_agent_prompts_node(llm):
     async def update_agent_prompts_node(state: GraphState):
@@ -783,7 +2690,6 @@ def create_update_agent_prompts_node(llm):
             return {"epoch": new_epoch, "agent_outputs": {}}
         elif state.get("significant_progress_made"):
             await log_stream.put("LOG: Significant progress was made. Updating prompts based on new sub-problems.")
-            # Clear critiques so they are not mis-applied from a previous epoch
             critiques = {} 
 
 
@@ -799,18 +2705,15 @@ def create_update_agent_prompts_node(llm):
             new_epoch = state["epoch"] + 1
             return {"epoch": new_epoch, "agent_outputs": {}}
 
-        # Start backpropagation from the penultimate layer up to the input layer
         for i in range(penultimate_layer_idx, -1, -1):
             await log_stream.put(f"LOG: [BACKPROP] Reflecting on Layer {i}...")
             
             for j, agent_prompt in enumerate(all_prompts_copy[i]):
                 agent_id = f"agent_{i}_{j}"
                 
-                # MODIFIED: Log the agent's prompt BEFORE any updates are applied
                 await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{agent_prompt}\n---")
                 
-                critique_for_this_agent = "" # Default to no critique
-                # If we didn't make significant progress, apply critiques. Otherwise, critique is empty.
+                critique_for_this_agent = ""
                 if not state.get("significant_progress_made"):
                     if i == penultimate_layer_idx:
                         critique_for_this_agent = critiques.get("global_critique", "")
@@ -823,15 +2726,13 @@ def create_update_agent_prompts_node(llm):
                         await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update for this agent.")
                         continue
                 
-                # Get the agent's old attributes to anchor the update
                 analysis_str = await attribute_chain.ainvoke({"agent_prompt": agent_prompt})
                 try:
                     analysis = clean_and_parse_json(analysis_str)
                 except (json.JSONDecodeError, AttributeError):
-                    analysis = {"attributes": "", "hard_request": ""} # Fallback
+                    analysis = {"attributes": "", "hard_request": ""}
 
                 agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
-                # Generate the new, refined prompt
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),   
@@ -839,17 +2740,14 @@ def create_update_agent_prompts_node(llm):
                     "sub_problem": agent_sub_problem,
                 })
                 
-                # MODIFIED: Log the agent's prompt AFTER it has been updated
                 await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
                 
-                # Update the prompt in our temporary copy
                 all_prompts_copy[i][j] = new_prompt
                 await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
         
         new_epoch = state["epoch"]
         await log_stream.put(f"--- Epoch {state['epoch']} Finished. Starting Epoch {new_epoch + 1} ---")
 
-        # Reset agent outputs and critiques for the new epoch
         return {
             "all_layers_prompts": all_prompts_copy,
             "epoch": new_epoch,
@@ -860,8 +2758,67 @@ def create_update_agent_prompts_node(llm):
         }
     return update_agent_prompts_node
 
+def create_final_harvest_node(llm, formatter_llm, num_questions):
+    async def final_harvest_node(state: GraphState):
+        await log_stream.put("--- [FINAL HARVEST] Starting Interrogation and Paper Generation ---")
+        
+        raptor_index = state.get("raptor_index")
+        if not raptor_index or not raptor_index.vector_store:
+            await log_stream.put("ERROR: No valid RAPTOR index found. Cannot perform final harvest.")
+            return {"academic_papers": {}}
 
-# --- FastAPI Endpoints ---
+        await log_stream.put("LOG: [HARVEST] Instantiating interrogator chain to generate expert questions...")
+        interrogator_chain = get_interrogator_chain(llm)
+        try:
+            questions_str = await interrogator_chain.ainvoke({
+                "original_request": state["original_request"],
+                "num_questions": num_questions
+            })
+            questions = clean_and_parse_json(questions_str).get("questions", [])
+            if not questions:
+                raise ValueError("No questions generated by interrogator.")
+            await log_stream.put(f"SUCCESS: Generated {len(questions)} expert questions.")
+        except Exception as e:
+            await log_stream.put(f"ERROR: Failed to generate questions for harvesting. Error: {e}. Aborting harvest.")
+            return {"academic_papers": {}}
+            
+        paper_formatter_chain = get_paper_formatter_chain(formatter_llm)
+        academic_papers = {}
+        
+        MAX_CONTEXT_CHARS = 250000
+
+        for i, question in enumerate(questions):
+            await log_stream.put(f"LOG: [HARVEST] Processing Question {i+1}/{len(questions)}: '{question}...'")
+            
+            try:
+                retrieved_docs = raptor_index.retrieve(question, k=40)
+                await log_stream.put(f"LOG: Retrieved {len(retrieved_docs)} documents from RAG index.")
+                
+                if not retrieved_docs:
+                    await log_stream.put("WARNING: No relevant documents found for this question. Skipping paper generation.")
+                    continue
+                
+                rag_context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+                
+                if len(rag_context) > MAX_CONTEXT_CHARS:
+                    await log_stream.put(f"WARNING: RAG context length ({len(rag_context)} chars) exceeds limit. Truncating to {MAX_CONTEXT_CHARS} chars.")
+                    rag_context = rag_context[:MAX_CONTEXT_CHARS]
+                
+                paper_content = await paper_formatter_chain.ainvoke({
+                    "question": question,
+                    "rag_context": rag_context
+                })
+                academic_papers[question] = paper_content
+                await log_stream.put(f"SUCCESS: Generated document for question {i+1}.")
+                
+            except Exception as e:
+                await log_stream.put(f"ERROR: Failed during document for question {i+1}. Error: {e}")
+        
+        await log_stream.put(f"--- [FINAL HARVEST] Finished. Generated {len(academic_papers)} papers. ---")
+        return {"academic_papers": academic_papers}
+    return final_harvest_node
+
+
 @app.get("/", response_class=HTMLResponse)
 def get_index():
     with open("index.html", "r", encoding="utf-8") as f:
@@ -870,8 +2827,32 @@ def get_index():
 @app.post("/build_and_run_graph")
 async def build_and_run_graph(payload: dict = Body(...)):
     llm = None
+    embeddings_model = None
+    summarizer_llm = None
     try:
         params = payload.get("params")
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables.")
+
+        await log_stream.put("--- Initializing Google Gemini Embeddings for RAG Index ---")
+        embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+
+        llm_provider_for_summarizer = params.get("llm_provider", "Gemini")
+
+        await log_stream.put(f"--- Initializing Dedicated RAPTOR Summarizer LLM ---")
+        if llm_provider_for_summarizer == "Ollama":
+            summarizer_model_name = "qwen3:1.7b"
+            await log_stream.put(f"Provider: Ollama, Model: {summarizer_model_name}")
+            summarizer_llm = ChatOllama(model=summarizer_model_name, temperature=0)
+        else:
+            await log_stream.put(f"Provider: Google Gemini, Model: gemini-2.5-flash")
+            summarizer_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0)
+        
+        await summarizer_llm.ainvoke("Respond with only 'OK'")
+        await log_stream.put("--- RAPTOR Summarizer LLM Connection Successful ---")
+
+
         if params.get("debug_mode") == 'true':
             await log_stream.put("--- 🚀 DEBUG MODE ENABLED 🚀 ---")
             llm = MockLLM()
@@ -879,15 +2860,18 @@ async def build_and_run_graph(payload: dict = Body(...)):
             llm_provider = params.get("llm_provider", "Gemini")
             if llm_provider == "Ollama":
                 model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
-                await log_stream.put(f"--- Initializing Local LLM: Ollama ({model_name}) ---")
+                await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
                 llm = ChatOllama(model=model_name, temperature=0)
                 await llm.ainvoke("Hi")
-                await log_stream.put("--- Ollama Connection Successful ---")
+                await log_stream.put("--- Main Agent LLM Connection Successful ---")
             else:
-                await log_stream.put("--- Initializing Google Gemini LLM ---")
+
+                await log_stream.put("--- Initializing Main Agent LLM: Google Gemini ---")
+
                 api_key = os.getenv("GEMINI_API_KEY")
                 if not api_key:
                     raise ValueError("GEMINI_API_KEY not found in environment variables.")
+
                 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
 
     except Exception as e:
@@ -899,6 +2883,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
     user_prompt = params.get("prompt")
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 3))
+    num_questions = int(params.get('num_questions', 25))
 
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
@@ -909,7 +2894,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
     await log_stream.put(f"Parameters: {params}")
 
     try:
-        # --- Problem Decomposition ---
         await log_stream.put("--- Decomposing Original Problem into Subproblems ---")
         num_agents_per_layer = len(mbti_archetypes)
         total_agents_to_create = num_agents_per_layer * cot_trace_depth
@@ -929,7 +2913,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             await log_stream.put(f"ERROR: Failed to decompose problem. Error: {e}. Defaulting to using the original prompt for all agents.")
             sub_problems_list = [user_prompt] * total_agents_to_create
 
-        # Map subproblems to agent IDs
         decomposed_problems_map = {}
         problem_idx = 0
         for i in range(cot_trace_depth):
@@ -938,10 +2921,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 if problem_idx < len(sub_problems_list):
                     decomposed_problems_map[agent_id] = sub_problems_list[problem_idx]
                     problem_idx += 1
-                else: # Fallback
+                else:
                     decomposed_problems_map[agent_id] = user_prompt
 
-        # --- Seed Verb Generation ---
         num_mbti_types = len(mbti_archetypes)
         total_verbs_to_generate = word_vector_size * num_mbti_types
         seed_generation_chain = get_seed_generation_chain(llm)
@@ -951,11 +2933,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
         seeds = {mbti: " ".join(random.sample(all_verbs, word_vector_size)) for mbti in mbti_archetypes}
         await log_stream.put(f"Seed verbs generated: {seeds}")
 
-        # --- Agent Prompt Generation ---
         all_layers_prompts = []
         input_spanner_chain = get_input_spanner_chain(llm, params['prompt_alignment'], params['density'])
         
-        # Layer 0
         await log_stream.put("--- Creating Layer 0 Agents ---")
         layer_0_prompts = []
         for j, (m, gw) in enumerate(seeds.items()):
@@ -965,7 +2945,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
-        # Subsequent Layers
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
         dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
 
@@ -991,14 +2970,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
         
-        # --- Graph Definition ---
         workflow = StateGraph(GraphState)
 
-        # Gateway node that increments the epoch
         def epoch_gateway(state: GraphState):
             new_epoch = state.get("epoch", 0) + 1
             state['epoch'] = new_epoch
-            # Clear outputs from previous epoch before starting the new forward pass
             state['agent_outputs'] = {}
             return state
             
@@ -1010,21 +2986,17 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, prompt, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
+        workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
+        workflow.add_node("update_rag_index", create_update_rag_index_node(summarizer_llm, embeddings_model))
         workflow.add_node("metrics", create_metrics_node(llm))
-        workflow.add_node("progress_assessor", create_progress_assessor_node(llm)) # New Node
-        workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm)) # New Node
+        workflow.add_node("update_critique_prompt", create_update_critique_prompt_node(llm, params))
+        workflow.add_node("progress_assessor", create_progress_assessor_node(llm))
+        workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
-
-        # Add a final node to capture the state before ending
-        def package_final_state(state: GraphState):
-            """This node is a clean exit point. It captures the state from the final
-            forward pass before the graph terminates."""
-            return state
-        workflow.add_node("package_results", package_final_state)
+        workflow.add_node("final_harvest", create_final_harvest_node(llm, summarizer_llm, num_questions))
 
 
-        # --- Graph Connections ---
         await log_stream.put("--- Connecting Graph Nodes ---")
         
         workflow.set_entry_point("epoch_gateway")
@@ -1049,11 +3021,10 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        # MODIFIED: New conditional logic for progress assessment
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Capturing final state and ending execution.")
-                return "package_results"
+                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing and harvest.")
+                return "update_rag_index"
             
             if state.get("significant_progress_made"):
                 await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
@@ -1068,16 +3039,22 @@ async def build_and_run_graph(payload: dict = Body(...)):
             {
                 "reframe": "reframe_and_decompose",
                 "critique": "critique",
-                "package_results": "package_results"
+                "update_rag_index": "update_rag_index"
             }
         )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
-        workflow.add_edge("synthesis", "metrics")
-        await log_stream.put("CONNECT: synthesis -> metrics")
+        workflow.add_edge("synthesis", "archive_epoch_outputs")
+        await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
+
+        workflow.add_edge("archive_epoch_outputs", "metrics")
+        await log_stream.put("CONNECT: archive_epoch_outputs -> metrics")
         
-        workflow.add_edge("metrics", "progress_assessor")
-        await log_stream.put("CONNECT: metrics -> progress_assessor")
+        workflow.add_edge("metrics", "update_critique_prompt")
+        await log_stream.put("CONNECT: metrics -> update_critique_prompt")
+        
+        workflow.add_edge("update_critique_prompt", "progress_assessor")
+        await log_stream.put("CONNECT: update_critique_prompt -> progress_assessor")
 
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
@@ -1088,15 +3065,17 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
 
-        workflow.add_edge("package_results", END)
-        await log_stream.put("CONNECT: package_results -> END")
+        workflow.add_edge("update_rag_index", "final_harvest")
+        await log_stream.put("CONNECT: update_rag_index -> final_harvest")
+
+        workflow.add_edge("final_harvest", END)
+        await log_stream.put("CONNECT: final_harvest -> END")
         
-        # --- Graph Execution ---
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
         ascii_art = graph.get_graph().draw_ascii()
-        await log_stream.put(f"{ascii_art}")
+        await log_stream.put(f"__start__{ascii_art}")
 
         initial_state = {
             "original_request": user_prompt,
@@ -1106,7 +3085,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "params": params, "all_layers_prompts": all_layers_prompts,
             "agent_outputs": {}, "memory": {}, "final_solution": None,
             "perplexity_history": [],
-            "significant_progress_made": False # New: Initialize flag
+            "significant_progress_made": False,
+            "raptor_index": None,
+            "all_rag_documents": [],
+            "academic_papers": None,
+            "critique_prompt": INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE
         }
 
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
@@ -1120,33 +3103,19 @@ async def build_and_run_graph(payload: dict = Body(...)):
         final_state_value = list(final_state.values())[0] if final_state else {}
         await log_stream.put("--- Execution Finished ---")
         
-        final_solution = final_state_value.get("final_solution", {"error": "No final solution found in the final state."})
+        academic_papers = final_state_value.get("academic_papers", {})
 
-        # MODIFIED: Package hidden layer outputs with their final system prompts
-        hidden_layer_outputs = {}
-        final_prompts = final_state_value.get("all_layers_prompts", [])
+        session_id = str(uuid.uuid4())
+        if academic_papers:
+            final_reports[session_id] = academic_papers
+            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created. Session ID: {session_id}")
+        else:
+            await log_stream.put("WARNING: No academic papers were generated in the final harvest.")
 
-        if "agent_outputs" in final_state_value and final_prompts:
-            for agent_id, output in final_state_value["agent_outputs"].items():
-                try:
-                    parts = agent_id.split('_')
-                    layer_index = int(parts[1])
-                    agent_index_in_layer = int(parts[2])
-
-                    # The last layer's output goes into synthesis, so we only show the ones before it.
-                    if layer_index < (cot_trace_depth - 1):
-                        system_prompt = final_prompts[layer_index][agent_index_in_layer]
-                        hidden_layer_outputs[agent_id] = {
-                            "output": output,
-                            "system_prompt": system_prompt
-                        }
-                except (IndexError, ValueError) as e:
-                    await log_stream.put(f"WARNING: Could not process hidden output for {agent_id}. Error: {e}")
 
         return JSONResponse(content={
             "message": "Graph execution complete.", 
-            "final_solution": final_solution,
-            "hidden_layer_outputs": hidden_layer_outputs
+            "session_id": session_id if academic_papers else None
         })
 
     except Exception as e:
@@ -1169,6 +3138,29 @@ def stream_log(request: Request):
                 continue
 
     return EventSourceResponse(event_generator())
+
+@app.get("/download_report/{session_id}")
+async def download_report(session_id: str):
+    papers = final_reports.get(session_id)
+    if not papers:
+        return JSONResponse(content={"error": "Report not found or expired."}, status_code=404)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for i, (question, content) in enumerate(papers.items()):
+            safe_question = re.sub(r'[^\w\s-]', '', question).strip().replace(' ', '_')
+            filename = f"paper_{i+1}_{safe_question[:50]}.md"
+            zip_file.writestr(filename, content)
+
+    zip_buffer.seek(0)
+    
+    del final_reports[session_id]
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=NOA_Report_{session_id}.zip"}
+    )
 
 
 if __name__ == "__main__":
