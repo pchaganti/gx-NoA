@@ -19,11 +19,13 @@ https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 
 ## Changelog
 
-*   **Interactive RAG Chat & Diagnostic Tool:** The process now pauses after the final epoch, allowing you to directly **chat with the generated RAG index**. This powerful diagnostic feature lets you interrogate the massive "cube of thinking text" from all hidden layers, ask follow-up questions, and gain extra insights beyond the automated academic questions. Your entire chat conversation is then archived and included in the final knowledge harvest, enriching the final report.
+*   **Experimental Code Generation & Execution:** A new "Coder Mode" has been introduced for requests that involve generating runnable code. The network now uses specialized coder agents and a code-synthesis process. Crucially, the `progress_assessor` agent can now **execute the generated Python code in a sandboxed environment** to check for errors and verify its output, providing more robust feedback for the next epoch.
 
-*   **Final Knowledge Harvest & RAG:** The run doesn't just end with a final answer anymore. All agent outputs from all epochs are now archived into a multi-layered RAPTOR (Recursive Abstractive Processing over Trees of RAG) index. Upon completion, an `interrogator` agent generates a series of expert-level questions about the original problem, and a `paper_formatter` agent uses the RAG index to write a formal academic-style paper answering each question. The final output is now a downloadable ZIP file containing this collection of research papers.
+*   **Interactive RAG Chat & Diagnostic Tool:** The process allows you to directly **chat with the generated RAG index** o, that allows you to send raw queries directly to the hidden layer, providing a powerful diagnostic feature to interrogate the massive "cube of thinking text" from all hidden layers. 
 
-*   **Dynamic Critique Annealing:** The network previously static "loss function" now evolves. A new meta-process analyzes the collective output of the hidden-layer agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompt of the critique agent, changing its persona (e.g., from a 'senior manager' to a 'cynical philosopher-king') to provide a different style of feedback for the next epoch.
+*   **Final Knowledge Harvest & RAG:** The run doesn't just end with a final answer anymore. All agent outputs from all epochs are now archived into a multi-layered RAPTOR (Recursive Abstractive Processing over Trees of RAG) index. Upon completion, an `interrogator` agent generates a series of expert-level questions informed by both the original problem and your chat session, and a `paper_formatter` agent uses the RAG index to write a formal academic-style paper answering each question. The final output is now a downloadable ZIP file containing this collection of research papers.
+
+*   **Dynamic Critique & Assessor Annealing:** The network's "loss function" now evolves more deeply. A new meta-process analyzes the collective output of the agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompts of both the `critique` and `progress_assessor` agents, changing their personas to provide different styles of feedback and evaluation for the next epoch.
 
 *   **Dynamic Problem Re-framing:** The network can now assess its own progress. If it determines it has made a "significant breakthrough," it formulates a new, more advanced problem that builds upon its success. This turns the process from simple refinement into a genuine journey of discovery.
 
@@ -32,8 +34,6 @@ https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
 *   **Keeping an Eye on Things - Perplexity Metrics & Chart:** A new `metrics` node calculates the average perplexity of all agent outputs after each epoch. We plot this on a live chart in the GUI, giving you a visual heuristic for the network's coherence over time.
 
 *   **Better Memory for the Long Haul - Dynamic Summarization:** To support extra-long mining sessions, a specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights without overflowing the context window.
-
-  
 
 ## The Core Idea: Qualitative Backpropagation
 
@@ -68,13 +68,13 @@ This is where NoA truly differs from a simple multi-agent system. The reflection
 
 1.  **Synthesis and Metrics**: After the forward pass, a `synthesis_node` merges the outputs from the final agent layer into a single, coherent solution. Immediately after, a `metrics_node` analyzes all agent outputs from the epoch to calculate a perplexity score.
 
-2.  **Dynamic Annealing of Critique**: Before any critique is generated, an `update_critique_prompt` node analyzes the tone and content of the hidden-layer agents' outputs. It uses a unique heuristic to select a new persona (e.g., a wise mentor, a harsh drill sergeant) and dynamically rewrites the system prompt for the critique agent. This ensures the *style* of feedback adapts to the network's current state.
+2.  **Dynamic Annealing of Critique & Assessment**: Before any critique is generated, an `update_personas` node analyzes the tone and content of the agents' outputs. It uses a unique heuristic to select a new persona and dynamically rewrites the system prompts for both the **`critique` and `progress_assessor` agents**. This ensures both the *style* of feedback and the *criteria for progress* adapt to the network's current state.
 
-3.  **The Crossroads of Progress**: The synthesized solution is passed to a `progress_assessor` node. This AI philosopher evaluates whether the solution represents "significant progress" based on novelty, coherence, and forward momentum. This decision dictates the course of the next epoch.
+3.  **The Crossroads of Progress**: The synthesized solution is passed to the dynamically-configured `progress_assessor` node. This AI philosopher evaluates whether the solution represents "significant progress." For code-related tasks, this node **executes the generated code in a sandbox** to check for errors, using the outcome as a key factor in its assessment. This decision dictates the course of the next epoch.
 
 4.  **Path A: The "Eureka!" Path (Significant Progress)**: If a breakthrough is achieved, the network's goal shifts to advancement. A `problem_reframer` node formulates a **new, more challenging problem** that builds on the recent success. This new problem is then decomposed and assigned to the agents.
 
-5.  **Path B: The "Refinement" Path (No Significant Progress)**: If the solution is not a major leap forward, the system focuses on iterative improvement. The dynamically-configured `critique_chain` scrutinizes the solution and generates global and individual critiques.
+5.  **Path B: The "Refinement" Path (No Significant Progress)**: If the solution is not a major leap forward, the system focuses on iterative improvement. The `critique_chain` scrutinizes the solution and generates global and individual critiques.
 
 6.  **Updating the "Neural" Weights**: This feedback—either a new mission or a detailed critique—propagates backward through the network. An `update_agent_prompts_node` uses this signal to modify each agent's core system prompt, refining their skills, attributes, and roles.
 
@@ -88,7 +88,7 @@ When the final epoch is complete, the process is not over. The network enters a 
 
 2.  **Pause for Interactive Chat**: At this point, the network pauses. The user is presented with a chat interface, allowing them to directly query the newly created RAG index. This serves as a powerful diagnostic tool, enabling the user to probe the network's collective "mind," ask clarifying questions, and explore threads of reasoning before the final summarization.
 
-3.  **Interrogation and Synthesis**: When the user concludes the chat session, the entire conversation is converted into documents and added to the knowledge base, which is re-indexed. A `final_harvest` node then takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
+3.  **Interrogation and Synthesis**: When the user concludes the chat session, the entire conversation is converted into documents and added to the knowledge base, which is re-indexed. A `final_harvest` node then takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem, now also taking context from the **user's chat session**. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
 
 4.  **Generating the Final Report**: The `paper_formatter` synthesizes the retrieved context into a formal, academic-style markdown document. The final output of the entire run is a downloadable ZIP archive containing this collection of research papers, representing the network's total accumulated knowledge on the topic.
 
@@ -179,7 +179,7 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 2.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
 3.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
 4.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
-5.  **Chat and Diagnose**: Once the epochs are complete, the GUI will present a chat interface. Use this to directly query the RAG index of the network's entire thought process. Ask follow-up questions and probe for deeper insights.
+5.  **Chat and Diagnose**: Once the epochs are complete, the GUI will present a chat interface. Use this to directly query the RAG index of the network's entire thought process. To perform a raw query on the RAG index, start your message with `diag:`.
 6.  **Harvest and Download**: When you are finished chatting, click the "HARVEST" button. This will incorporate your chat history and generate the final report. A download link for a ZIP file containing the research papers will appear.
 
 ## Let's Collaborate: Building a P2P Network
