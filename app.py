@@ -1670,8 +1670,10 @@ if __name__ == "__main__":
                 "skills_used": ["python", "mocking", "synthesis"]
             }) 
 
-        elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt:
+        elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt or "CTO" in prompt:
+
             return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
+
         elif "you are a master prompt engineer" in prompt:
             return f"""You are a CTO providing a technical design review...
 Original Request: {{original_request}}
@@ -1686,7 +1688,7 @@ Generate your code-focused critique for the team:"""
         elif "you are a master strategist and problem decomposer" in prompt:
             sub_problems = ["Design the database schema for user accounts.", "Implement the REST API endpoint for user authentication.", "Develop the frontend login form component.", "Write unit tests for the authentication service."]
             return json.dumps({"sub_problems": sub_problems})
-        elif "you are an ai philosopher and progress assessor" in prompt:
+        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt:
              return json.dumps({
                 "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
                 "significant_progress": True
@@ -1704,6 +1706,16 @@ Generate your code-focused critique for the team:"""
             return "This is a mock summary of a cluster of code modules, generated in Coder debug mode for the RAPTOR index."
         elif "you are an expert computational astrologer" in prompt:
             return random.choice(reactor_list)
+
+        elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
+
+            pick = random.randint(0,1)
+            if pick == 0:
+                return "yes"
+
+            else:
+                return "no"
+
         elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
             return """
 # Technical Design Document: Mock API Service
@@ -1770,6 +1782,16 @@ class MockLLM(Runnable):
 
         if "you are a helpful ai assistant" in prompt:
             return "This is a mock streaming response for the RAG chat in debug mode."
+
+        elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
+
+            pick = random.randint(0,1)
+            if pick == 0:
+                return "yes"
+
+            else:
+                return "no"
+
         elif "create the system prompt of an agent" in prompt:
             return f"""
 You are a mock agent for debugging.
@@ -1859,7 +1881,7 @@ Generate your global critique for the team:"""
             return "This is a mock summary of a cluster of documents, generated in debug mode for the RAPTOR index."
         elif "you are an expert computational astrologer" in prompt:
             return random.choice(reactor_list)
-        elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
+        elif "you are an expert interrogator" in prompt:
             return """
 # Mock Academic Paper
 ## Based on Provided RAG Context
@@ -2348,14 +2370,19 @@ Problem: "{problem}"
 
 def get_interrogator_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} expert-level questions that exhaustively explore the problem from every possible angle of novelty.
-These questions should be deep, insightful, and designed to push the boundaries of knowledge. They should cover theoretical, practical, philosophical, and unconventional perspectives.
+You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} inpsired in the original_request and       
+the questions the user is interested in.
 
 The output must be a JSON object with a single key "questions", which is a list of strings.
 
 Original Request to Interrogate:
 ---
 {original_request}
+---
+
+Further questions user is also interested in:
+---
+{further_questions}
 ---
 
 Generate the JSON object with exactly {num_questions} expert-level questions:
@@ -2399,7 +2426,7 @@ Answer:
 
 def get_code_detector_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-Analyze the following text. Your task is to determine if the text contains a runnable code block (e.g., Python, JavaScript, etc.).
+Analyze the following text. Your task is to determine if the text contains a 
 Answer with a single word: "true" if it contains code, and "false" otherwise.
 
 Text to analyze:
@@ -2619,10 +2646,8 @@ Your JSON formatted response:
 def create_synthesis_node(llm):
     async def synthesis_node(state: GraphState):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
-        
-        is_code_request_chain = get_request_is_code_chain(llm)
-        is_code_str = await is_code_request_chain.ainvoke({"request": state["original_request"]})
-        is_code = "true" in is_code_str.lower()
+
+        is_code = state["original_request"]
         
         if is_code:
             await log_stream.put("LOG: Original request detected as a code generation task. Using code synthesis prompt.")
@@ -2660,7 +2685,7 @@ def create_synthesis_node(llm):
                 }
             else:
                  final_solution = clean_and_parse_json(final_solution_str)
-            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution, indent=2)}")
+            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution_str, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
@@ -3103,10 +3128,14 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
 
         await log_stream.put("LOG: [HARVEST] Instantiating interrogator chain to generate expert questions...")
         interrogator_chain = get_interrogator_chain(llm)
+        user_questions = [ doc["content"] for doc in state["chat_history"] if doc["role"] == "user"]
+        
         try:
             questions_str = await interrogator_chain.ainvoke({
                 "original_request": state["original_request"],
-                "num_questions": num_questions
+                "num_questions": num_questions,
+                "further_questions": user_questions
+                
             })
             questions_data = clean_and_parse_json(questions_str)
             questions = questions_data.get("questions", [])
@@ -3123,16 +3152,7 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
         MAX_CONTEXT_CHARS = 250000
 
         generation_tasks = []
-        user_questions = [ doc["content"] for doc in state["chat_history"] if doc["role"] == "user"]
-        sys_answers = [ doc["content"] for doc in state["chat_history"] if doc["role"] == "ai"]
 
-        for user_q, sys_a in zip(user_questions, sys_answers):
-            
-            paper_content = await paper_formatter_chain.ainvoke({
-                "question": user_q,
-                "rag_context": sys_a
-            })
-            academic_papers[user_q] = paper_content
 
         for question in questions:
             async def generate_paper(q):
@@ -3219,13 +3239,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 3))
 
-    is_code_request_chain = get_request_is_code_chain(llm)
-    is_code_str = await is_code_request_chain.ainvoke({"request": user_prompt})
-    is_code = "true" in is_code_str.lower()
-    if is_code:
-        await log_stream.put("--- [CONFIG] Code generation request detected. Workflow will be adjusted. ---")
-        params["num_epochs"] = "1"
-        await log_stream.put("--- [CONFIG] Number of epochs set to 1 for code generation. ---")
+    code_detection_chain = get_code_detector_chain(llm)
+    is_code = code_detection_chain.ainvoke({"text": user_prompt})
 
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
@@ -3368,23 +3383,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
-        def code_vs_text_gateway(state: GraphState):
-            if state.get("is_code_request"):
-                log_stream.put_nowait("LOG: Code request detected. Ending graph after synthesis.")
-                return "end"
-            else:
-                log_stream.put_nowait("LOG: Non-code request. Proceeding to archiving.")
-                return "archive"
-
-        workflow.add_conditional_edges(
-            "synthesis",
-            code_vs_text_gateway,
-            {
-                "end": END,
-                "archive": "archive_epoch_outputs"
-            }
-        )
-        await log_stream.put("CONNECT: synthesis -> code_vs_text_gateway (conditional)")
 
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
@@ -3408,6 +3406,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
             }
         )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
+
+        workflow.add_edge("synthesis", "archive_epoch_outputs")
+        await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
         
         workflow.add_edge("archive_epoch_outputs", "update_rag_index")
         await log_stream.put("CONNECT: archive_epoch_outputs -> update_rag_index")
@@ -3484,9 +3485,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
                     sessions[session_id] = current_session_state
                     final_state_value = current_session_state
         
-    
 
-        if final_state_value.get("is_code_request"):
+        if is_code:
+
             final_code_solution = final_state_value.get("final_solution", {})
             await log_stream.put(f"--- 💻 Code Generation Finished. Returning final code. ---")
             return JSONResponse(content={

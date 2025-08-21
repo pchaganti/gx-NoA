@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NoA | Free Deep Think</title>
-    <!-- ADDED: Chart.js library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css">
     <style>
         :root {
             --primary-color: #0E1117;
@@ -370,7 +372,7 @@
 
     <div class="container hidden" id="chat-container">
         <div class="header-with-button">
-            <h2>Final Harvest Chat</h2>
+            <h2>Train the interrogator: ask what you want to know, and it will appear in the final report</h2>
             <button id="harvest-button">HARVEST</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
@@ -389,7 +391,7 @@
     <div class="container hidden" id="code-result-container">
         <h2>Generated Code</h2>
         <p>The graph execution is complete. The following code has been generated based on your request.</p>
-        <pre><code id="code-output"></code></pre>
+        <pre><code id="code-output" class="language-python"></code></pre>
         <h3>Reasoning:</h3>
         <p id="code-reasoning" style="white-space: pre-wrap;"></p>
     </div>
@@ -761,12 +763,23 @@
             
             if (result.code_solution) {
                 addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-                if(codeOutput) codeOutput.textContent = result.code_solution;
+         
+                const rawCode = result.code_solution;
+                const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(rawCode);
+                const cleanCode = codeMatch ? codeMatch[1].trim() : rawCode.trim();
+
+                if(codeOutput) {
+                    codeOutput.textContent = cleanCode; 
+                    Prism.highlightElement(codeOutput);   
+                }
+
+                if(codeOutput) codeOutput.textContent = cleanCode; // Display the clean code
                 if(codeReasoning) codeReasoning.textContent = result.reasoning;
                 if(codeResultContainer) codeResultContainer.classList.remove('hidden');
                 if(runInterface) runInterface.classList.add('hidden');
                 if(graphArchitectureSection) graphArchitectureSection.classList.remove('hidden');
-                
+                if(diagnosticChatContainer) diagnosticChatContainer.classList.add('hidden');
+
                 if(runButton) {
                     runButton.disabled = false;
                     runButton.textContent = 'Build and Run Graph';
@@ -860,5 +873,10 @@
 
 
 </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/copy-to-clipboard/prism-copy-to-clipboard.min.js"></script>
+
 </body>
 </html>
