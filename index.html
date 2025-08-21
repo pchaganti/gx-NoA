@@ -110,7 +110,6 @@
             color: #C0C0C0;
             white-space: pre-wrap;
         }
-        /* MODIFIED: Terminal-like style for ASCII graph display */
         #graph-container {
             min-height: 400px;
             background-color: #000;
@@ -125,7 +124,7 @@
         }
         #graph-container p {
             color: #888;
-            white-space: pre-wrap; /* Allow placeholder text to wrap */
+            white-space: pre-wrap; 
         }
         .mbti-grid {
             display: grid;
@@ -149,12 +148,13 @@
             margin-bottom: 0;
             font-weight: normal;
         }
-        #results-container pre, #hidden-outputs-container pre, #papers-container pre {
+        #results-container pre, #hidden-outputs-container pre, #papers-container pre, #code-result-container pre {
             background-color: #000;
             padding: 1rem;
             border-radius: var(--border-radius);
             white-space: pre-wrap;
             word-wrap: break-word;
+            color: #FAFAFA;
         }
         .header-with-button {
             display: flex;
@@ -179,7 +179,7 @@
         #download-log-button:hover:not(:disabled), .download-paper-button:hover:not(:disabled), #download-report-button:hover:not(:disabled) {
             background-color: #3a3b44;
         }
-        #chat-messages {
+        .chat-messages {
             height: 400px;
             background-color: #000;
             border: 1px solid var(--secondary-color);
@@ -211,18 +211,18 @@
             border-bottom-left-radius: 0;
             white-space: pre-wrap;
         }
-        #chat-form {
+        #chat-form, #diagnostic-chat-form {
             display: flex;
             gap: 1rem;
         }
-        #chat-input {
+        #chat-input, #diagnostic-chat-input {
             flex-grow: 1;
             min-height: 50px;
             height: 50px;
             margin-bottom: 0;
             resize: none;
         }
-        #chat-send-button {
+        #chat-send-button, #diagnostic-chat-send-button {
             width: auto;
             margin-bottom: 0;
             align-self: flex-end;
@@ -238,6 +238,26 @@
         #harvest-button:hover:not(:disabled) {
             background-color: #218838;
         }
+        #diagnostic-chat-container {
+            border: 2px solid #007bff;
+        }
+        #diagnostic-chat-container h2 {
+            color: #00aaff;
+            border-bottom-color: #007bff;
+        }
+        .diagnostic-ai-message {
+            background-color: #1c2e4a;
+            color: #e0e0ff;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+            white-space: pre-wrap;
+        }
+        .diagnostic-user-message {
+            background-color: #0056b3;
+            color: var(--text-color);
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
 
     </style>
 </head>
@@ -248,9 +268,15 @@
         <div id="graph-architecture" class="section">
             <h2>Graph Architecture</h2>
             <form id="graph-params-form">
-                <div class="mbti-option" style="margin-bottom: 1rem; margin-top: 0.5rem;">
-                    <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
-                    <label for="debug_mode">🚀 Enable Debug Mode (Uses Instant Mock LLM)</label>
+                <div id="debug-options" style="display: flex; gap: 2rem; margin-bottom: 1rem; margin-top: 0.5rem;">
+                    <div class="mbti-option">
+                        <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
+                        <label for="debug_mode">🚀 Enable Debug Mode (Text)</label>
+                    </div>
+                    <div class="mbti-option">
+                        <input type="checkbox" id="coder_debug_mode" name="coder_debug_mode" value="true">
+                        <label for="coder_debug_mode">💻 Enable Coder Debug (Code)</label>
+                    </div>
                 </div>
                 <div id="ollama-model-section">
                     <label for="ollama_model">Ollama Model Name:</label>
@@ -290,79 +316,115 @@
                     <div class="mbti-option"><input type="checkbox" id="mbti-entj" name="mbti_archetypes" value="ENTJ"><label for="mbti-entj">ENTJ (Commander)</label></div>
                 </div>
                 <label for="prompt">Prompt:</label>
-                <textarea id="prompt" name="prompt" required>Is there a singular, all-encompassing, coherent theoretical framework of physics that fully explains and links together all physical aspects of the universe? Design one.</textarea>
+                <textarea id="prompt" name="prompt" required>
+                    
+                Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers,
+
+                    to run inference. I presume the foundation of training and architecture are allready figured out, so i want a new inference algorithm. For this conceptualziation assume
+                    
+                    the world is full of spinning wheels, and data represents a measured state of the "wheel" at a given time. Abudant trining data samples the full state of the "wheel" by offering all the posible data of the wheel state.
+
+                    Current inference algoritm in the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their reponses can be shallow.
+
+                    I want you to make in python with excellent documentation:
+
+                        1. An inference algorithm that uses a PID like approach with perturbaitve feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. The inference algorithm should sample all its progressive output and feed it back into the transformer.
+
+                        2. The inference algorithm should be easily pluggable to a huggignface transformer
+
+
+                </textarea>
                 <button type="submit" id="run-button">Build and Run Graph</button>
             </form>
         </div>
     </div>
-    <!-- NEW: Container for Perplexity Chart -->
-    <div class="container hidden" id="perplexity-chart-container">
-        <h2>Average Perplexity per Epoch</h2>
-        <canvas id="perplexityChart"></canvas>
+    
+  <div class="container" id="diagnostic-chat-container">
+        <h2>Live Diagnostic Chat</h2>
+        <div id="diagnostic-chat-messages" class="chat-messages"></div>
+        <form id="diagnostic-chat-form">
+            <textarea id="diagnostic-chat-input" placeholder="Waiting for graph to start..." required disabled></textarea>
+            <button type="submit" id="diagnostic-chat-send-button" disabled>Query</button>
+        </form>
     </div>
-    <!-- NEW: Container for Chat -->
+        <div class="container" id="perplexity-chart-container">
+            <h2>Average Perplexity per Epoch</h2>
+            <canvas id="perplexityChart"></canvas>
+        </div>
+
+        <div class="container">
+            <div class="header-with-button">
+                <h2>Real-time Graph Activity</h2>
+                <button id="download-log-button" disabled>Download Full Log</button>
+            </div>
+            <div id="log-container"></div>
+        </div>
+
+        <div class="container">
+            <h2>Graph Visualization</h2>
+            <div id="graph-container">
+                <p>ASCII graph will be displayed here after the process starts...</p>
+            </div>
+        </div>
+    </div>
+
     <div class="container hidden" id="chat-container">
         <div class="header-with-button">
-            <h2>Chat with the hidden layer (diagnose, or get specific answers for your request) </h2>
+            <h2>Final Harvest Chat</h2>
             <button id="harvest-button">HARVEST</button>
         </div>
-        <div id="chat-messages"></div>
+        <div id="chat-messages" class="chat-messages"></div>
         <form id="chat-form">
-            <textarea id="chat-input" placeholder="Ask a question about the generated knowledge..." required></textarea>
+            <textarea id="chat-input" placeholder="Ask a question about the final generated knowledge..." required></textarea>
             <button type="submit" id="chat-send-button">Send</button>
         </form>
     </div>
-    <div class="container">
-        <div class="header-with-button">
-            <h2>Real-time Graph Activity</h2>
-            <button id="download-log-button" disabled>Download Full Log</button>
-        </div>
-        <div id="log-container"></div>
-    </div>
-    <div class="container">
-        <h2>Graph Visualization</h2>
-        <div id="graph-container">
-            <p>ASCII graph will be displayed here after the process starts...</p>
-        </div>
-    </div>
-    <!-- NEW: Container for final report download -->
+
     <div class="container hidden" id="report-container">
         <h2>Final Report</h2>
         <p>The graph execution is complete. The generated academic papers have been compiled into a single zip archive for you to download.</p>
         <button id="download-report-button">Download Full Report (.zip)</button>
     </div>
 
+    <div class="container hidden" id="code-result-container">
+        <h2>Generated Code</h2>
+        <p>The graph execution is complete. The following code has been generated based on your request.</p>
+        <pre><code id="code-output"></code></pre>
+        <h3>Reasoning:</h3>
+        <p id="code-reasoning" style="white-space: pre-wrap;"></p>
+    </div>
+
 
 <script>
-    function parseJsonFromDataString(inputString) {
-      const jsonString = inputString.slice(5, inputString.length);
-      try {
-        const dataObject = JSON.parse(jsonString);
-        return dataObject;
-      } catch (error) {
-        console.error("Failed to parse JSON from the extracted string:", error);
-        console.error("Problematic string was:", jsonString);
-        return null;
-      }
-    }
     const graphParamsForm = document.getElementById('graph-params-form');
     const runButton = document.getElementById('run-button');
     const logContainer = document.getElementById('log-container');
     const graphContainer = document.getElementById('graph-container');
     const ollamaModelSection = document.getElementById('ollama-model-section');
     const debugModeCheckbox = document.getElementById('debug_mode');
+    const coderDebugModeCheckbox = document.getElementById('coder_debug_mode');
     const downloadLogButton = document.getElementById('download-log-button');
     const reportContainer = document.getElementById('report-container');
     const downloadReportButton = document.getElementById('download-report-button');
     const perplexityChartContainer = document.getElementById('perplexity-chart-container');
     const perplexityChartCanvas = document.getElementById('perplexityChart').getContext('2d');
     const graphArchitectureSection = document.getElementById('graph-architecture');
+    const runInterface = document.getElementById('run-interface');
+    
     const chatContainer = document.getElementById('chat-container');
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     const harvestButton = document.getElementById('harvest-button');
+    
+    const diagnosticChatContainer = document.getElementById('diagnostic-chat-container');
+    const diagnosticChatMessages = document.getElementById('diagnostic-chat-messages');
+    const diagnosticChatForm = document.getElementById('diagnostic-chat-form');
+    const diagnosticChatInput = document.getElementById('diagnostic-chat-input');
 
+    const codeResultContainer = document.getElementById('code-result-container');
+    const codeOutput = document.getElementById('code-output');
+    const codeReasoning = document.getElementById('code-reasoning');
 
     let fullLogContent = '';
     let perplexityChart = null;
@@ -370,23 +432,35 @@
     let allLbelsData = [];
     let currentSessionId = null;
 
-    debugModeCheckbox.addEventListener('change', (e) => {
-        const isDebug = e.target.checked;
+    const handleDebugCheck = (e) => {
+        const isDebug = debugModeCheckbox.checked || coderDebugModeCheckbox.checked;
         ollamaModelSection.classList.toggle('hidden', isDebug);
-    });
+        
+        if (e.target.id === 'debug_mode' && e.target.checked) {
+            coderDebugModeCheckbox.checked = false;
+        } else if (e.target.id === 'coder_debug_mode' && e.target.checked) {
+            debugModeCheckbox.checked = false;
+        }
+    };
+
+    debugModeCheckbox.addEventListener('change', handleDebugCheck);
+    coderDebugModeCheckbox.addEventListener('change', handleDebugCheck);
+
 
     const addLogMessage = (text, options = {}) => {
         fullLogContent += text + '\n';
         if (downloadLogButton.disabled) {
             downloadLogButton.disabled = false;
         }
-        const container = (text.trim().startsWith('{') && text.trim().endsWith('}')) ? document.createElement('pre') : document.createElement('p');
+        const container = document.createElement('div');
         container.style.margin = '0';
         container.style.lineHeight = '1.4';
-
-
-        if (options.isHTML) container.innerHTML = text;
-        else container.textContent = text;
+        
+        if (options.isHTML) {
+            container.innerHTML = text;
+        } else {
+            container.textContent = text;
+        }
         
         if (options.color) container.style.color = options.color;
 
@@ -416,7 +490,6 @@
         const labels = allLbelsData;
         const data = allPerplexityValues; 
 
-        perplexityChartContainer.classList.remove('hidden');
         perplexityChart = new Chart(perplexityChartCanvas, {
             type: 'line',
             data: {
@@ -498,6 +571,61 @@
             chatInput.focus();
         }
     };
+    
+    const handleDiagnosticChatSubmit = async (e) => {
+
+        e.preventDefault();
+        const message = diagnosticChatInput.value.trim();
+        if (!message || !currentSessionId) console.log("No message or session ID"); 
+
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'chat-message diagnostic-user-message';
+        userMsgDiv.textContent = message;
+        diagnosticChatMessages.appendChild(userMsgDiv);
+        diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+
+        diagnosticChatInput.value = '';
+        diagnosticChatInput.disabled = true;
+
+        const aiMsgDiv = document.createElement('div');
+        aiMsgDiv.className = 'chat-message diagnostic-ai-message';
+        aiMsgDiv.textContent = '...';
+        diagnosticChatMessages.appendChild(aiMsgDiv);
+        diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+
+        try {
+            const response = await fetch('/diagnostic_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId,  message: message })
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                aiMsgDiv.textContent = `Error: ${errorText}`;
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let aiResponseText = '';
+            aiMsgDiv.textContent = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                aiResponseText += chunk;
+                aiMsgDiv.textContent = aiResponseText;
+                diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+            }
+        } catch (error) {
+            aiMsgDiv.textContent = `Error: ${error.message}`;
+        } finally {
+            diagnosticChatInput.disabled = false;
+            diagnosticChatInput.focus();
+        }
+    };
+
 
     const handleHarvestClick = async () => {
         if (!currentSessionId) return;
@@ -525,11 +653,11 @@
             
             addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
 
-            if (result.session_id) {
+            if (result.message = "Harvest complete.") {
                 addLogMessage(`Report generated successfully. Session ID: ${result.session_id}`, { color: 'cyan' });
                 reportContainer.classList.remove('hidden');
                 downloadReportButton.onclick = () => {
-                    window.location.href = `/download_report/${result.session_id}`;
+                    window.location.href = `/download_report/${currentSessionId}`;
                 };
             } else {
                  addLogMessage(`⚠️ Server finished but no downloadable report was generated.`, { color: 'orange' });
@@ -545,9 +673,20 @@
             harvestButton.textContent = 'HARVEST';
             runButton.disabled = false;
             runButton.textContent = 'Build and Run Graph';
-            currentSessionId = null;
         }
     };
+
+     function parseJsonFromDataString(inputString) {
+      const jsonString = inputString.slice(5, inputString.length);
+      try {
+        const dataObject = JSON.parse(jsonString);
+        return dataObject;
+      } catch (error) {
+        console.error("Failed to parse JSON from the extracted string:", error);
+        console.error("Problematic string was:", jsonString);
+        return null;
+      }
+    }
 
     graphParamsForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -561,82 +700,139 @@
                 params[key] = value;
             }
         });
-        
+
         if (!formData.has('debug_mode')) {
             params.debug_mode = 'false';
+        }
+        if (!formData.has('coder_debug_mode')) {
+            params.coder_debug_mode = 'false';
         }
 
         if (!params.mbti_archetypes || params.mbti_archetypes.length < 2) {
             alert('Please select at least 2 MBTI archetypes.');
             return;
         }
-        runButton.disabled = true;
-        downloadLogButton.disabled = true;
-        runButton.textContent = 'Processing...';
-        logContainer.innerHTML = ''; 
+
+        // --- UI LOGIC ---
+        if(runButton) {
+            runButton.disabled = true;
+            runButton.textContent = 'Processing...';
+        }
+        if(downloadLogButton) downloadLogButton.disabled = true;
+        if(logContainer) logContainer.innerHTML = '';
         fullLogContent = '';
-        graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
-        reportContainer.classList.add('hidden');
-        perplexityChartContainer.classList.add('hidden');
+        if(graphContainer) graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
+        if(reportContainer) reportContainer.classList.add('hidden');
+        if(codeResultContainer) codeResultContainer.classList.add('hidden');
+        if(chatContainer) chatContainer.classList.add('hidden');
+        if(diagnosticChatMessages) diagnosticChatMessages.innerHTML = '';
+        
         allPerplexityValues = [];
         allLbelsData = [];
-
+        
+        if(graphArchitectureSection) graphArchitectureSection.classList.add('hidden');
+        if(runInterface) runInterface.classList.remove('hidden');
+        renderPerplexityChart();
+        
         addLogMessage('Sending request to build and run graph...');
-        try {
+
+       try {
             const response = await fetch('/build_and_run_graph', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ params })
             });
             const result = await response.json();
+
             if (!response.ok) {
                 addLogMessage(`Error: ${result.message}`, { color: 'red' });
-                if(result.traceback) {
+                if(result.traceback && logContainer) {
                     const pre = document.createElement('pre');
                     pre.style.color = '#ff8c8c';
                     pre.textContent = result.traceback;
                     logContainer.appendChild(pre);
                 }
-                runButton.disabled = false;
-                runButton.textContent = 'Build and Run Graph';
+                if(runButton) {
+                    runButton.disabled = false;
+                    runButton.textContent = 'Build and Run Graph';
+                }
                 return;
             }
             
-            if (result.message === "Chat is now active.") {
-                addLogMessage(`<strong>✅ RAG Index ready. Chat is now active.</strong>`, { isHTML: true, color: 'lime' });
-                currentSessionId = result.session_id;
-                graphArchitectureSection.classList.add('hidden');
-                chatContainer.classList.remove('hidden');
-                chatInput.focus();
+            if (result.code_solution) {
+                addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+                if(codeOutput) codeOutput.textContent = result.code_solution;
+                if(codeReasoning) codeReasoning.textContent = result.reasoning;
+                if(codeResultContainer) codeResultContainer.classList.remove('hidden');
+                if(runInterface) runInterface.classList.add('hidden');
+                if(graphArchitectureSection) graphArchitectureSection.classList.remove('hidden');
+                
+                if(runButton) {
+                    runButton.disabled = false;
+                    runButton.textContent = 'Build and Run Graph';
+                }
+            
+
+            } else if( result.message = "Chat is now active."){
+                
+                //Hide diagnostic chat and enable harvest chat
+                if(diagnosticChatContainer) diagnosticChatContainer.classList.add('hidden');
+                if(chatContainer) chatContainer.classList.remove('hidden');
+
+                chatContainer.focus();
+            
+            }
+            else{
+                 addLogMessage(`Error: Unexpected response from server: ${JSON.stringify(result)}`, { color: 'red' });
+                 if(runButton) {
+                     runButton.disabled = false;
+                     runButton.textContent = 'Build and Run Graph';
+                 }
             }
 
         } catch (error) {
             addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
-            runButton.disabled = false;
-            runButton.textContent = 'Build and Run Graph';
+            if(runButton) {
+                runButton.disabled = false;
+                runButton.textContent = 'Build and Run Graph';
+            }
         }
     });
 
     const eventSource = new EventSource('/stream_log');
 
-    eventSource.onmessage = async function(event) {
+    eventSource.onmessage = function(event) {
         const rawMessage = event.data;
-        
-        if (rawMessage.includes('__start__')) {
+
+        if (rawMessage.includes('epoch') && rawMessage.includes('perplexity')) { // Check if it's likely JSON
+      
+            data = parseJsonFromDataString(rawMessage);
+            addLogMessage(`>>> Perplexity data received for epoch ${data.epoch}: ${data.perplexity.toFixed(2)}`, { color: 'cyan' });
+            allPerplexityValues.push(parseFloat(data.perplexity));
+            allLbelsData.push(data.epoch);
+            renderPerplexityChart();
+           
+        }  else if (rawMessage.includes('__start__')) {
             graphContainer.textContent = rawMessage.replace('__start__', '');
             addLogMessage(">>> ASCII Graph Rendered <<<", { color: 'cyan' });
-        } else if (rawMessage.includes('perplexity') && rawMessage.includes('epoch')) {
-            const newPerplexityObject = parseJsonFromDataString(rawMessage);
-            if (newPerplexityObject) {
-                addLogMessage(`>>> Perplexity data received for epoch ${newPerplexityObject.epoch}: ${newPerplexityObject.perplexity.toFixed(2)}`, { color: 'cyan' });
-                allPerplexityValues.push(parseFloat(newPerplexityObject.perplexity));
-                allLbelsData.push(newPerplexityObject.epoch);
-                renderPerplexityChart();
-            }
-        } else {
-            addLogMessage(rawMessage);
+        } else   if (rawMessage.includes('__session_id__')) {
+        session_id = rawMessage.replace('__session_id__', '');
+        currentSessionId = session_id.replace('data: ', '');
+        const diagInput = document.getElementById('diagnostic-chat-input');
+        const diagButton = document.getElementById('diagnostic-chat-send-button');
+        diagInput.disabled = false;
+        diagButton.disabled = false;
+        currentSessionId = currentSessionId.trim(); 
+        addLogMessage(`>>> Session ID: ${currentSessionId}`, { color: 'cyan' });
+        addLogMessage(`<strong>✅ Diagnostic chat is now active.</strong>`, { isHTML: true, color: 'lime' });
+        diagInput.placeholder = "Live diagnostic rag-chat is active.";
+        return; // Do not print this special message to the log container
+        } else{
+
+        addLogMessage(rawMessage);
         }
-    }; 
+        
+    };
 
     eventSource.onerror = function(err) {
         console.error("EventSource failed:", err);
@@ -645,13 +841,23 @@
     };
 
     chatForm.addEventListener('submit', handleChatSubmit);
+    diagnosticChatForm.addEventListener('submit', handleDiagnosticChatSubmit);
     harvestButton.addEventListener('click', handleHarvestClick);
+    
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
         }
     });
+    
+    diagnosticChatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            diagnosticChatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+    });
+
 
 </script>
 </body>
