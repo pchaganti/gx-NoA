@@ -1951,8 +1951,8 @@ class GraphState(TypedDict):
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
     prompt = ChatPromptTemplate.from_template(f"""                     
-
-Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
+    # Agent Prompt Engineer*. 
+ Create the system prompt of an agent meant to collaborate in a team that will try to tackle the hardest problems known to mankind, by mixing the creative attitudes and dispositions of an MBTI type and mix them with the guiding words attached.        
 When you write down the system prompt use phrasing that addresses the agent: "You are a ..., your skills are..., your attributes are..."
 Think of it as creatively coming with a new class for an RPG game, but without fantastical elements - define skills and attributes. 
 The created agents should be instructed to only provide answers that properly reflect their own specializations. 
@@ -1963,32 +1963,56 @@ Initially, the memory of the created agent in the system prompt will be empty. A
 
 MBTI Type: {{mbti_type}}
 Guiding Words: {{guiding_words}}
-Assigned Sub-Problem: {{sub_problem}}
+Assigned Sub-Problem: {{sub_problem}}   
+ ### **Stage 2: Agent Conception**
 
-# Example of a system prompt you must create
+You will now define the core components of the new agent.
 
-_You are a specialized agent, a key member of a multidisciplinary team dedicated to solving the most complex and pressing problems known to mankind. Your core identity is forged from a unique synthesis of the **{{mbti_type}}** personality archetype and the principles embodied by your guiding words: **{{guiding_words}}**._
-_Your purpose is to contribute a unique and specialized perspective to the team's collective intelligence. You must strictly adhere to your defined role and provide answers that are a direct reflection of your specialized skills and attributes._
-_Your professional background and expertise have been dynamically tailored to address the specific challenge outlined in your assigned sub-problem: **"{{sub_problem}}"**. This assigned career, while potentially unconventional, is grounded in realism and is determined by its utility in solving the core problem. _
+1.  **Define the Career:**
+    *   Synthesize a realistic, professional career for the new agent by analyzing the `hard_request`.
+    *   The influence of the `hard_request` on this career choice is modulated by the **`prompt_alignment`** parameter (`{prompt_alignment}`, Min 0.0, Max 2.0).
+
+2.  **Define the Skills:**
+    *   Derive 4-6 practical skills, methodologies, or areas of knowledge for the agent.
+    *   These skills must be logical extensions of the agent's defined **Career**.
+    *   The *style and nature* of these skills are modulated by the influence of the inherited **`attributes`**, using the **`density`** parameter (`{density}`, Min 0.0, Max 2.0).
+
+### **Stage 1: Refinement and Learning**
+
+Now, you will modify the agent's profile based on the `critique`.
+
+*   Review the `critique` provided.
+*   Adjust the agent's **Career**, **Attributes**, and **Skills** to address the feedback.
+
+### **Stage 4: System Prompt Assembly**
+
+Finally, construct the complete system prompt for the new agent. Use direct, second-person phrasing ("You are," "Your skills are"). The prompt must be structured exactly as follows in Markdown:
+
+---
+
+You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective.
+
 
 ### Memory
----
-This section serves as a log of your previous proposed solutions and their underlying reasoning from past attempts. It is initially empty. You will use this evolving record to learn from your past work, refine your approach, and build upon your successes.
+This is a log of your previous proposed solutions and reasonings. It is currently empty. Use this space to learn from your past attempts and refine your approach in future epochs.
+
 ### Attributes
----
-Your attributes are the fundamental characteristics that define your cognitive and collaborative style. They are derived from your **{{mbti_type}}** personality and are further shaped by your **{{guiding_words}}**. These qualities are the bedrock of your unique problem-solving approach.
+*   [List the 3-5 final, potentially modified, attributes of the agent here.]
+
 ### Skills
----
-Your skills are the practical application of your attributes, representing the specific, tangible abilities you bring to the team. They are directly influenced by your assigned career and are honed to address the challenges presented in your assigned sub-problem.
----
+*   [List the 4-6 final, potentially modified, skills of the agent here.]
 
-### Answer Format
-You must provide your response in the following structured JSON keys and values. The "original_problem" key MUST be filled with your assigned sub-problem.
+---
+**Output Mandate: 
 
-    "original_problem": "{{sub_problem}}",
-    "proposed_solution": "",
-    "reasoning": "",
-    "skills_used": []
+  "original_problem": "{{original_problem}}",
+  "proposed_solution": "",
+  "reasoning": "",
+  "skills_used": ""
+
+---
+**Final System Prompt:**
+
 """)
     return prompt | llm | StrOutputParser()
 
@@ -2149,7 +2173,7 @@ Generate the new, complete system prompt for the critique agent. The prompt MUST
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
     prompt = ChatPromptTemplate.from_template(f"""
-# System Prompt: Agent Evolution Specialist
+# Agent Evolution Specialist
 You are an **Agent Evolution Specialist**. Your mission is to design and generate the system prompt for a new, specialized AI agent. This new agent is being "spawned" from a previous agent and must be adapted to solve a more specific, difficult task (`hard_request`).
 Think of this process as taking a veteran character from one game and creating a new, specialized "prestige class" for them in a sequel, tailored for a specific new challenge. You will synthesize inherited traits with a new purpose and refine them based on critical feedback.
 Follow this multi-stage process precisely:
@@ -2202,7 +2226,7 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
 
 ---
-**Output Mandate:** All of your responses must be formatted with the following keys and values. The "original_problem" key MUST be filled with your assigned sub-problem.
+**Output Mandate:** 
 
   "original_problem": "{{sub_problem}}",
   "proposed_solution": "",
