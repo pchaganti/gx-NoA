@@ -28,6 +28,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
 from sklearn.cluster import KMeans
+from contextlib import redirect_stdout
 
 
 load_dotenv()
@@ -36,8 +37,9 @@ app = FastAPI()
 
 log_stream = asyncio.Queue()
 
-final_reports = {}
-active_sessions = {}
+sessions = {}
+final_reports = {} # Use a dictionary for final reports, keyed by session ID
+#below: deep, esoteric and obscure pseudoscience stuff
 
 #below: deep, esoteric and obscure pseudoscience stuff
 
@@ -1462,10 +1464,9 @@ class RAPTORRetriever(BaseRetriever):
 
 
 class RAPTOR:
-    def __init__(self, llm, embeddings_model, session_id, chunk_size=1000, chunk_overlap=200):
+    def __init__(self, llm, embeddings_model, chunk_size=1000, chunk_overlap=200):
         self.llm = llm
         self.embeddings_model = embeddings_model
-        self.session_id = session_id
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self.tree = {}
         self.all_nodes: Dict[str, Document] = {}
@@ -1585,6 +1586,187 @@ def clean_and_parse_json(llm_output_string):
     print(f"Problematic string: {json_string}")
     return None
 
+class CoderMockLLM(Runnable):
+    """A mock LLM for debugging that returns instant, pre-canned CODE responses."""
+
+    def invoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return asyncio.ensure_future(self.ainvoke(input_data, config=config, **kwargs))
+        else:
+            return asyncio.run(self.ainvoke(input_data, config=config, **kwargs))
+
+    async def ainvoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+        prompt = str(input_data).lower()
+        await asyncio.sleep(0.05)
+
+        if "you are a helpful ai assistant" in prompt:
+            return "This is a mock streaming response for the RAG chat in Coder debug mode."
+        elif "create the system prompt of an agent" in prompt:
+            return f"""
+You are a Senior Python Developer agent.
+### memory
+- No past commits.
+### attributes
+- python, fastapi, restful, solid
+### skills
+- API Design, Database Management, Asynchronous Programming, Unit Testing.
+You must reply in the following JSON format: "original_problem": "Your sub-problem related to code.", "proposed_solution": "", "reasoning": "", "skills_used": []
+            """
+        elif "you are an analyst of ai agents" in prompt:
+            return json.dumps({
+                "attributes": "python fastapi solid",
+                "hard_request": "Implement a quantum-resistant encryption algorithm from scratch."
+            })
+        elif "you are a 'dense_spanner'" in prompt or "you are an agent evolution specialist" in prompt:
+             return f"""
+You are now a Principal Software Architect.
+### memory
+- Empty.
+### attributes
+- design, scalability, security, architecture
+### skills
+- System Design, Microservices, Cloud Infrastructure, CI/CD pipelines.
+You must reply in the following JSON format: "original_problem": "An evolved sub-problem about system architecture.", "proposed_solution": "", "reasoning": "", "skills_used": []
+            """
+
+        elif "you are a synthesis agent" in prompt or "you are an expert code synthesis agent" in prompt:
+            code_solution = """```python
+# main.py
+# This is a synthesized mock solution from the Coder Debug Mode.
+
+class APIClient:
+    def __init__(self, base_url):
+        self.base_url = base_url
+
+    def get_data(self, endpoint):
+        '''Fetches data from a given endpoint.'''
+        print(f"Fetching data from {self.base_url}/{endpoint}")
+        # CORRECTED: Added empty list as value for the "data" key.
+        return {"status": "success", "data": []}
+
+class DataProcessor:
+    def process(self, data):
+        '''Processes the fetched data.'''
+        if not data:
+            return []
+        processed = [item * 2 for item in data.get("data", [])]
+        print(f"Processed data: {processed}")
+        return processed
+
+def main():
+    '''Main application logic.'''
+    client = APIClient("https://api.example.com")
+    raw_data = client.get_data("items")
+    processor = DataProcessor()
+    final_data = processor.process(raw_data)
+    print(f"Final result: {final_data}")
+
+if __name__ == "__main__":
+    main()
+```"""
+            # CORRECTED: The return value is now a valid JSON string, which the backend expects.
+            return json.dumps({
+                "proposed_solution": code_solution,
+                "reasoning": "This response was synthesized by the CoderMockLLM.",
+                "skills_used": ["python", "mocking", "synthesis"]
+            }) 
+
+        elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt or "CTO" in prompt:
+
+            return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
+
+        elif "you are a master prompt engineer" in prompt:
+            return f"""You are a CTO providing a technical design review...
+Original Request: {{original_request}}
+Proposed Final Solution:
+{{proposed_solution}}
+
+Generate your code-focused critique for the team:"""
+        elif "you are a memory summarization agent" in prompt:
+            return "This is a mock summary of the agent's past commits, focusing on key refactors and feature implementations."
+        elif "analyze the following text for its perplexity" in prompt:
+            return str(random.uniform(5.0, 40.0))
+        elif "you are a master strategist and problem decomposer" in prompt:
+            sub_problems = ["Design the database schema for user accounts.", "Implement the REST API endpoint for user authentication.", "Develop the frontend login form component.", "Write unit tests for the authentication service."]
+            return json.dumps({"sub_problems": sub_problems})
+        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt:
+             return json.dumps({
+                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
+                "significant_progress": True
+            })
+        elif "you are a strategic problem re-framer" in prompt:
+             return json.dumps({
+                "new_problem": "The authentication API is complete. The new, more progressive problem is to build a scalable, real-time notification system that integrates with it."
+            })
+        elif "generate exactly" in prompt and "verbs" in prompt:
+            return "design implement refactor test deploy abstract architect containerize scale secure query"
+        elif "generate exactly" in prompt and "expert-level questions" in prompt:
+            questions = ["How would this architecture scale to 1 million concurrent users?", "What are the security implications of the chosen authentication method?", "How can we ensure 99.999% uptime for this service?", "What is the optimal database indexing strategy for this query pattern?"]
+            return json.dumps({"questions": questions})
+        elif "you are an ai assistant that summarizes academic texts" in prompt:
+            return "This is a mock summary of a cluster of code modules, generated in Coder debug mode for the RAPTOR index."
+        elif "you are an expert computational astrologer" in prompt:
+            return random.choice(reactor_list)
+
+        elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
+
+            pick = random.randint(0,1)
+            if pick == 0:
+                return "yes"
+
+            else:
+                return "no"
+
+        elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
+            return """
+# Technical Design Document: Mock API Service
+
+**Abstract:** This document outlines the technical design for a mock API service, generated in Coder Debug Mode. It synthesizes information from the RAG context to answer a specific design question.
+
+**1. Introduction:** The purpose of this document is to structure the retrieved agent outputs and code snippets into a coherent technical specification.
+
+**2. System Architecture:**
+The system follows a standard microservice architecture.
+```mermaid
+graph TD;
+    A[User] --> B(API Gateway);
+    B --> C{Authentication Service};
+    B --> D{Data Service};
+    D -- uses --> E[(Database)];```
+
+**3. Code Implementation:**
+The core logic is implemented in Python, as shown in the synthesized code block below.
+
+```python
+def get_user(user_id: int):
+    # Mock implementation to fetch a user
+    db = {"1": "Alice", "2": "Bob"}
+    return db.get(str(user_id), None)
+```
+
+**4. Conclusion:** This design provides a scalable and maintainable foundation for the service. The implementation details demonstrate the final step of the development process.
+"""
+        else:
+            return json.dumps({
+                "original_problem": "A sub-problem statement provided to a coder agent.",
+                "proposed_solution": "```python\ndef sample_function():\n    return 'Hello from coder agent " + str(random.randint(100,999)) + "'\n```",
+                "reasoning": "This response was generated instantly by the CoderMockLLM.",
+                "skills_used": ["python", "mocking", f"api_design_{random.randint(1,5)}"]
+            })
+
+    async def astream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+        prompt = str(input_data).lower()
+        if "you are a helpful ai assistant" in prompt:
+            words = ["This", " is", " a", " mock", " streaming", " response", " for", " the", " RAG", " chat", " in", " Coder", " debug", " mode."]
+            for word in words:
+                yield word
+                await asyncio.sleep(0.05)
+        else:
+            result = await self.ainvoke(input_data, config, **kwargs)
+            yield result
+
+
 class MockLLM(Runnable):
     """A mock LLM for debugging that returns instant, pre-canned responses."""
 
@@ -1602,6 +1784,16 @@ class MockLLM(Runnable):
 
         if "you are a helpful ai assistant" in prompt:
             return "This is a mock streaming response for the RAG chat in debug mode."
+
+        elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
+
+            pick = random.randint(0,1)
+            if pick == 0:
+                return "yes"
+
+            else:
+                return "no"
+
         elif "create the system prompt of an agent" in prompt:
             return f"""
 You are a mock agent for debugging.
@@ -1691,7 +1883,7 @@ Generate your global critique for the team:"""
             return "This is a mock summary of a cluster of documents, generated in debug mode for the RAPTOR index."
         elif "you are an expert computational astrologer" in prompt:
             return random.choice(reactor_list)
-        elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
+        elif "you are an expert interrogator" in prompt:
             return """
 # Mock Academic Paper
 ## Based on Provided RAG Context
@@ -1751,6 +1943,10 @@ class GraphState(TypedDict):
     academic_papers: Optional[dict]
     critique_prompt: str
     individual_critique_prompt: str
+    assessor_prompt: str
+    is_code_request: bool
+    session_id: str
+    chat_history: List[dict]
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -2126,6 +2322,8 @@ You are an AI philosopher and progress assessor. Your task is to evaluate a synt
 - **Quality**: The solution is detailed, actionable, and demonstrates a deep understanding of the problem.
 - **Forward Momentum**: The solution doesn't just solve the problem, it opens up new, more advanced questions or avenues of exploration.
 
+{execution_context}
+
 Based on this philosophy, analyze the following and decide if the threshold for significant progress has been met. Your output must be a JSON object with two keys:
 - "reasoning": A brief explanation for your decision.
 - "significant_progress": a boolean value (true or false).
@@ -2137,7 +2335,7 @@ Original Problem:
 
 Synthesized Solution from Agent Team:
 ---
-{final_solution}
+{proposed_solution}
 ---
 
 Now, provide your assessment in the required JSON format:
@@ -2183,14 +2381,19 @@ Problem: "{problem}"
 
 def get_interrogator_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} expert-level questions that exhaustively explore the problem from every possible angle of novelty.
-These questions should be deep, insightful, and designed to push the boundaries of knowledge. They should cover theoretical, practical, philosophical, and unconventional perspectives.
+You are an expert-level academic interrogator and research director. Your task is to analyze a high-level problem and generate exactly {num_questions} inpsired in the original_request and       
+the questions the user is interested in.
 
 The output must be a JSON object with a single key "questions", which is a list of strings.
 
 Original Request to Interrogate:
 ---
 {original_request}
+---
+
+Further questions user is also interested in:
+---
+{further_questions}
 ---
 
 Generate the JSON object with exactly {num_questions} expert-level questions:
@@ -2231,6 +2434,115 @@ Question: {question}
 Answer:
 """)
     return prompt | llm
+
+def get_code_detector_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+Analyze the following text. Your task is to determine if the text contains a 
+Answer with a single word: "true" if it contains code, and "false" otherwise.
+
+Text to analyze:
+---
+{text}
+---
+""")
+    return prompt | llm | StrOutputParser()
+
+def get_request_is_code_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+Analyze the following user request. Your task is to determine if the user is asking for code to be generated.
+Answer with a single word: "true" if the request is about generating code, and "false" otherwise.
+
+User Request:
+---
+{request}
+---
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_code_synthesis_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert code synthesis agent. Your role is to combine multiple code snippets and solutions from different agents into a single, cohesive, and runnable application.
+You must analyze the different approaches, merge them logically, handle potential conflicts, and produce a final, well-structured code file.
+The final output should be a single block of code.
+
+Original Problem: {original_request}
+Agent Solutions (containing code snippets):
+{agent_solutions}
+
+Synthesize the final, complete code application:
+""")
+    return prompt | llm | StrOutputParser()
+
+INITIAL_ASSESSOR_PROMPT_TEMPLATE = """
+You are an AI philosopher and progress assessor. Your task is to evaluate a synthesized solution against the original problem and determine if "significant progress" has been made.
+"Significant progress" is not just a correct answer. It implies:
+- **Novelty**: The solution offers a new perspective or a non-obvious approach.
+- **Coherence**: The reasoning is sound, logical, and well-structured.
+- **Quality**: The solution is detailed, actionable, and demonstrates a deep understanding of the problem.
+- **Forward Momentum**: The solution doesn't just solve the problem, it opens up new, more advanced questions or avenues of exploration.
+
+Based on this philosophy, analyze the following and decide if the threshold for significant progress has been met. Your output must be a JSON object with two keys:
+- "reasoning": A brief explanation for your decision.
+- "significant_progress": a boolean value (true or false).
+
+Original Problem:
+---
+{original_request}
+---
+
+Synthesized Solution from Agent Team:
+---
+{proposed_solution}
+---
+
+{execution_context}
+
+Now, provide your assessment in the required JSON format:
+"""
+
+def get_assessor_prompt_updater_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are a master prompt engineer. Your task is to create a new system prompt for the 'Progress Assessor' agent.
+You must preserve the core mission of the agent, which is to evaluate a solution and determine if "significant progress" has been made, based on novelty, coherence, quality, and forward momentum.
+
+You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona into the system prompt, replacing the old persona but keeping the core mission and all input fields ({{original_request}}, {{proposed_solution}}, {{execution_context}}) intact.
+
+**New Persona Prompts (Identities & Prompts):**
+---
+{reactor_prompts}
+---
+
+**Original Core Mission Text (for reference):**
+"You are an AI philosopher and progress assessor. Your task is to evaluate a synthesized solution against the original problem and determine if 'significant progress' has been made.
+'Significant progress' is not just a correct answer. It implies:
+- **Novelty**: The solution offers a new perspective or a non-obvious approach.
+- **Coherence**: The reasoning is sound, logical, and well-structured.
+- **Quality**: The solution is detailed, actionable, and demonstrates a deep understanding of the problem.
+- **Forward Momentum**: The solution doesn't just solve the problem, it opens up new, more advanced questions or avenues of exploration.
+
+Based on this philosophy, analyze the following and decide if the threshold for significant progress has been met. Your output must be a JSON object with two keys:
+- 'reasoning': A brief explanation for your decision.
+- 'significant_progress': a boolean value (true or false).
+
+Original Problem:
+---
+{{{{original_request}}}}
+---
+
+Synthesized Solution from Agent Team:
+---
+{{{{proposed_solution}}}}
+---
+
+{{{{execution_context}}}}
+
+Now, provide your assessment in the required JSON format:"
+---
+
+Generate the new, complete system prompt for the progress assessor agent. The prompt MUST end with the same input fields and final instruction as the original.
+""")
+    return prompt | llm | StrOutputParser()
 
 def create_agent_node(llm, node_id):
     """
@@ -2345,7 +2657,15 @@ Your JSON formatted response:
 def create_synthesis_node(llm):
     async def synthesis_node(state: GraphState):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
-        synthesis_chain = get_synthesis_chain(llm)
+
+        is_code = state["original_request"]
+        
+        if is_code:
+            await log_stream.put("LOG: Original request detected as a code generation task. Using code synthesis prompt.")
+            synthesis_chain = get_code_synthesis_chain(llm)
+        else:
+            await log_stream.put("LOG: Original request is not a code task. Using standard synthesis prompt.")
+            synthesis_chain = get_synthesis_chain(llm)
 
         last_agent_layer_idx = len(state['all_layers_prompts']) - 1
         num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
@@ -2368,8 +2688,15 @@ def create_synthesis_node(llm):
         })
         
         try:
-            final_solution = clean_and_parse_json(final_solution_str)
-            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution, indent=2)}")
+            if is_code:
+                final_solution = {
+                    "proposed_solution": final_solution_str,
+                    "reasoning": "Synthesized multiple agent code outputs into a single application.",
+                    "skills_used": ["code_synthesis"]
+                }
+            else:
+                 final_solution = clean_and_parse_json(final_solution_str)
+            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution_str, indent=2)}")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
@@ -2397,16 +2724,15 @@ def create_archive_epoch_outputs_node():
                 system_prompt = all_prompts[layer_idx][agent_idx]
                 
                 content = (
+                    f"Agent ID: {agent_id}\n"
+                    f"Epoch: {state['epoch']}\n\n"
+                    f"System Prompt:\n---\n{system_prompt}\n---\n\n"
                     f"Sub-Problem: {output.get('original_problem', 'N/A')}\n\n"
                     f"Proposed Solution: {output.get('proposed_solution', 'N/A')}\n\n"
                     f"Reasoning: {output.get('reasoning', 'N/A')}"
                 )
                 
-                metadata = {
-                    "agent_id": agent_id,
-                    "epoch": state['epoch'],
-                    "system_prompt": system_prompt
-                }
+                metadata = { "agent_id": agent_id, "epoch": state['epoch'] }
                 
                 new_docs.append(Document(page_content=content, metadata=metadata))
             except (ValueError, IndexError) as e:
@@ -2418,31 +2744,32 @@ def create_archive_epoch_outputs_node():
         return {"all_rag_documents": all_rag_documents}
     return archive_epoch_outputs_node
 
-
 def create_update_rag_index_node(llm, embeddings_model):
-    async def update_rag_index_node(state: GraphState):
-        await log_stream.put("--- [RAG PASS] Building Final RAPTOR Index from All Epochs ---")
+    async def update_rag_index_node(state: GraphState, end_of_run: bool = False):
+        node_name = "Final RAG Index" if end_of_run else f"Epoch {state['epoch']} RAG Index"
+        await log_stream.put(f"--- [RAG PASS] Building {node_name} ---")
         
         all_rag_documents = state.get("all_rag_documents", [])
         if not all_rag_documents:
-            await log_stream.put("WARNING: No documents were archived during the run. Cannot build RAG index.")
+            await log_stream.put("WARNING: No documents were archived. Cannot build RAG index.")
             return {"raptor_index": None}
 
-        await log_stream.put(f"LOG: Total documents from all epochs to index: {len(all_rag_documents)}. Building RAPTOR index...")
+        await log_stream.put(f"LOG: Total documents to index: {len(all_rag_documents)}. Building RAPTOR index...")
 
-        session_id = str(uuid.uuid4())
-        raptor_index = RAPTOR(llm=llm, embeddings_model=embeddings_model, session_id=session_id)
+        raptor_index = RAPTOR(llm=llm, embeddings_model=embeddings_model)
         
         try:
             await raptor_index.add_documents(all_rag_documents)
-            await log_stream.put("SUCCESS: Final RAPTOR index built successfully.")
+            await log_stream.put(f"SUCCESS: {node_name} built successfully.")
+            await log_stream.put(f"__session_id__ {state.get('session_id')}")
             return {"raptor_index": raptor_index}
         except Exception as e:
-            await log_stream.put(f"ERROR: Failed to build final RAPTOR index. Error: {e}")
+            await log_stream.put(f"ERROR: Failed to build {node_name}. Error: {e}")
             await log_stream.put(traceback.format_exc())
-            return {"raptor_index": None}
+            return {"raptor_index": state.get("raptor_index")}
 
     return update_rag_index_node
+
 
 def create_metrics_node(llm):
     """
@@ -2471,7 +2798,7 @@ def create_metrics_node(llm):
             score = 100.0
             await log_stream.put(f"ERROR: Could not parse perplexity score. Defaulting to 100. Raw output: '{score_str}'. Error: {e}")
 
-        await log_stream.put(f"{json.dumps({'epoch': state['epoch'], 'perplexity': score})}")
+        await log_stream.put(json.dumps({'epoch': state['epoch'], 'perplexity': score}))
 
         new_history = state.get("perplexity_history", []) + [score]
         return {"perplexity_history": new_history}
@@ -2480,9 +2807,6 @@ def create_metrics_node(llm):
 
 
 def create_progress_assessor_node(llm):
-    """
-    NEW: This node assesses if significant progress was made in the epoch.
-    """
     async def progress_assessor_node(state: GraphState):
         await log_stream.put("--- [REFLECTION PASS] Assessing Epoch for Significant Progress ---")
         
@@ -2490,13 +2814,53 @@ def create_progress_assessor_node(llm):
         if not final_solution or final_solution.get("error"):
             await log_stream.put("WARNING: No valid final solution to assess. Defaulting to no progress.")
             return {"significant_progress_made": False}
+
+        code_detector_chain = get_code_detector_chain(llm)
+        solution_text = final_solution.get("proposed_solution", "")
+        is_code_str = await code_detector_chain.ainvoke({"text": solution_text})
+        execution_context = ""
+
+        if "true" in is_code_str.lower():
+            await log_stream.put("LOG: [ASSESSOR] Code detected in the final solution. Attempting to execute.")
+            code_match = re.search(r"```(?:\w+\n)?([\s\S]*?)```", solution_text)
+            code_to_run = code_match.group(1) if code_match else solution_text
             
-        assessor_chain = get_progress_assessor_chain(llm)
+            try:
+                output_buffer = io.StringIO()
+                with redirect_stdout(output_buffer):
+                    exec(code_to_run, {})
+                execution_output = output_buffer.getvalue()
+                execution_context = f"""
+                        # Code Execution Result
+                        The provided code was executed successfully in a sandbox.
+                        ## Output:
+                        ---
+                        {execution_output}
+                        ---
+                        """
+                await log_stream.put(f"SUCCESS: [ASSESSOR] Code executed successfully. Output:\n{execution_output}")
+            except Exception:
+                tb = traceback.format_exc()
+                execution_context = f"""
+                        # Code Execution Failed
+                        The provided code failed to execute in a sandbox.
+                        ## Stack Trace:
+                        ---
+                        {tb}
+                        ---
+                        """
+                await log_stream.put(f"ERROR: [ASSESSOR] Code execution failed. Traceback:\n{tb}")
+
+        dynamic_assessor_prompt = state.get("assessor_prompt", INITIAL_ASSESSOR_PROMPT_TEMPLATE)
+        assessor_chain = ChatPromptTemplate.from_template(dynamic_assessor_prompt) | llm | StrOutputParser()
+        
         assessment_str = await assessor_chain.ainvoke({
             "original_request": state["original_request"],
-            "final_solution": json.dumps(final_solution, indent=2)
+            "proposed_solution": json.dumps(final_solution, indent=2),
+            "execution_context": execution_context,
+            "sub_problem": state.get("current_problem", state["original_request"])
         })
-        
+
         try:
             assessment = clean_and_parse_json(assessment_str)
             progress_made = assessment.get("significant_progress", False)
@@ -2626,78 +2990,63 @@ def create_critique_node(llm):
         return {"critiques": critiques}
     return critique_node
 
-def create_update_critique_prompt_node(llm, params):
-    async def update_critique_prompt_node(state: GraphState):
-        await log_stream.put("--- [ANNEALING] Dynamically Annealing Critique Agent Prompt ---")
+def create_update_personas_node(llm, params):
+    async def update_personas_node(state: GraphState):
+        await log_stream.put("--- [ANNEALING] Dynamically Annealing Critique & Assessor Agent Prompts ---")
         try:
             all_outputs = state.get("agent_outputs", {})
-            num_layers = len(state.get("all_layers_prompts", []))
-            
-            hidden_layer_outputs = []
-            for agent_id, output in all_outputs.items():
-                layer_idx = int(agent_id.split('_')[1])
-                if layer_idx < num_layers -1:
-                     hidden_layer_outputs.append(output)
-            
-            if not hidden_layer_outputs:
-                await log_stream.put("LOG: [CRITIQUE UPDATE] No hidden layer outputs found from the last epoch. Critique prompt will not be updated.")
+            if not all_outputs:
+                await log_stream.put("LOG: [ANNEALING] No agent outputs found from the last epoch. Personas will not be updated.")
                 return {}
 
             utterances = "\n\n---\n\n".join(
                 f"Solution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
-                for output in hidden_layer_outputs
+                for output in all_outputs.values()
             )
-            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Gathered {len(utterances)} characters of utterances from {len(hidden_layer_outputs)} hidden layer agents.")
+            await log_stream.put(f"LOG: [ANNEALING] Gathered {len(utterances)} characters of utterances from {len(all_outputs)} agents.")
 
             TOKEN_LIMIT_CHARS = 1024000
             if len(utterances) > TOKEN_LIMIT_CHARS:
-                await log_stream.put(f"WARNING: [CRITIQUE UPDATE] Utterance length ({len(utterances)}) exceeds threshold ({TOKEN_LIMIT_CHARS}). Chunking and summarizing.")
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=TOKEN_LIMIT_CHARS, chunk_overlap=200)
-                chunks = text_splitter.split_text(utterances)
-                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Split utterances into {len(chunks)} chunks.")
-                
-                summarizer_chain = get_memory_summarizer_chain(llm)
-                summary_tasks = [summarizer_chain.ainvoke({"history": chunk}) for chunk in chunks]
-                summaries = await asyncio.gather(*summary_tasks)
-                utterances = "\n\n".join(summaries)
-                await log_stream.put(f"LOG: [CRITIQUE UPDATE] Summarized chunks. New utterance length: {len(utterances)}.")
+                await log_stream.put(f"WARNING: [ANNEALING] Utterance length ({len(utterances)}) exceeds threshold. Summarizing.")
+                # Simple truncation for now to avoid complexity of another LLM call here
+                utterances = utterances[:TOKEN_LIMIT_CHARS]
 
-            await log_stream.put("LOG: [CRITIQUE UPDATE] Detecting pseudo-reactor from agent utterances...")
+            await log_stream.put("LOG: [ANNEALING] Detecting pseudo-reactor from agent utterances...")
             reactor_chain = get_pseudo_neurotransmitter_selector_chain(llm)
             selected_reactor = await reactor_chain.ainvoke({"agent_utterances": utterances})
-            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Pseudo-reactor detected: {selected_reactor}")
+            await log_stream.put(f"LOG: [ANNEALING] Pseudo-reactor detected: {selected_reactor}")
 
-            await log_stream.put("LOG: [CRITIQUE UPDATE] Mapping reactor to persona prompts...")
+            await log_stream.put("LOG: [ANNEALING] Mapping reactor to persona prompts...")
             reactor_prompts_list = FunctionMapper().table(selected_reactor)
             reactor_prompts_str = "\n---\n".join([f"Identity: {p[0]}\nPrompt Fragment: {p[1]}" for p in reactor_prompts_list])
-            await log_stream.put(f"LOG: [CRITIQUE UPDATE] Retrieved {len(reactor_prompts_list)} prompts for reactor '{selected_reactor}'.")
-
-            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for critique agent...")
+            
+            # Update Critique Prompts
+            await log_stream.put("LOG: [ANNEALING] Generating new system prompt for GLOBAL critique agent...")
             updater_chain = get_critique_prompt_updater_chain(llm)
             new_critique_prompt = await updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
             
-            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New GLOBAL critique prompt generated.")
-            
-            await log_stream.put("LOG: [CRITIQUE UPDATE] Generating new system prompt for INDIVIDUAL critique agent...")
+            await log_stream.put("LOG: [ANNEALING] Generating new system prompt for INDIVIDUAL critique agent...")
             individual_updater_chain = get_individual_critique_prompt_updater_chain(llm)
             new_individual_critique_prompt = await individual_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
 
-            await log_stream.put(f"SUCCESS: [CRITIQUE UPDATE] New INDIVIDUAL critique prompt generated.")
-            
-            critique_snippet = (new_critique_prompt[:200] + '...') if len(new_critique_prompt) > 200 else new_critique_prompt
-            await log_stream.put(f"LOG: [CRITIQUE UPDATE] New global critique prompt starts with: {critique_snippet}")
+            # Update Assessor Prompt
+            await log_stream.put("LOG: [ANNEALING] Generating new system prompt for PROGRESS ASSESSOR agent...")
+            assessor_updater_chain = get_assessor_prompt_updater_chain(llm)
+            new_assessor_prompt = await assessor_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+
+            await log_stream.put("SUCCESS: [ANNEALING] All dynamic prompts (Critique & Assessor) have been updated.")
 
             return {
                 "critique_prompt": new_critique_prompt,
                 "individual_critique_prompt": new_individual_critique_prompt,
+                "assessor_prompt": new_assessor_prompt
             }
 
         except Exception as e:
-            await log_stream.put(f"ERROR: [CRITIQUE UPDATE] Failed to update critique prompt: {e}")
+            await log_stream.put(f"ERROR: [ANNEALING] Failed to update dynamic prompts: {e}")
             await log_stream.put(traceback.format_exc())
             return {}
-
-    return update_critique_prompt_node
+    return update_personas_node
 
 
 
@@ -2792,10 +3141,14 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
 
         await log_stream.put("LOG: [HARVEST] Instantiating interrogator chain to generate expert questions...")
         interrogator_chain = get_interrogator_chain(llm)
+        user_questions = [ doc["content"] for doc in state["chat_history"] if doc["role"] == "user"]
+        
         try:
             questions_str = await interrogator_chain.ainvoke({
                 "original_request": state["original_request"],
-                "num_questions": num_questions
+                "num_questions": num_questions,
+                "further_questions": user_questions
+                
             })
             questions_data = clean_and_parse_json(questions_str)
             questions = questions_data.get("questions", [])
@@ -2812,6 +3165,8 @@ def create_final_harvest_node(llm, formatter_llm, num_questions):
         MAX_CONTEXT_CHARS = 250000
 
         generation_tasks = []
+
+
         for question in questions:
             async def generate_paper(q):
                 try:
@@ -2867,14 +3222,16 @@ async def build_and_run_graph(payload: dict = Body(...)):
         params = payload.get("params")
 
 
-        if params.get("debug_mode") == 'true':
-
-            await log_stream.put(f"--- Initializing Dedicated RAPTOR Summarizer LLM ---")
-            summarizer_llm = MockLLM() 
+        if params.get("coder_debug_mode") == 'true':
+            await log_stream.put(f"--- 💻 CODER DEBUG MODE ENABLED 💻 ---")
+            llm = CoderMockLLM()
+            summarizer_llm = CoderMockLLM()
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
-            await log_stream.put("--- 🚀 DEBUG MODE ENABLED 🚀 ---")
+        elif params.get("debug_mode") == 'true':
+            await log_stream.put(f"--- 🚀 DEBUG MODE ENABLED 🚀 ---")
             llm = MockLLM()
             summarizer_llm = MockLLM()
+            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
         else:
             
             summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0)
@@ -2894,7 +3251,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
     user_prompt = params.get("prompt")
     word_vector_size = int(params.get("vector_word_size"))
     cot_trace_depth = int(params.get('cot_trace_depth', 3))
-    num_questions = int(params.get('num_questions', 25))
+
+    code_detection_chain = get_code_detector_chain(llm)
+    is_code = code_detection_chain.ainvoke({"text": user_prompt})
 
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
@@ -2998,13 +3357,19 @@ async def build_and_run_graph(payload: dict = Body(...)):
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
         workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
-        workflow.add_node("update_rag_index", create_update_rag_index_node(summarizer_llm, embeddings_model))
+        update_rag_index_node_func = create_update_rag_index_node(summarizer_llm, embeddings_model)
+        workflow.add_node("update_rag_index", update_rag_index_node_func)
         workflow.add_node("metrics", create_metrics_node(llm))
-        workflow.add_node("update_critique_prompt", create_update_critique_prompt_node(llm, params))
+        workflow.add_node("update_personas", create_update_personas_node(llm, params))
         workflow.add_node("progress_assessor", create_progress_assessor_node(llm))
         workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("critique", create_critique_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
+        
+        async def final_rag_builder(state: GraphState):
+            return await update_rag_index_node_func(state, end_of_run=True)
+
+        workflow.add_node("build_final_rag_index", final_rag_builder)
 
 
         await log_stream.put("--- Connecting Graph Nodes ---")
@@ -3031,10 +3396,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
             workflow.add_edge(node, "synthesis")
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
+
         async def assess_progress_and_decide_path(state: GraphState):
             if state["epoch"] >= state["max_epochs"]:
                 await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
-                return "update_rag_index"
+                return "build_final_rag_index"
             
             if state.get("significant_progress_made"):
                 await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
@@ -3049,22 +3415,25 @@ async def build_and_run_graph(payload: dict = Body(...)):
             {
                 "reframe": "reframe_and_decompose",
                 "critique": "critique",
-                "update_rag_index": "update_rag_index"
+                "build_final_rag_index": "build_final_rag_index"
             }
         )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
         workflow.add_edge("synthesis", "archive_epoch_outputs")
         await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
+        
+        workflow.add_edge("archive_epoch_outputs", "update_rag_index")
+        await log_stream.put("CONNECT: archive_epoch_outputs -> update_rag_index")
+        
+        workflow.add_edge("update_rag_index", "metrics")
+        await log_stream.put("CONNECT: update_rag_index -> metrics")
 
-        workflow.add_edge("archive_epoch_outputs", "metrics")
-        await log_stream.put("CONNECT: archive_epoch_outputs -> metrics")
+        workflow.add_edge("metrics", "update_personas")
+        await log_stream.put("CONNECT: metrics -> update_personas")
         
-        workflow.add_edge("metrics", "update_critique_prompt")
-        await log_stream.put("CONNECT: metrics -> update_critique_prompt")
-        
-        workflow.add_edge("update_critique_prompt", "progress_assessor")
-        await log_stream.put("CONNECT: update_critique_prompt -> progress_assessor")
+        workflow.add_edge("update_personas", "progress_assessor")
+        await log_stream.put("CONNECT: update_personas -> progress_assessor")
 
         workflow.add_edge("critique", "update_prompts")
         await log_stream.put("CONNECT: critique -> update_prompts")
@@ -3075,17 +3444,22 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
 
-        workflow.add_edge("update_rag_index", END)
-        await log_stream.put("CONNECT: update_rag_index -> END")
+        workflow.add_edge("build_final_rag_index", END)
+        await log_stream.put("CONNECT: build_final_rag_index -> END")
         
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
         ascii_art = graph.get_graph().draw_ascii()
-        await log_stream.put(f"__start__{ascii_art}")
-
+        await log_stream.put(ascii_art)
+        
+        session_id = str(uuid.uuid4())
+        print(session_id)
         initial_state = {
+            "session_id": session_id,
+            "chat_history": [],
             "original_request": user_prompt,
+            "current_problem": user_prompt,
             "decomposed_problems": decomposed_problems_map,
             "layers": [], "critiques": {}, "epoch": 0,
             "max_epochs": int(params["num_epochs"]),
@@ -3097,44 +3471,50 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "all_rag_documents": [],
             "academic_papers": None,
             "critique_prompt": INITIAL_GLOBAL_CRITIQUE_PROMPT_TEMPLATE,
-            "individual_critique_prompt": INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE
+            "individual_critique_prompt": INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE,
+            "assessor_prompt": INITIAL_ASSESSOR_PROMPT_TEMPLATE,
+            "is_code_request": is_code,
+            "summarizer_llm": summarizer_llm,
+            "embeddings_model": embeddings_model
         }
-
+        initial_state["llm"] = llm # Store the llm instance for the chat
+        sessions[session_id] = initial_state
+        
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
-        final_aggregated_state = initial_state.copy()
-
+        
         async for output in graph.astream(initial_state, {'recursion_limit': int(params["num_epochs"]) * 1000}):
             for node_name, node_output in output.items():
                 await log_stream.put(f"--- Node Finished Processing: {node_name} ---")
                 if node_output is not None:
+                    current_session_state = sessions[session_id]
                     for key, value in node_output.items():
                         if key in ['agent_outputs', 'memory']:
-                            if key in final_aggregated_state and isinstance(final_aggregated_state[key], dict):
-                                final_aggregated_state[key].update(value)
+                            if key in current_session_state and isinstance(current_session_state[key], dict):
+                                current_session_state[key].update(value)
                             else:
-                                final_aggregated_state[key] = value
+                                current_session_state[key] = value
                         else:
-                            final_aggregated_state[key] = value
+                            current_session_state[key] = value
+                    sessions[session_id] = current_session_state
+                    final_state_value = current_session_state
         
-        final_state_value = final_aggregated_state
-        await log_stream.put("--- Agent Execution Finished. Pausing for User Chat. ---")
-        
-        session_id = str(uuid.uuid4())
 
-        active_sessions[session_id] = {
-            "state": final_state_value,
-            "chat_history": [],
-            "llm": llm,
-            "summarizer_llm": summarizer_llm,
-            "embeddings_model": embeddings_model,
-            "params": params
-        }
-        await log_stream.put(f"--- 🧠 RAG Index Ready. Chat is now active. Session ID: {session_id} ---")
+        if is_code:
 
-        return JSONResponse(content={
-            "message": "Chat is now active.",
-            "session_id": session_id
-        })
+            final_code_solution = final_state_value.get("final_solution", {})
+            await log_stream.put(f"--- 💻 Code Generation Finished. Returning final code. ---")
+            return JSONResponse(content={
+                "message": "Code generation complete.",
+                "code_solution": final_code_solution.get("proposed_solution", "# No code generated."),
+                "reasoning": final_code_solution.get("reasoning", "No reasoning provided.")
+            })
+        else:
+            await log_stream.put("--- Agent Execution Finished. Pausing for User Chat. ---")
+
+            return JSONResponse(content={
+                "message": "Chat is now active.",
+                "session_id": session_id
+            })
 
     except Exception as e:
         error_message = f"An error occurred during graph execution: {e}"
@@ -3145,23 +3525,26 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
 @app.post("/chat")
 async def chat_with_index(payload: dict = Body(...)):
-    session_id = payload.get("session_id")
     message = payload.get("message")
-    session = active_sessions.get(session_id)
+    session_id = payload.get("session_id") 
 
-    if not session:
+    print("Sesion keys: ", sessions.keys())
+    print("Session ID: ", session_id)
+ 
+    if not session_id or session_id not in list(sessions.keys()):
         return JSONResponse(content={"error": "Invalid session ID"}, status_code=404)
 
-    state = session["state"]
+    state = sessions[session_id]
+
     raptor_index = state.get("raptor_index")
-    llm = session["llm"]
+    llm = state["llm"]
 
     if not raptor_index:
         return JSONResponse(content={"error": "RAG index not found for this session"}, status_code=500)
 
     async def stream_response():
         try:
-            retrieved_docs = raptor_index.retrieve(message, k=10)
+            retrieved_docs = await asyncio.to_thread(raptor_index.retrieve, message, k=10)
             context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 
             chat_chain = get_rag_chat_chain(llm)
@@ -3171,28 +3554,82 @@ async def chat_with_index(payload: dict = Body(...)):
                 yield content
                 full_response += content
 
-            session["chat_history"].append({"role": "user", "content": message})
-            session["chat_history"].append({"role": "ai", "content": full_response})
-            active_sessions[session_id] = session
+            state["chat_history"].append({"role": "user", "content": message})
+            state["chat_history"].append({"role": "ai", "content": full_response})
 
         except Exception as e:
+
             print(f"Error during chat streaming: {e}")
             yield f"Error: Could not generate response. {e}"
 
     return StreamingResponse(stream_response(), media_type="text/event-stream")
 
+@app.post("/diagnostic_chat")
+async def diagnostic_chat_with_index(payload: dict = Body(...)):
+    message = payload.get("message")
+    session_id = payload.get("session_id")
+    message = payload.get("message")
+
+    print("Sesion keys: ", sessions.keys())
+    print("Session ID: ", session_id)
+
+    if not session_id or session_id not in list(sessions.keys()):
+        return JSONResponse(content={"error": "Invalid session ID"}, status_code=404)
+
+    print("Entering diagnostic_chat_with_index")
+
+    state = sessions[session_id]
+    raptor_index = state.get("raptor_index")
+
+    if not raptor_index:
+        async def stream_error():
+            yield "The RAG index for this session is not yet available. Please wait for the first epoch to complete."
+        return StreamingResponse(stream_error(), media_type="text/event-stream")
+        
+    async def stream_response():
+        try:
+            query = message.strip()[5:]
+            await log_stream.put(f"--- [DIAGNOSTIC] Raw RAG query received: '{query}' ---")
+                
+            retrieved_docs = await asyncio.to_thread(raptor_index.retrieve, query, k=10)
+                
+            if not retrieved_docs:
+                yield "No relevant documents found in the RAPTOR index for that query."
+                return
+
+            yield "--- Top Relevant Documents (Raw Retrieval) ---\n\n"
+            for i, doc in enumerate(retrieved_docs):
+                    content_preview = doc.page_content.replace('\n', ' ').strip()
+                    metadata_str = json.dumps(doc.metadata)
+                    response_chunk = (
+                        f"DOCUMENT #{i+1}\n"
+                        f"-----------------\n"
+                        f"METADATA: {metadata_str}\n"
+                        f"CONTENT: {content_preview}...\n\n"
+                    )
+                    yield response_chunk
+
+        except Exception as e:
+            print(f"Error during diagnostic chat streaming: {e}")
+            yield f"Error: Could not generate response. {e}"
+
+    return StreamingResponse(stream_response(), media_type="text/event-stream")
 
 @app.post("/harvest")
 async def harvest_session(payload: dict = Body(...)):
-    session_id = payload.get("session_id")
-    session = active_sessions.get(session_id)
+
+
+    if not payload.get("session_id") or payload.get("session_id") not in list(sessions.keys()):
+        return JSONResponse(content={"error": "Invalid request"}, status_code=404)
+
+    session =  sessions.get(payload.get("session_id"))
 
     if not session:
-        return JSONResponse(content={"error": "Invalid session ID"}, status_code=404)
+        return JSONResponse(content={"error": "Invalid request"}, status_code=404)
 
     try:
         await log_stream.put("--- [HARVEST] Initiating Final Harvest Process ---")
-        state = session["state"]
+        state = session 
         chat_history = session["chat_history"]
         llm = session["llm"]
         summarizer_llm = session["summarizer_llm"]
@@ -3212,7 +3649,7 @@ async def harvest_session(payload: dict = Body(...)):
             
             await log_stream.put("--- [RAG PASS] Re-building Final RAPTOR Index with Chat History ---")
             update_rag_node = create_update_rag_index_node(summarizer_llm, embeddings_model)
-            update_result = await update_rag_node(state)
+            update_result = await update_rag_node(state, end_of_run=True)
             state.update(update_result)
 
         num_questions = int(params.get('num_questions', 25))
@@ -3221,31 +3658,29 @@ async def harvest_session(payload: dict = Body(...)):
         state.update(final_harvest_result)
 
         academic_papers = state.get("academic_papers", {})
-        report_session_id = str(uuid.uuid4())
+        session_id = state.get("session_id", "")
+
         if academic_papers:
-            final_reports[report_session_id] = academic_papers
-            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created. Session ID: {report_session_id}")
+            final_reports[session_id] = academic_papers
+            await log_stream.put(f"SUCCESS: Final report with {len(academic_papers)} papers created.")
         else:
             await log_stream.put("WARNING: No academic papers were generated in the final harvest.")
 
-        del active_sessions[session_id]
 
         return JSONResponse(content={
             "message": "Harvest complete.",
-            "session_id": report_session_id if academic_papers else None
         })
 
     except Exception as e:
         error_message = f"An error occurred during harvest: {e}"
         await log_stream.put(error_message)
         await log_stream.put(traceback.format_exc())
-        if session_id in active_sessions:
-            del active_sessions[session_id]
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
 @app.get('/stream_log')
 async def stream_log(request: Request):
+
     async def event_generator():
         while True:
             if await request.is_disconnected():
@@ -3265,7 +3700,11 @@ async def stream_log(request: Request):
 
 @app.get("/download_report/{session_id}")
 async def download_report(session_id: str):
-    papers = final_reports.get(session_id)
+
+    print(final_reports.keys())
+    print(session_id)
+    papers = final_reports.get(session_id, {})
+
     if not papers:
         return JSONResponse(content={"error": "Report not found or expired."}, status_code=404)
 
