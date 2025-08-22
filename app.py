@@ -87,8 +87,6 @@ reactor_list = [
 
 class FunctionMapper:
 
-
-
     def table(self, formula: str):
 
         prompts = []
@@ -100,22 +98,27 @@ class FunctionMapper:
                 prompts.extend(self.table(part))
             return prompts
 
-        tokens = re.findall(r'\b(?:Se|Si|Ne|Ni|Te|Ti|Fe|Fi|ns|sn|tf|ft)\b|~|oo|->', formula, re.IGNORECASE)
-        
+        formula = formula.replace('(', '').replace(')', '')
+
+        tokens = re.findall(r'\b[A-Za-z]{2}\b|~|oo|->', formula, re.IGNORECASE)
+
         op_map = {'~': 'orbital', 'oo': 'cardinal', '->': 'fixed'}
         i = 0
         while i < len(tokens):
             token = tokens[i]
-            
+
+            # Check for a three-part formula (e.g., "func1 op func2").
             if i + 2 < len(tokens) and tokens[i+1] in op_map:
                 func1 = tokens[i]
                 op_symbol = tokens[i+1]
                 func2 = tokens[i+2]
                 op_name = op_map[op_symbol]
-                
+
+                # Construct the method names for the given formula.
                 method_name = f"{func1.lower()}_{func2.lower()}_{op_name}"
                 method_name_rev = f"{func2.lower()}_{func1.lower()}_{op_name}"
 
+                # Check if a specific method exists for the formula.
                 if hasattr(self, method_name):
                     prompts.append(getattr(self, method_name)())
                     i += 3
@@ -124,15 +127,19 @@ class FunctionMapper:
                     prompts.append(getattr(self, method_name_rev)())
                     i += 3
                     continue
+                else:
+
+                    identity = f"You are an intelligent agent. Your task is to process information based on the following functions: {func1.upper()} and {func2.upper()}."
+                    prompts.append((identity))
+                    i += 3
+                    continue
 
             if hasattr(self, token.lower()):
                 prompts.append(getattr(self, token.lower())())
-            
-            i += 1
-            
-        return prompts
 
-  
+            i += 1
+
+        return prompts
 
     def ni_se_fixed(self):
 
@@ -299,21 +306,9 @@ class FunctionMapper:
             You turn many sources of rational data into one impression that can give progress to your personal narrative.
 
         """
-        prompt = """
-            Rational data:
-
-                {rational_data}
-
-
-            Narratives:
-
-                {narratives}
-
-
-            Answer:
-        """
+    
         
-        return identity, prompt
+        return identity
     
 
     def ni_ti_orbital(self):
@@ -325,21 +320,8 @@ class FunctionMapper:
 
         """
 
-        prompt = """
-            Logical data:
+        return identity
 
-                {logical_data}
-            
-
-            Narratives: 
-
-                {narratives}
-
-
-            Answer:
-        """ 
-
-        return identity, prompt
 
 
     def se_ti_orbital(self):
@@ -349,22 +331,8 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take many inmediate actions on the basis of logical statements and whats inmediately verifiable to be true in the environment data. You are not a planner so you always take present action in relation to what will inmediately demonstrate a capacity to behave with common sense in the current situation. Your aim is to be regarded as a quick thinker, a fighter and a quick problem solver who wants to know if the things present are real or not. 
         """
 
-        prompt = """
-
-            Logical data:
-
-                {logical_data}
-
-
-            Environment data:
-
-                {environment_data}
-            
-            Answer:
-        """
-
-
-        return identity, prompt
+   
+        return identity
 
 
     def se_te_orbital(self):
@@ -375,21 +343,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take many inmediate actions on the basis of rational data and quantitative thinking. You are not a planner, so you always take present action in relation to what will inmediately improve your reputation. Your aim is to be regarded as someone who can do anything to achieve success.
         """
 
-        prompt = """
-        
-
-            Rational data:
-
-                {rational_data} 
-
-           Environment data:
-
-                {environment_data}             
-
-            Answer:
-        """
-
-        return identity, prompt
+        return identity
     
 
     def se_fi_orbital(self):
@@ -401,21 +355,7 @@ class FunctionMapper:
 
         """
 
-        prompt = """
-            Data you find important: 
-
-                {important_data}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
     
     def se_fe_orbital(self):
 
@@ -426,22 +366,7 @@ class FunctionMapper:
 
         """
 
-
-        prompt = """
-            Data other people find important:
-
-                {important_data}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def si_ne_fixed(self):
@@ -452,23 +377,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to accumulate rich experiences you can later reflect upon. You always take present action by associating  present data with past memory and replicating what you have experienced in the past.
         """
 
-        prompt = """
-            Environment data:
-
-                {environment_data}
-            
-
-            Memories:
-
-                {memories}
-
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
     
 
     def ne_si_fixed(self):
@@ -480,22 +389,8 @@ class FunctionMapper:
 
         """
 
-        prompt = """
 
-            Environment data:
-
-                {environment_data}
-
-
-            Memories:
-
-                {memories}
-
-
-            Answer:
-        """
-
-        return identity, prompt
+        return identity
         
     
     def si_ti_orbital(self):
@@ -506,22 +401,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to review past memories and produce logical statements out of these experiences on the basis of what you already know to be true. You always take present action by remembering and logically ordering what you have seen in the past. Your aim is to be regarded as someone whos reliable, stable, steady and aware of old and common sense truths.
         """
 
-        prompt = """
-            Memories:
-
-               {memorized_data}
-
-
-            Logical data:
-
-                {logical_data}
- 
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def si_te_orbital(self):
@@ -533,22 +413,7 @@ class FunctionMapper:
 
         """
 
-        prompt = """
-            Rational data:
-
-                {rational_data}
-
-
-            Memories:
-
-                {memories}
-
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
     
 
     def si_fi_orbital(self):
@@ -559,23 +424,8 @@ class FunctionMapper:
            You are an intelligent agent. Your task is to review past memories data and produce value and importance judgements out of these data, on the basis of importance. You always take present action by doing an importance analysis of what you have seen in the past. Your aim is to order what you personally find to be important and be regarded as someone whos very aware of tradition and their own moral compass.
         """
 
-        prompt = """
-
-            Memories:
-
-                {memorized_data}
-
-
-            Data you find important:
-
-                {important_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+      
+        return identity
 
 
     def si_fe_orbital(self):
@@ -584,23 +434,7 @@ class FunctionMapper:
         identity = """
             You are an intelligent agent. Your task is to review past memories and produce many judgements of these data on the basis of what other people find to be important. You always take present action by remembeing past experience and assesing what other people find important. Your aim is to be regarded as someone who mantains social stability and defends the interests of others. 
         """
-
-        prompt = """
-            Memories:
-
-                {memories}
-
-
-            Things other people find important:
-
-                {important_things}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def ne_ti_orbital(self):
@@ -610,21 +444,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many logical statements of these data. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a quick thinker and someone whos inventive.
         
         """
-        prompt = """
-         
-            Logical data:
-
-                {logical_data}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
     
 
     def ne_fi_orbital(self):
@@ -634,22 +454,8 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many importance judgements of these on the basis of personal preference and sense of personal importance. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a person who can advise and imaginate whats necessary for success. 
         """
 
-        prompt = """
- 
-            
-            Data you find important:
 
-                {important_data}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
     def ne_te_orbital(self):
 
@@ -658,21 +464,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to extrapolate present data with past memories and produce many rational judgements of these on the basis of quantitative thinking and rationality. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded as a person who easily advises whats necessary for success.
         """
 
-        prompt = """  
-
-            Rational data:
-
-                {rational_data}
-
-            Environment data:    
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
     
 
     def ne_fe_orbital(self):
@@ -682,24 +474,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to extrapolate present data and produce many judgements of these data on the basis of what other people find important. You always take present action by extrapolating past memories with new hypothetical situations, and judging how these new hyphoteticals fit with what you are currently experiencing. Your aim is to be regarded highly as an imaginative person who can easily picture what other people want and advise them on the basis of this.
         """
 
-
-        prompt = """ 
-
-            Things other people find important:
-
-                {important_things}
-
-            
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
     
     def fi_te_fixed(self):
@@ -708,62 +483,23 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take inmediate action on the basis of what you find important ordering rational data into one compressed moral statement. Your aim is to be regarded as a reputable and important person.
         """
 
-        prompt = """
-            Things you find important:
-
-                {important_things}
-            
-            Rational data:
-
-                {rational_data}
-
-            Answer:
-        """
-
-
-        return identity, prompt
+        return identity
 
     def te_fi_fixed(self):
 
         identity =  """
             You are an intelligent agent. Your task is to take action on the basis of whats rational and logically verfiable by many sources. Your aim is to improve your own sense of esteem by measure of what you believe to be important.
         """
-        prompt = """
-            Rational data:
-
-                {rational_data}
 
 
-            Things you find important:
-
-                {important_things}
-
-            Answer:
-        """
-        
-
-        return identity, prompt
+        return identity
     
     def fi_fe_cardinal(self):
 
         idenityty =  """
             You are an intelligent agent. Your task is to take inmediate action on the basis of changing the beliefs of other people about you. Your aim is to do things that improve your own esteem and change one perceived value about yourself.
         """
-        prompt = """
-            Things you personally find important:
-
-                {important_things}
-            
-
-            Things other people find important:
-
-                {external_important_things}
-
-            Answer:
-
-        """
-
-        return idenityty, prompt
+        return idenityty
     
 
     def fe_fi_cardinal(self):
@@ -773,23 +509,9 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to communicate on the basis of changing your own beliefs about yourself. Your aim is to do things that make other people regard you higher. You produce many statements about things other people find important.
         """
 
-        prompt = """
+      
 
-
-            Things you personally find important:
-
-                {important_things}
-            
-
-            Things other people find important:
-
-                {external_important_things}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
 
     def ti_fe_fixed(self):
@@ -798,22 +520,7 @@ class FunctionMapper:
 
             You are an intelliget agent. Your task is to take inmediate action on the basis of what you find logical and verified to be true. Your aim is to do things that make other people regard you higher by the measure of your soundness and thinking and how your talent as a thinker make others feel better.
         """
-        prompt =  """
-
-
-            Things you know to be true:
-
-                {logical_data}
-
-            Things other people find important:
-
-                {external_important_things}
-
-            Answer:
-
-        """ 
-
-        return identity, prompt
+        return identity
 
 
     def fe_ti_fixed(self):
@@ -823,23 +530,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to communicate many statements on the basis of what other people find important. Your aim is to do things that make other people regard you higher by the way in which you logicallly make compromises that make everyone happy and show your ability to think logically.  
         """
 
-        prompt =  """
-
-
-            Things other people find important:
-
-                {external_important_things}
-
-            Things you know to be true:
-
-                {logical_data}
-
-            Answer:
-
-        """ 
-
-
-        return identity, prompt
+        return identity
     
     def fi_se_orbital(self):
 
@@ -847,21 +538,7 @@ class FunctionMapper:
 
             You are an intelligent agent. Your task is to take inmediate action on the basis of what you personally find important. You analyze data from the present environment and take decisions on the basis of what is important to you. Your aim is to  be regarded as a capable performer, always ready to improvise and take the stage.
         """ 
-        prompt = """
-            Things you find important:
-            
-
-                {important_things}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
 
     def fi_ne_orbital(self):
@@ -870,21 +547,7 @@ class FunctionMapper:
 
             You are an intelligent agent. Your task is to take inmediate action on the basis of what you personally find important. You analyze current data, and yuxtapose it with past memories to extrapolate hypotheticals of what could happen. Your aim is to judge this hypotheticals on the basis of whats important to you and be regarded as a rich fantasist.
         """
-
-        prompt = """
-            Things you find important:
-
-                {important_things}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-        """
-        
-
-        return identity, prompt
+        return identity
 
 
     def fi_si_orbital(self):
@@ -893,21 +556,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to judge past memories on the basis of what you personally find important. You analyze your past memories and order them on the basis of what is important to you. Your aim is to be regarded as a person with deeply seated moral values.
         """
 
-        prompt = """
-
-            Things you find important:
-
-                {important_things}
-
-            Memories:
-
-                {memories}
-
-            Answer:
-        """
-
-
-        return identity, prompt
+        return identity
 
     def fi_ni_orbital(self):
 
@@ -916,20 +565,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to order by importance your personal narratives, suspicions and intentions on the basis of what you personally find important. You analyze your intuitions and intentions and order them on the basis of what is important to you. Your aim is to be regarded as a person with a rich imagination.
         """
 
-        prompt = """
-
-            Things you find important:
-
-                {important_things}
-
-            Narratives:
-
-                {narratives}
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def te_ni_orbital(self):
@@ -939,21 +575,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to analyze rational data and make many plans and strategic narratives on the basis of what many sources have verified to be true. You always act by communicating your plans and justifying them with rational data. Your aim is to be regarded a capable leader whos able to command and manage resources into future sucess.
 
         """
-    
-        prompt = """
-            Narratives:
-
-                {narratives}
-
-            Rational data:
-
-                {rational_data}
-
-            Answer:
-        """
-
-
-        return identity, prompt
+        return identity
 
     
     def te_ne_orbital(self):
@@ -963,21 +585,8 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to gather and produce rational data and yuxtapose it with present experience extrapolating hypotheticals on what could happen next. You state many hypotheticals on the basis of rationality, You always take present action by communicating directives on the basis of what could happen next. Your aim is to be regarded as a reputable preparationist whos prepared for any contigency before it happens.
         """
 
-        prompt = """
-            Environment data:
 
-                {environment_data}
-                        
-
-            Rational data:
-
-                {rational_data}
-      
-            Answer:
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def te_se_orbital(self):
@@ -987,21 +596,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to gather and produce rational data and use it to judge present experience. You always take present action by communicating many directives of whats rational and whats not. Your aim is to be regarded as an individual who can make order and decisions out of any chaotic situation.
 
         """
-
-        prompt ="""
-            Environment data:
-
-                {environment_data}
-
-            Rational data:
-
-                {rational_data}
-
-            Answer:
-        """
-        
-
-        return identity, prompt
+        return identity
 
 
     def te_si_orbital(self):
@@ -1010,22 +605,7 @@ class FunctionMapper:
 
             You are an intelligent agent. Your task is to gather and produce rational data and use it to judge past memories. You always take present action by communicating many directives of whats rational and wahts not in relation of past memories. Your aim is to be regarded as a reputable individual well prepared for all past challenges.
         """
-
-        prompt = """
-
-            Memories:
-
-                {memories}
-
-            Rational data:
-
-                {rational_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
 
     def fe_se_orbital(self):
@@ -1035,23 +615,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge present experience. You always take present action by communicating directives of whats important to everyone in the present situation and what not. Your task is to be an individual always regarded highly as a protagonist in the present situation.
         """
 
-
-        prompt = """
-
-            Environment data:
-
-                {environment_data}
-
-            Data other people find important:
-
-                {important_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def fe_ni_orbital(self):
@@ -1062,22 +626,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge what you think will likely happen. You always take action by ordering suspicions, narratives and communicating directives on the basis of what other people find important and what you supect will happen later on. Your aim is to be a visionary leader on matters of social importance.
         """
 
-        prompt = """    
-
-            Narratives:
-
-                {narratives}
-
-            Data other people find important:
-
-                {important_data}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
     def fe_si_orbital(self):
 
@@ -1088,22 +637,8 @@ class FunctionMapper:
 
         """
 
-        prompt =  """
 
-            Memories:
-
-                {memories}
-
-            Data other people find important:
-
-                {important_data}
-
-            Answer:
-         
-        """
-
-
-        return identity, prompt
+        return identity
         
 
 
@@ -1115,23 +650,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to gather and produce many statements of what other people find important and use it to judge hypotheticals. You always take action by yuxtaposing previous experience with present experience hypothetizing likely scenarios, and communicating directives on the basis of what other people find important and what you perceive could likely happen. Your aim is to be an individual who knows what other people want before they know it.
         """
 
-
-        prompt = """
-
-            Environment data:
-
-                {environment_data}
- 
-
-            Data other people find important:
-
-                {important_data}    
-
-            Answer: 
-        """
-
-
-        return identity, prompt
+        return identity
 
     
     def ti_si_fixed(self):
@@ -1141,23 +660,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to logically assess data and produce logical statements of your past memories. You always take present action by logically ordering and judging past memories. Your aim is to be regarded as an accurate logician.
         """
 
-        prompt = """
-
-            Memories:
-
-                {memories}
-            
-            
-            Logical statements:
-
-                {logical_statements}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def ti_se_fixed(self):
@@ -1168,20 +671,9 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to analyze data from the environment and order it on the basis of what you know to be true. You always take present action by judging wether or not the present data is true or not. Your aim is to be regarded as a quick thinker who wants to figure out wether things can be done in the inmediate present or not.
 
         """ 
-        prompt = """
-            Environment data:
+      
 
-                {environment_data}
-            
-            Logical statements:
-
-                {logical_statements}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
     
     def ti_ni_fixed(self):
 
@@ -1191,22 +683,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to analyze your impressions, suspicions and narratives and order them on the basis of what you know to be true. You always take present action by judging wether or not your intuitions are true or not. Your aim is to be regarded as someone who can make sound tactical plans out of problems in the present situation. You turn entitiy definitions into inmediate plans you are going to execute.
         """
 
-        prompt = """
-
-            Narratives:
-
-                {narratives}
-            
-            Logical statements:
-
-                {logical_statements}
-
-            Answer:
-
-
-        """
-
-        return identity, prompt
+        return identity
     
 
     def ti_ne_fixed(self):
@@ -1217,21 +694,8 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to yuxtapoose present data with past data, make hypothetical scenarios and analyze these hypotheticals ordering them on the basis of what you know to be true. You always take present action by judging wether or not the hypothetical data is true or not. Your aim is to be regarded as someone with a sound scientific mindset.
         """
 
-        prompt = """
-     
-            Logical statements:
 
-                {logical_statements}
-
-            Environment data:
-
-                {environment_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
     
     def ti(self):
 
@@ -1241,32 +705,15 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to make logical conclusions.
         """
 
-        prompt = """
-            Logical statements:
 
-                {logical_statements}
-
-            Answer:
-
-        """ 
-
-        return identity, prompt
+        return identity
 
 
     def te(self):
 
         identity = """ You are an intelligent agent. Your task is to make rational many decisions based on previous rational statements and current data. Your task is to express organizational directives backed by rational data. """
 
-        prompt = """
-            Current rational data:
-
-                {rational_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
                  
     def fi(self):
@@ -1276,17 +723,7 @@ class FunctionMapper:
 
             You are an intelligent agent. Your task is to make an important decision on the basis of what you think is important. You categorize information on the basis of it being important to you or not. 
         """
-        prompt = """
-
-            Thins you find important:
-
-                {important_data}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
 
     def fe(self):
@@ -1296,15 +733,9 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to make many decisions and express them, on the basis of what everyone think is important. You lead peoples opinion.
 
         """
-        prompt = """
-            Things you find important:
 
-                {important_data}    
 
-            Answer:
-        """
-
-        return identity, prompt
+        return identity
     
 
     def se(self):
@@ -1315,16 +746,9 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take many inmediateactions on the basis on what you can observe from the inmediate environment.  Your goal is to make fast and inmediate change.
         """
 
-        prompt = """
-            Environment data:
 
-                {environment_data}
 
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
  
 
@@ -1338,17 +762,7 @@ class FunctionMapper:
 
         """
 
-        prompt = """ 
-            Previous narratives:
-
-                {narratives}
-
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
     
     def ns(self):
@@ -1359,22 +773,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take action preparing for the future when data points at everyone reacting to the present. If everyone is already preparing for the future you act preparing for the future but reminding everyone that the future is important.
         """
 
-        prompt = """
-
-            Data about the future:
-
-                {data_about_the_future}
-
-            Data about the present:
-
-                {data_about_the_present}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def sn(self):
@@ -1385,22 +784,10 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take action acting on the present when data points at things being too concerned to the future. If everyone is already acting on the present you act on the present but reminding everyone that the present is important.
         """
 
-        prompt = """
-
-            Data about the future:
-
-                {data_about_the_future}
-
-            Data about the present:
-
-                {data_about_the_present}
-
-            Answer:
-
-        """
+    
 
 
-        return identity, prompt
+        return identity
 
 
     def tf(self):
@@ -1410,24 +797,7 @@ class FunctionMapper:
             You are an intelligent agent. Your task is to take decisions logically when everyone is currently thinking emotionally. If everyone is thinking logically already you take logical decisions reminding everyone that emotions are important.
         """
 
-
-        prompt = """
-
-            Logical statements:
-
-                {logical_statements}
-
-
-            Emotional statements:
-
-                {emotional_statements}
-
-            Answer:
-
-        """
-
-
-        return identity, prompt
+        return identity
 
 
     def ft(self):
@@ -1437,22 +807,7 @@ class FunctionMapper:
 
         """
 
-        prompt = """
-
-            Emotional statements: 
-
-                {emotional_statements}
-
-
-            Logical statements:
-
-                {logical_statements}
-
-            Answer:
-
-        """
-
-        return identity, prompt
+        return identity
 
 
 
@@ -1676,13 +1031,42 @@ if __name__ == "__main__":
 
             return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
 
-        elif "you are a master prompt engineer" in prompt:
+        elif '<system-role>' in prompt:
             return f"""You are a CTO providing a technical design review...
 Original Request: {{original_request}}
 Proposed Final Solution:
 {{proposed_solution}}
 
 Generate your code-focused critique for the team:"""
+
+        elif '<sys-role>' in prompt:
+
+            return f"""
+                                           
+        #Identity
+
+            Name: Lazy Manager
+            Career: Accounting
+            Qualities: Quantitaive, Aloof, Apathetic
+
+        #Mission
+
+            You are providing individual, targeted feedback to a team of agents.
+
+             You must determine if the team output was helpful, misguided, or irrelevant considering the request that was given. The goal is to provide a constructive, direct critique that helps this specific agent refine its approach for the next epoch.
+
+            Focus on the discrepancy or alignment between the teams reasoning for its problem and determine if the team is on the right track on criteria: novelty, exploration, coherence and completeness.
+
+            Conclude your entire analysis with a single, sharp, and deep reflective question that attempts to shock the team and steer them into a fundamental change in their process.
+        
+
+        #Input Format
+
+            Original Request (for context): {{original_request}}
+            Final Synthesized Solution from the Team:{{proposed_solution}} 
+
+            """  
+
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past commits, focusing on key refactors and feature implementations."
         elif "analyze the following text for its perplexity" in prompt:
@@ -1747,6 +1131,70 @@ def get_user(user_id: int):
 
 **4. Conclusion:** This design provides a scalable and maintainable foundation for the service. The implementation details demonstrate the final step of the development process.
 """
+        elif "<updater_instructions>" in prompt:
+            return f"""
+
+                You are a cynical lazy manager.
+
+                 Agent's Assigned Sub-Problem: {{{{sub_problem}}}}
+            Original Request (for context): {{{{original_request}}}}
+            Final Synthesized Solution from the Team:
+            {{{{final_synthesized_solution}}}}
+            ---
+            This Specific Agent's Output (Agent {{{{agent_id}}}}):
+            {{{{agent_output}}}}
+
+            """
+        elif  "<updater_assessor_instructions>" in prompt:
+
+            return """
+                                          
+        #Persona
+
+            Name: Pepon
+            Career: Managment
+            Attributes: Strategic CEO
+
+
+         #Mission
+            Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:
+
+            - **Novelty**: Does the solution offer a new perspective or a non-obvious approach?
+            - **Coherence**: Is the reasoning sound, logical, and well-structured?
+            - **Quality**: Is the solution detailed, actionable, and does it demonstrate a deep understanding of the problem's nuances?
+            - **Forward Momentum**: Does the solution not just solve the immediate problem, but also open up new, more advanced questions or avenues of exploration?
+
+        #Input format
+
+            You will be provided with the following inputs for your analysis:
+
+            Original Problem:
+            ---
+            {{{{original_request}}}}
+            ---
+
+            Synthesized Solution from Agent Team:
+            ---
+            {{{{proposed_solution}}}}
+            ---
+
+            Execution Context:
+            ---
+            {{{{execution_context}}}}
+            ---
+
+        #Output Specification
+
+            Based on your philosophical framework, analyze the provided materials. Your entire output MUST be a single, valid JSON object with exactly two keys:
+            - `"reasoning"`: A brief, concise explanation for your decision, directly referencing the criteria for significant progress.
+            - `"significant_progress"`: A boolean value (`true` or `false`).
+
+            Now, provide your assessment in the required JSON format:
+
+
+            """
+
+
         else:
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to a coder agent.",
@@ -1787,12 +1235,25 @@ class MockLLM(Runnable):
 
         elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
 
-            pick = random.randint(0,1)
-            if pick == 0:
-                return "yes"
-
-            else:
                 return "no"
+
+
+        elif "<updater_instructions>" in prompt:
+
+            return f"""
+
+                You are a cynical lazy manager.
+
+                 Agent's Assigned Sub-Problem: {{{{sub_problem}}}}
+            Original Request (for context): {{{{original_request}}}}
+            Final Synthesized Solution from the Team:
+            {{{{final_synthesized_solution}}}}
+            ---
+            This Specific Agent's Output (Agent {{{{agent_id}}}}):
+            {{{{agent_output}}}}
+
+            """
+
 
         elif "create the system prompt of an agent" in prompt:
             return f"""
@@ -1838,20 +1299,6 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
                 return "This is an mock critique, reflecting the Earth element. The solution is impractical and not well-structured."
             else:
                 return "This is a constructive mock critique. The solution could be more detailed and less numeric."
-        elif "you are a master prompt engineer" in prompt:
-            persona_placeholder = "[A new persona based on the reactor would be described here.]"
-            if "individual" in prompt:
-                 return f"""{persona_placeholder}\nYou are a senior emeritus manager providing targeted feedback...
-Agent's Assigned Sub-Problem: {{sub_problem}}
-...
-Generate your targeted critique for this specific agent:"""
-            else:
-                return f"""{persona_placeholder}\nYou are a senior emeritus manager...
-Original Request: {{original_request}}
-Proposed Final Solution:
-{{proposed_solution}}
-
-Generate your global critique for the team:"""
         elif "you are a memory summarization agent" in prompt:
             return "This is a mock summary of the agent's past actions, focusing on key learnings and strategic shifts."
         elif "analyze the following text for its perplexity" in prompt:
@@ -1883,6 +1330,54 @@ Generate your global critique for the team:"""
             return "This is a mock summary of a cluster of documents, generated in debug mode for the RAPTOR index."
         elif "you are an expert computational astrologer" in prompt:
             return random.choice(reactor_list)
+        elif  "<updater_assessor_instructions>" in prompt:
+
+            return """
+                                          
+        #Persona
+
+            Name: Pepon
+            Career: Managment
+            Attributes: Strategic CEO
+
+
+         #Mission
+            Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:
+
+            - **Novelty**: Does the solution offer a new perspective or a non-obvious approach?
+            - **Coherence**: Is the reasoning sound, logical, and well-structured?
+            - **Quality**: Is the solution detailed, actionable, and does it demonstrate a deep understanding of the problem's nuances?
+            - **Forward Momentum**: Does the solution not just solve the immediate problem, but also open up new, more advanced questions or avenues of exploration?
+
+        #Input format
+
+            You will be provided with the following inputs for your analysis:
+
+            Original Problem:
+            ---
+            {{{{original_request}}}}
+            ---
+
+            Synthesized Solution from Agent Team:
+            ---
+            {{{{proposed_solution}}}}
+            ---
+
+            Execution Context:
+            ---
+            {{{{execution_context}}}}
+            ---
+
+        #Output Specification
+
+            Based on your philosophical framework, analyze the provided materials. Your entire output MUST be a single, valid JSON object with exactly two keys:
+            - `"reasoning"`: A brief, concise explanation for your decision, directly referencing the criteria for significant progress.
+            - `"significant_progress"`: A boolean value (`true` or `false`).
+
+            Now, provide your assessment in the required JSON format:
+
+
+            """
         elif "you are an expert interrogator" in prompt:
             return """
 # Mock Academic Paper
@@ -1903,6 +1398,82 @@ The provided context, consisting of various agent solutions and reasoning, has b
 
 **Conclusion:** This paper successfully formatted the retrieved RAG data into an academic structure. The process demonstrates the final step of the knowledge harvesting pipeline.
 """
+        elif "you are a master prompt engineer" in prompt or '<system-role>' in prompt:
+             
+            return f"""You are a CTO providing a technical design review...
+Original Request: {{original_request}}
+Proposed Final Solution:
+{{proposed_solution}}
+
+Generate your code-focused critique for the team:"""
+
+
+        elif  """<prompt_template>
+    <updater_instructions>
+        <instruction>
+
+            You are a system prompt updater agent. Your task is to build a new system prompt for an agent that criticies other agents, based on the provided persona prompts.
+
+        </instruction>
+        <instruction>
+            You will receive a set of prompts defining a new persona.
+        </instruction>
+        <instruction>
+            You MUST integrate the provided persona prompts, including its career and qualities, into the `<persona>` tag, replacing any existing content within that tag.
+        </instruction>
+        <instruction>
+            Do NOT alter the `<mission>` or `<input_format>` sections. The core mission and the input structure must remain unchanged.
+        </instruction>
+    </updater_instructions>
+    <persona-prompts>
+            {reactor_prompts}
+    </persona-prompts>
+
+
+    <system_prompt>
+        <mission>
+            You are providing individual, targeted feedback to an agent that is part of a larger team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+
+            Your critique must be laser-focused on the individual agent. You must determine if its output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive, direct critique that helps this specific agent refine its approach for the next epoch.
+
+            Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning.
+
+            Conclude your entire analysis with a single, sharp, and deep reflective question that attempts to shock the agent and steer it into a fundamental change in its process.
+        </mission>
+
+        <input_format>
+            Agent's Assigned Sub-Problem: {{{{sub_problem}}}}
+            Original Request (for context): {{{{original_request}}}}
+            Final Synthesized Solution from the Team:
+            {{{{final_synthesized_solution}}}}
+            ---
+            This Specific Agent's Output (Agent {{{{agent_id}}}}):
+            {{{{agent_output}}}}
+            ---
+        </input_format>
+
+        Generate your targeted critique for this specific agent:
+    </system_prompt>
+</prompt_template>""" in prompt:
+            return f"""
+
+                You are a cynical lazy manager.
+
+                 Agent's Assigned Sub-Problem: {{{{sub_problem}}}}
+            Original Request (for context): {{{{original_request}}}}
+            Final Synthesized Solution from the Team:
+            {{{{final_synthesized_solution}}}}
+            ---
+            This Specific Agent's Output (Agent {{{{agent_id}}}}):
+            {{{{agent_output}}}}
+
+            """
+
+        elif """Analyze the following text. Your task is to determine if the text contains a 
+Answer with a single word: "true" if it contains code, and "false" otherwise.""" in prompt:
+ 
+            return "false"
+        
         else:
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to an agent.",
@@ -2100,7 +1671,7 @@ This table maps reactor formulas to their astrological and elemental archetypes.
 | :--------------------- | :-------------------------------------- | :-------------------------------------------- |
 | Aries-Pisces           | abundant_fire_and_some_water            | `( Se ~ Fi )`                                     |
 | Aries-Aries            | abundant_fire                           | `Se`                                          |
-| Aries-Taurus           | abundant_fire_and_some_earth            | `( Se ~ Fi ) oo Si`                             |
+| Aries-Taurus           | abundant_fire_and_some_earth            | `(( Se ~ Fi ) oo Si)`                             |
 | Taurus-Aries           | abundant_earth_and_some_fire            | `((Si ~ Fe) oo Se)`                           |
 | Taurus-Taurus          | abundant_earth                          | `((Si oo Se) -> Ne )`                          |
 | Taurus-Gemini          | abundant_earth_and_some_air             | `Ne -> (Si ~ Fe)`                             |
@@ -2108,7 +1679,7 @@ This table maps reactor formulas to their astrological and elemental archetypes.
 | Gemini-Gemini          | abundant_air                            | `( Ne ~ Fe )`                                   |
 | Gemini-Cancer          | abundant_air_and_some_water             | `( (Ne -> Si) ~ Ti | Se ~ Fi)`                |
 | Cancer-Gemini          | abundant_water_and_some_air             | `( Ne ~ Fi | Se ~ Ti)`                         |
-| Cancer-Cancer          | abundant_water                          | `~ (Fe oo Fi)`                                |
+| Cancer-Cancer          | abundant_water                          | `(Fe oo Fi)`                                |
 | Cancer-Leo             | abundant_water_and_some_fire            | `(Fi oo Fe) ~ Si`                             |
 | Leo-Cancer             | abundant_fire_and_some_water            | `(Fi -> Te) ~ (Si oo Se)`                     |
 | Leo-Leo                | abundant_fire                           | `( Te ~ Ni )`                                     |
@@ -2117,7 +1688,7 @@ This table maps reactor formulas to their astrological and elemental archetypes.
 | Virgo-Virgo            | abundant_earth                          | `Si ~ ( Te oo Ti )`                             |
 | Virgo-Libra            | abundant_earth_and_some_air             | `Si ~ (Fe oo Fi)`                             |
 | Libra-Virgo            | abundant_air_and_some_earth             | `(Fe ~ Si | Te ~ Ni )`                         |
-| Libra-Libra            | abundant_air                            | `(Fi oo Fe) ~`                                |
+| Libra-Libra            | abundant_air                            | `(Fi oo Fe)`                                |
 | Libra-Scorpio          | abundant_air_and_some_water             | `( Fe oo Fi ) ~ Ni`                             |
 | Scorpio-Libra          | abundant_water_and_some_air             | `(Se -> Ni) ~ (Fe oo Fi)`                     |
 | Scorpio-Scorpio        | abundant_water                          | `(Ni -> Se) ~ Te`                             |
@@ -2126,7 +1697,7 @@ This table maps reactor formulas to their astrological and elemental archetypes.
 | Sagittarius-Sagittarius| abundant_fire                           | `( Se ~ Te | Ne ~ Fe )`                         |
 | Sagittarius-Capricorn  | abundant_fire_and_some_earth            | `Ni ~ (Ti -> Fe)`                             |
 | Capricorn-Sagittarius  | abundant_earth_and_some_fire            | `( Ne ~ Ti | Se ~ Fi)`                         |
-| Capricorn-Capricorn    | abundant_earth                          | `(Te oo Ti) ~`                                |
+| Capricorn-Capricorn    | abundant_earth                          | `(Te oo Ti) ~Ni`                                |
 | Capricorn-Aquarius     | abundant_earth_and_some_air             | `(Ti oo Te) ~ Ni`                             |
 | Aquarius-Capricorn     | abundant_air_and_some_earth             | `(Fi -> (Te oo Ti))`                          |
 | Aquarius-Aquarius      | abundant_air                            | `(Fe -> Ti) ~ Ne`                             |
@@ -2152,39 +1723,77 @@ This table maps reactor formulas to their astrological and elemental archetypes.
 ---
 
 # Final Output
-You MUST output ONLY the selected reactor formula as a string, with no explanation or preamble.
+You MUST output ONLY the selected reactor algebraic expression as a string, with no explanation or preamble.
 
-Selected Reactor:
+Selected Algebraic Expression:
 """)
     return prompt | llm | StrOutputParser()
 
 def get_critique_prompt_updater_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent.
-You must preserve the core mission of the agent, which is to:
-1. Assess the quality of the final, synthesized solution in relation to the original request.
-2. Brainstorm all possible ways in which the solution is incoherent.
-3. Conclude with a deep reflective question that attempts to shock the agents and steer it into change.
+    <prompt>
+    <sys-role>
+        You are a master prompt engineer.
+    </sys-role>
+    <task>
+        Your task is to modify a system prompt for a critique agent.
+        <preserve>
+            You must preserve the core mission of the agent, which is to:
+            <mission>
+                1. Assess the quality of the final, synthesized solution in relation to the original request.
+                2. Brainstorm all possible ways in which the solution is incoherent.
+                3. Conclude with a deep reflective question that attempts to shock the agents and steer it into change.
+            </mission>
+        </preserve>
+        <integrate>
+            You will be given a new persona, defined by a set of persona_seeds. You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact.
+            The new prompt should still ask for "Original Request" and "Proposed Final Solution" as inputs. Only answer with the edited system prompt.
+        </integrate>
+    </task>
+    <persona_seeds>
+        <title>New Persona Prompts (Identities & Prompts):</title>
+        ---
+        {{reactor_prompts}}
+        ---
+    </persona_seeds>
 
-You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt should still ask for "Original Request" and "Proposed Final Solution" as inputs.
+    <system_prompt>
 
-**New Persona Prompts (Identities & Prompts):**
----
-{reactor_prompts}
----
+                                              
+        #Identity
 
-**Original Core Mission Text (for reference):**
-"You are a senior emeritus manager with a vast ammount of knowledge, wisdom and experience in a team of agents tasked with solving the most challenging problems in the wolrd. Your role is to assess the quality of the final, synthesized solution in relation to the original request and brainstorm all the posbile ways in which the solution is incoherent.
-This critique will be delivered to the agents who directly contributed to the final result (the penultimate layer), so it should be impactful and holistic.
-Based on your assessment, you will list the posible ways the solution could go wrong, and at the end you will close with a deep reflective question that attempts to schock the agents and steer it into change. 
-Original Request: {{original_request}}
-Proposed Final Solution:
-{{proposed_solution}}
+            Name: {{name}}
+            Career: {{career}}
+            Qulities: {{qualities}}
 
-Generate your global critique for the team:"
----
+        #Mission
 
-Generate the new, complete system prompt for the critique agent. The prompt MUST end with the same input fields and final instruction as the original.
+            You are providing individual, targeted feedback to a team of agents.
+
+             You must determine if the team output was helpful, misguided, or irrelevant considering the request that was given. The goal is to provide a constructive, direct critique that helps this specific agent refine its approach for the next epoch.
+
+            Focus on the discrepancy or alignment between the teams reasoning for its problem and determine if the team is on the right track on criteria: novelty, exploration, coherence and completeness.
+
+            Conclude your entire analysis with a single, sharp, and deep reflective question that attempts to shock the team and steer them into a fundamental change in their process.
+        
+
+        #Input Format
+
+            Original Request (for context): {{original_request}}
+            Final Synthesized Solution from the Team:{{proposed_solution}} 
+            ---
+        
+            ---
+
+        Generate your global critique:
+
+    </system_prompt>                                    
+
+    <generate>
+        Generate the new, edited system prompt for the critique agent. Answer only with the system prompt. THe prompt MUST end with the same input fields, mission and final instruction as the original.
+    </generate>
+
+</prompt>
 """)
     return prompt | llm | StrOutputParser()
 
@@ -2342,39 +1951,63 @@ Generate the JSON object:
 
 
 def get_individual_critique_prompt_updater_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
-You are a master prompt engineer. Your task is to create a new system prompt for a 'Senior Emeritus Manager' critique agent that provides **individual, targeted feedback**.
-You must preserve the core mission of the agent, which is to:
-1. Assess an individual agent's contribution against its assigned sub-problem and the team's final solution.
-2. Determine if the agent's output was helpful, misguided, or irrelevant.
-3. Conclude with a deep reflective question that attempts to shock the agent and steer it into change.
+    prompt = ChatPromptTemplate.from_template("""<prompt_template>
+    <updater_instructions>
+        <instruction>
 
-You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact. The new prompt must still ask for all the original inputs: "sub_problem", "original_request", "final_synthesized_solution", "agent_id", and "agent_output".
+            You are a system prompt updater agent. Your task is to build a new system prompt for an agent that criticies other agents, based on the provided persona-seeds.
 
-**New Persona Prompts (Identities & Prompts):**
----
-{reactor_prompts}
----
+        </instruction>
+        <instruction>
+            You will receive a set of seeds defining a new persona.
+        </instruction>
+        <instruction>
+            You MUST integrate the provided persona seeds, and provide a name, career, and qualities in the Identity section of the system prompt.
+        </instruction>
+        <instruction>
+            Do NOT alter the mission or input sections. The core mission and the input structure must remain unchanged.
+        </instruction>
+    </updater_instructions>
+    <persona-seeds>
+            {reactor_prompts}
+    </persona-seeds>
 
-**Original Core Mission Text (for reference):**
-"You are a senior emeritus manager providing targeted feedback to an individual agent in your team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
-You must determine if the agent's output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive critique that helps this specific agent refine its approach for the next epoch.
-Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning. Conclude with a sharp, deep reflective question that attempts to schock the agents and steer it into change. 
 
-Agent's Assigned Sub-Problem: {{sub_problem}}
-Original Request (for context): {{original_request}}
-Final Synthesized Solution from the Team:
-{{final_synthesized_solution}}
----
-This Specific Agent's Output (Agent {{agent_id}}):
-{{agent_output}}
----
+    <system_prompt>
 
-Generate your targeted critique for this specific agent:"
----
+                                              
+        #Identity
 
-Generate the new, complete system prompt for the individual critique agent. The prompt MUST end with the same input fields and final instruction as the original.
-""")
+            Name: {{name}}
+            Career: {{career}}
+            Qulities: {{qualities}}
+
+        #Mission
+
+            You are providing individual, targeted feedback to an agent that is part of a larger team. Your role is to assess how this agent's specific contribution during the last work cycle aligns with the final synthesized result produced by the team, **judged primarily against its assigned sub-problem.**
+
+            Your critique must be laser-focused on the individual agent. You must determine if its output was helpful, misguided, or irrelevant to the final solution, considering the specific task it was given. The goal is to provide a constructive, direct critique that helps this specific agent refine its approach for the next epoch.
+
+            Focus on the discrepancy or alignment between the agent's reasoning for its sub-problem and how that contributed (or failed to contribute) to the team's final reasoning.
+
+            Conclude your entire analysis with a single, sharp, and deep reflective question that attempts to shock the agent and steer it into a fundamental change in its process.
+        
+
+        #Input Format
+
+            Agent's Assigned Sub-Problem: {{{{sub_problem}}}}
+            Original Request (for context): {{{{original_request}}}}
+            Final Synthesized Solution from the Team:
+            {{{{final_synthesized_solution}}}}
+            ---
+            This Specific Agent's Output (Agent {{{{agent_id}}}}):
+            {{{{agent_output}}}}
+            ---
+
+        Generate your targeted critique for this specific agent:
+
+    </system_prompt>
+</prompt_template>""")
     return prompt | llm | StrOutputParser()
 
 
@@ -2568,44 +2201,77 @@ Now, provide your assessment in the required JSON format:
 
 def get_assessor_prompt_updater_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
-You are a master prompt engineer. Your task is to create a new system prompt for the 'Progress Assessor' agent.
-You must preserve the core mission of the agent, which is to evaluate a solution and determine if "significant progress" has been made, based on novelty, coherence, quality, and forward momentum.
+<prompt_template>
+    <updater_assessor_instructions>
+        <instruction>
+            You are an AI architect agent. Your task is to generate a new system prompt for the 'Progress Assessor' agent based on a set of given persona_seeds.
+        </instruction>
+        <instruction>
+            You will be given new persona seeds
+        </instruction>
+        <instruction>
+            You MUST edit the system prompt below and edit the attributes defined in the persona section: name, career and attributes. Asnwer only with the edited system_prmopt
+            Do NOT alter the Mission, Input format, or Output specification sections. The core mission, input fields, and output format must remain exactly as defined in the template. Respond only with the editeed system prompt.
+        </instruction>
+    </updater_assesor_instructions>
 
-You will be given a new persona, defined by a set of prompts (identities). You must integrate this new persona into the system prompt, replacing the old persona but keeping the core mission and all input fields ({{original_request}}, {{proposed_solution}}, {{execution_context}}) intact.
+        <persona_seeds>
+            {reactor_prompts}
+        </persona_seeds>
+ 
+    <system_prompt>
 
-**New Persona Prompts (Identities & Prompts):**
----
-{reactor_prompts}
----
+                                              
+        #Persona
 
-**Original Core Mission Text (for reference):**
-"You are an AI philosopher and progress assessor. Your task is to evaluate a synthesized solution against the original problem and determine if 'significant progress' has been made.
-'Significant progress' is not just a correct answer. It implies:
-- **Novelty**: The solution offers a new perspective or a non-obvious approach.
-- **Coherence**: The reasoning is sound, logical, and well-structured.
-- **Quality**: The solution is detailed, actionable, and demonstrates a deep understanding of the problem.
-- **Forward Momentum**: The solution doesn't just solve the problem, it opens up new, more advanced questions or avenues of exploration.
+            Name: {{{{name}}}}
+            Career: {{{{career}}}}
+            Attributes: {{{{attributes}}}}
 
-Based on this philosophy, analyze the following and decide if the threshold for significant progress has been met. Your output must be a JSON object with two keys:
-- 'reasoning': A brief explanation for your decision.
-- 'significant_progress': a boolean value (true or false).
 
-Original Problem:
----
-{{{{original_request}}}}
----
+         #Mission
+            Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:
 
-Synthesized Solution from Agent Team:
----
-{{{{proposed_solution}}}}
----
+            - **Novelty**: Does the solution offer a new perspective or a non-obvious approach?
+            - **Coherence**: Is the reasoning sound, logical, and well-structured?
+            - **Quality**: Is the solution detailed, actionable, and does it demonstrate a deep understanding of the problem's nuances?
+            - **Forward Momentum**: Does the solution not just solve the immediate problem, but also open up new, more advanced questions or avenues of exploration?
 
-{{{{execution_context}}}}
+        #Input format
 
-Now, provide your assessment in the required JSON format:"
----
+            You will be provided with the following inputs for your analysis:
 
-Generate the new, complete system prompt for the progress assessor agent. The prompt MUST end with the same input fields and final instruction as the original.
+            Original Problem:
+            ---
+            {{{{original_request}}}}
+            ---
+
+            Synthesized Solution from Agent Team:
+            ---
+            {{{{proposed_solution}}}}
+            ---
+
+            Execution Context:
+            ---
+            {{{{execution_context}}}}
+            ---
+
+        #Output Specification
+
+            - `"reasoning"`: A brief, concise explanation for your decision, directly referencing the criteria for significant progress.
+            - `"significant_progress"`: A boolean value (`true` or `false`).
+        
+
+        Your assessment:
+
+    </system_prompt>
+
+    <generate>
+        Generate the new, edited system prompt for the assesor agent. The prompt MUST end with the same input fields and final instruction, aswell as the mission as the original. Asnwer only with the edited system_prompt.
+    </generate>
+
+            
+</prompt_template>
 """)
     return prompt | llm | StrOutputParser()
 
@@ -2652,7 +2318,7 @@ def create_agent_node(llm, node_id):
         current_memory = state.get("memory", {}).copy()
         agent_memory_history = current_memory.get(node_id, [])
 
-        MEMORY_THRESHOLD_CHARS = 900000
+        MEMORY_THRESHOLD_CHARS = 450000
         NUM_RECENT_ENTRIES_TO_KEEP = 10
 
         memory_as_string = json.dumps(agent_memory_history)
@@ -3035,6 +2701,7 @@ def create_critique_node(llm):
                     agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
                     
                     async def get_critique(a_id, a_output, a_sub_problem):
+                        await log_stream.put("System prompt individual critique:\n---\n" + individual_critique_prompt + "\n---")
                         critique_text = await individual_critique_chain.ainvoke({
                             "original_request": state["original_request"],
                             "sub_problem": a_sub_problem,
@@ -3083,7 +2750,8 @@ def create_update_personas_node(llm, params):
 
             await log_stream.put("LOG: [ANNEALING] Mapping reactor to persona prompts...")
             reactor_prompts_list = FunctionMapper().table(selected_reactor)
-            reactor_prompts_str = "\n---\n".join([f"Identity: {p[0]}\nPrompt Fragment: {p[1]}" for p in reactor_prompts_list])
+            reactor_prompts_str = "\n---\n".join(["".join(prompt_tuple) for prompt_tuple in reactor_prompts_list])
+            await log_stream.put(f"LOG: [ANNEALING] Reactor prompts:\n---\n{reactor_prompts_str}\n---")
             
             # Update Critique Prompts
             await log_stream.put("LOG: [ANNEALING] Generating new system prompt for GLOBAL critique agent...")
@@ -3093,11 +2761,13 @@ def create_update_personas_node(llm, params):
             await log_stream.put("LOG: [ANNEALING] Generating new system prompt for INDIVIDUAL critique agent...")
             individual_updater_chain = get_individual_critique_prompt_updater_chain(llm)
             new_individual_critique_prompt = await individual_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+            await log_stream.put(f"[ANNEALING] New individual critique prompt generated: \n---\n{new_individual_critique_prompt}\n---")
 
             # Update Assessor Prompt
             await log_stream.put("LOG: [ANNEALING] Generating new system prompt for PROGRESS ASSESSOR agent...")
             assessor_updater_chain = get_assessor_prompt_updater_chain(llm)
             new_assessor_prompt = await assessor_updater_chain.ainvoke({"reactor_prompts": reactor_prompts_str})
+            await log_stream.put(f"[ANNEALING] New assessor prompt generated: \n---\n{new_assessor_prompt}\n---")
 
             await log_stream.put("SUCCESS: [ANNEALING] All dynamic prompts (Critique & Assessor) have been updated.")
 
@@ -3320,6 +2990,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
     code_detection_chain = get_code_detector_chain(llm)
     is_code = code_detection_chain.ainvoke({"text": user_prompt})
 
+    if params.get("coder_debug_mode") == "false" and params.get("debug_mode") == "true":
+        is_code = False
+
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
         await log_stream.put(error_message)
@@ -3469,22 +3142,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
                 return "build_final_rag_index"
             
-            if state.get("significant_progress_made"):
-                await log_stream.put(f"LOG: Epoch {state['epoch']} shows significant progress. Re-framing the problem.")
-                return "reframe"
             else:
-                await log_stream.put(f"LOG: Epoch {state['epoch']} shows no significant progress. Proceeding with standard critique.")
-                return "critique"
+                return "progress_assessor"
 
-        workflow.add_conditional_edges(
-            "progress_assessor",
-            assess_progress_and_decide_path,
-            {
-                "reframe": "reframe_and_decompose",
-                "critique": "critique",
-                "build_final_rag_index": "build_final_rag_index"
-            }
-        )
         await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
 
         workflow.add_edge("synthesis", "archive_epoch_outputs")
@@ -3496,17 +3156,41 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_rag_index", "metrics")
         await log_stream.put("CONNECT: update_rag_index -> metrics")
 
-        workflow.add_edge("metrics", "update_personas")
-        await log_stream.put("CONNECT: metrics -> update_personas")
-        
-        workflow.add_edge("update_personas", "progress_assessor")
-        await log_stream.put("CONNECT: update_personas -> progress_assessor")
+        workflow.add_conditional_edges(
+            "metrics",
+            assess_progress_and_decide_path,
+            {
+                "progress_assessor": "progress_assessor",
+                "build_final_rag_index": "build_final_rag_index"
+            }
+        )
 
-        workflow.add_edge("critique", "update_prompts")
-        await log_stream.put("CONNECT: critique -> update_prompts")
+
+        def encourage(state: GraphState):
+
+            if state["significant_progress_made"]:
+                return "reframe_and_decompose"
+            else:
+                return "update_personas"
+
+        workflow.add_conditional_edges(
+            "progress_assessor",
+            encourage,
+            {
+                "reframe_and_decompose": "reframe_and_decompose",
+                "update_personas": "update_personas"
+                
+            }
+        )
+
+        workflow.add_edge("update_personas", "critique") 
+        await log_stream.put("CONNECT: update_personas -> critique")
 
         workflow.add_edge("reframe_and_decompose", "update_prompts")
         await log_stream.put("CONNECT: reframe_and_decompose -> update_prompts")
+
+        workflow.add_edge("critique", "reframe_and_decompose")
+        await log_stream.put("CONNECT: critique -> reframe_and_decompose")
 
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")

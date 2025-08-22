@@ -319,20 +319,19 @@
                 </div>
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>
-                    
-                Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers,
+             
 
-                    to run inference. I presume the foundation of training and architecture are allready figured out, so i want a new inference algorithm. For this conceptualziation assume
-                    
-                    the world is full of spinning wheels, and data represents a measured state of the "wheel" at a given time. Abudant trining data samples the full state of the "wheel" by offering all the posible data of the wheel state.
+ Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers, to run inference. I presume the foundation of training and architecture are allready figured out, so i want a new inference algorithm. For this conceptualziation assume
 
-                    Current inference algoritm in the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their reponses can be shallow.
+the world is full of spinning wheels (harmonic oscillators), like we see them in atoms, solar systems, galaxies, human hierarchies...etrc, and data represents a measured state of the "wheel" at a given time. Abudant training data samples the full state of the "wheel" by offering all the posible data of the wheel full state. This is where understanding each reached: by spinning the whole wheel.
 
-                    I want you to make in python with excellent documentation:
+ Current inference algoritm in the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their reponses can be shallow. The training algorithms encode the wheels but inference algorithms do not extract them very well.
 
-                        1. An inference algorithm that uses a PID like approach with perturbaitve feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. The inference algorithm should sample all its progressive output and feed it back into the transformer.
+ I want you to make in python with excellent documentation:
 
-                        2. The inference algorithm should be easily pluggable to a huggignface transformer
+1. An inference algorithm that uses a PID like approach with perturbaitve feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. The inference algorithm should sample all its progressive output and feed it back into the transformer.
+
+ 2. The inference algorithm should be coded from scratch without using external dependencies.
 
 
                 </textarea>
