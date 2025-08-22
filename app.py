@@ -2005,7 +2005,6 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
 ---
 **Output Mandate: 
 
-  "original_problem": "{{original_problem}}",
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
@@ -2232,6 +2231,8 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
+
+  # Your system prompt:
 
 """)
 
@@ -3336,6 +3337,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             agent_id = f"agent_0_{j}"
             sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
             prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem})
+            await log_stream.put(f"Prompt for agent {agent_id}: {prompt}")
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
@@ -3361,6 +3363,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                     "critique": "",
                     "sub_problem": sub_problem,
                 })
+                await log_stream.put(f"Prompt for agent {agent_id}: {new_prompt}")
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
         
