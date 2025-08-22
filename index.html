@@ -760,20 +760,26 @@
                 }
                 return;
             }
-            
-            if (result.code_solution) {
+                    if (result.code_solution) {
                 addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-         
+
                 const rawCode = result.code_solution;
+                
+                // 1. First, extract the code from the backticks as before.
                 const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(rawCode);
-                const cleanCode = codeMatch ? codeMatch[1].trim() : rawCode.trim();
+                let cleanCode = codeMatch ? codeMatch[1].trim() : rawCode.trim();
+
+                // 2. **THIS IS THE FIX:** Replace all literal '\\n' with actual newlines.
+                cleanCode = cleanCode.replace(/\\n/g, '\n');
 
                 if(codeOutput) {
-                    codeOutput.textContent = cleanCode; 
+                    // 3. Now set the textContent with the *corrected* string
+                    codeOutput.textContent = cleanCode;
+                    
+                    // 4. Finally, let Prism highlight the formatted code
                     Prism.highlightElement(codeOutput);   
                 }
 
-                if(codeOutput) codeOutput.textContent = cleanCode; // Display the clean code
                 if(codeReasoning) codeReasoning.textContent = result.reasoning;
                 if(codeResultContainer) codeResultContainer.classList.remove('hidden');
                 if(runInterface) runInterface.classList.add('hidden');
@@ -784,9 +790,7 @@
                     runButton.disabled = false;
                     runButton.textContent = 'Build and Run Graph';
                 }
-            
-
-            } else if( result.message = "Chat is now active."){
+            }else if( result.message = "Chat is now active."){
                 
                 //Hide diagnostic chat and enable harvest chat
                 if(diagnosticChatContainer) diagnosticChatContainer.classList.add('hidden');
