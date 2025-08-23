@@ -1074,7 +1074,7 @@ Generate your code-focused critique for the team:"""
         elif "you are a master strategist and problem decomposer" in prompt:
             sub_problems = ["Design the database schema for user accounts.", "Implement the REST API endpoint for user authentication.", "Develop the frontend login form component.", "Write unit tests for the authentication service."]
             return json.dumps({"sub_problems": sub_problems})
-        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt:
+        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt:
              return json.dumps({
                 "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
                 "significant_progress": True
@@ -1237,6 +1237,12 @@ class MockLLM(Runnable):
 
                 return "no"
 
+        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt:
+             return json.dumps({
+                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
+                "significant_progress": True
+            })
+ 
 
         elif "<updater_instructions>" in prompt:
 
@@ -2043,8 +2049,8 @@ Now, provide your assessment in the required JSON format:
 def get_problem_reframer_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 You are a strategic problem re-framer. You have been informed that an AI agent team has made a significant breakthrough on a problem.
-Your task is to formulate a new, more progressive, and more challenging problem that builds upon their success.
-The new problem should represent the "next logical step" or a more ambitious goal that is now possible because of the previous solution. It should inspire the agents and push them into a new domain of inquiry.
+Your task is to formulate a new, more progressive, and more challenging problem that builds upon their success thats grounded in the original problem and still tries to achieve the same goal.
+The new problem should represent the "next logical step" or a more ambitious goal that is now possible because of the previous solution. 
 
 Original Problem:
 ---
@@ -2296,7 +2302,6 @@ def create_agent_node(llm, node_id):
             await log_stream.put(f"ERROR: Could not find prompt for {node_id} in state. Halting agent.")
             return {}
 
-        await log_stream.put(f"[SYSTEM PROMPT] Agent {node_id} (Epoch {state['epoch']}):\n---\n{agent_prompt}\n---")
         
         if layer_index == 0:
             await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing its sub-problem.")
@@ -2359,6 +2364,7 @@ Input Data to Process:
 ---
 Your JSON formatted response:
 """
+        await log_stream.put(f"LOG: Agent {node_id} prompt:\n{full_prompt}")
         
         response_str = await agent_chain.ainvoke({"input": full_prompt})
         
