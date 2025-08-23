@@ -19,7 +19,7 @@ Your feedback is invaluable. If you run into a crash or have ideas, please **ope
 Essentially, you can think of this project as a way to **max out a model's performance by trading response time for quality**. The best part is that you don't need a supercomputer. local-deepthink is designed to turn even a modest 32gb RAM CPU-only laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models, you can leave the network running for hours or even days, allowing it to "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
 ## Use Cases
-The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for problems where the only clue you have is a vague question or for one-shotting very long prompting sessions.
+The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for problems where the only clue you have is a vague question or for one-shotting very long prompting sessions. Best part? Soon you will be able to export the QNN into a JSON file and take it with you at the weight of only megabytes and plug it somewhere else to whatever LLM you like. If you create an RPG world, you could export its QNN and have other people prompt it.
 
 *   **For Non-Programmers: Ultra-Long Creative Generation**
     Think of local-deepthink as a way to handle prompts that require ultra-long or deeply creative outputs. Do you want to theory-craft a complex system or design the lore of an entire RPG world? Normally, this requires prompting a model repeatedly and figuring out different system prompts. With local-deepthink, you give the system a high-level goal, and the QNN figures out the rest. At the end of the run, it delivers a comprehensive, queryable knowledge base, and an interrogator chain can use your points of interest to generate an exhaustive final report.
@@ -99,6 +99,7 @@ The current focus is on polishing and debugging existing features to reach a bet
 *   **Story Telling Mode:** A dedicated mode for generating complex narratives, characters, and plots.
 *   **World Simulation Mode:** For creating and simulating intricate worlds with consistent lore, physics, and histories, perfect for RPGs and theoretical systems.
 *   **Recursive Module Stitching:** An advanced feature enabling the system to design, code, and recursively assemble different software modules to create complex, full-stack applications from a high-level prompt.
+*   **Export your QNN:** Soon you will be able to import and export your QNN in plain JSON format, so other people can prompt it, at just a few mbs of size.
 
 ## Hyperparameters & Hardware Guidelines ⚙️
 
