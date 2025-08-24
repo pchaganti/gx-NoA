@@ -9,12 +9,13 @@ I wanted to see if I could recreate a small-scale version of that "soup" require
 https://www.youtube.com/watch?v=GSTtLWpM3uU
 
 ## ⚠️ Alpha Software - We Need Your Help! ⚠️
-Please be aware that local-deepthink is currently in an alpha stage. It is experimental research software. With the recent addition of a **code execution sandbox**, you should proceed very carefully. You may encounter bugs, unexpected behavior, or breaking changes.
+Please be aware that local-deepthink is currently in an alpha stage. It is experimental research software. You may encounter bugs, unexpected behavior, or breaking changes.
 
 Your feedback is invaluable. If you run into a crash or have ideas, please **open an issue** on our GitHub repository with your graph monitor trace log. Helping us identify and squash bugs is one of the most important contributions you can make right now!
 
 ## **Is true "deep thinking" only for trillion-dollar companies?**
-**local-deepthink** is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepMind offer powerful reasoning by giving their massive models more "thinking time" in a closed environment (for a high price), local-deepthink explores a different path: **emergent intelligence on affordable local hardware**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively.
+
+**local-deepthink** is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepMind offer powerful reasoning by giving their massive models more "thinking time" in a closed environment (for a high price), local-deepthink explores a different path: **emergent intelligence on affordable local hardware**. We simulate a society of AI agents that collaborate, evolve, and deepen their understanding collectively over time.
 
 Essentially, you can think of this project as a way to **max out a model's performance by trading response time for quality**. The best part is that you don't need a supercomputer. local-deepthink is designed to turn even a modest 32gb RAM CPU-only laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models, you can leave the network running for hours or even days, allowing it to "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
@@ -25,32 +26,30 @@ The **Qualitative Neural Network (QNN)** algorithm that powers this system is gr
     Think of local-deepthink as a way to handle prompts that require ultra-long or deeply creative outputs. Do you want to theory-craft a complex system or design the lore of an entire RPG world? Normally, this requires prompting a model repeatedly and figuring out different system prompts. With local-deepthink, you give the system a high-level goal, and the QNN figures out the rest. At the end of the run, it delivers a comprehensive, queryable knowledge base, and an interrogator chain can use your points of interest to generate an exhaustive final report.
 
 *   **For Programmers & Researchers: Conceptual Algorithm Design**
-    If you are a researcher building algorithms from scratch, you can use local-deepthink to conceptualize new, SOTA (State-of-the-Art) algorithms. With the new code execution sandbox, agents can even write and test vanilla code snippets. It's an ideal tool for exploring novel solutions where external dependencies can be plugged in later.
+    If you are a researcher building algorithms from scratch, you can use local-deepthink to conceptualize new, SOTA (State-of-the-Art) algorithms. The system can synthesize agent outputs into a final, runnable code block, making it an ideal tool for exploring novel solutions where external dependencies can be plugged in later.
 
 ## Changelog
 
-*   **Code Execution Sandbox:** Agents now have access to a code sandbox, allowing them to write and execute code to solve problems, perform calculations, or prototype solutions.
 *   **Interactive RAG Chat & Diagnostic Tool:** The process now pauses after the final epoch, allowing you to directly **chat with the generated RAG index**. This powerful diagnostic feature lets you interrogate the massive "cube of thinking text" from all hidden layers, ask follow-up questions, and gain extra insights.
 *   **Final Knowledge Harvest & RAG:** The run now archives all agent outputs into a multi-layered RAPTOR index. Upon completion, `interrogator` and `paper_formatter` agents use this RAG index to write a formal academic-style paper answering expert-level questions about the problem.
-*   **Dynamic Critique Annealing:** The network's "loss function" now evolves. A meta-process analyzes the collective output and selects a "pseudo-neurotransmitter" that rewrites the critique agent's persona (e.g., from a 'senior manager' to a 'cynical philosopher-king') to provide different feedback for the next epoch and avoid local minima.
-*   **Dynamic Problem Re-framing:** The network can now assess its own progress. If it determines it has made a "significant breakthrough," it formulates a new, more advanced problem that builds upon its success.
+*   **Dynamic Problem Re-framing:** The network can now assess its own progress. After each cycle (epoch), it formulates a new, more advanced problem that builds upon its previous solution, forcing the agents to continuously deepen their understanding.
 *   **Divide and Conquer - Automatic Problem Decomposition:** local-deepthink now starts by breaking down the user's initial problem into smaller, granular sub-problems, assigning each agent a unique piece of the puzzle.
 *   **Perplexity Metrics & Chart:** A `metrics` node calculates the average perplexity of all agent outputs after each epoch, plotted on a live chart in the GUI.
-*   **Dynamic Summarization:** A specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights.
+*   **Dynamic Summarization:** A specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights while managing context length.
 
 ## The Core Idea: Qualitative Backpropagation
 
 The core experiment is the **Qualitative Neural Network (QNN)**, an algorithm inspired by backpropagation in traditional neural networks. It's a numerical algorithm, of course, but what if the principle could be applied qualitatively? Instead of sending back a numerical error signal, you send back a "reflection."
 
-After the network produces a solution, a "critique" agent reviews it and provides criticism. This feedback is then used to **automatically re-write the core system prompts** of the agents that contributed. The goal is for the network to "learn" from its mistakes over multiple cycles, refining not just its answers, but its own internal structure and approach. QNNs are also extremely human-interpretable, unlike their numerical counterparts.
+After the network produces a solution, a "reflection pass" analyzes the result and **automatically re-writes the core system prompts** of the agents that contributed. The goal is for the network to "learn" from its own output over multiple cycles (epochs), refining not just its answers, but its own internal structure and approach. QNNs are also extremely human-interpretable, unlike their numerical counterparts.
 
 ### The Trade-Off: Speed for Depth
 
-The obvious trade-off here is speed. A 6-layer network with 6 agents per layer, running for 20 cycles, can easily take 12 hours to complete. You're trading quick computation for a slow, iterative process of refinement. The algorithm excels in problems where creativity and insight override pure precision, like developing new frameworks in the social sciences.
+The obvious trade-off here is speed. A 6-layer network with 6 agents per layer, running for 20 epochs, can easily take 12 hours to complete. You're trading quick computation for a slow, iterative process of refinement. The algorithm excels in problems where creativity and insight override pure precision, like developing new frameworks in the social sciences.
 
 ## The QNN Algorithm: From Individual Agents to a Collective Mind
 
-The core of local-deepthink is the novel QNN algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a unique "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
+The core of local-deepthink is the novel QNN algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
 
 ### The Forward Pass
 
@@ -60,16 +59,14 @@ In a QNN, the "weights" and "biases" of the network are not numerical values but
 2.  **Building Depth with Dense Layers**: A `dense-spanner` chain analyzes the agents of the preceding layer and spawns a new agent in the next layer, specifically engineered to tackle a tailored challenge.
 3.  **Action**: A user's prompt initiates a cascade of information through the network until the final layer is reached, constituting a full "forward pass" of collaborative inference.
 
-### The Reflection Pass: Learning, Critiquing, and Evolving Goals
+### The Reflection Pass: Learning Through Evolving Goals
 
-This is where a QNN truly differs from a simple multi-agent system.
+This is where a QNN truly differs from a simple multi-agent system. Instead of simply correcting errors, the network learns by continuously raising the bar.
 
 1.  **Synthesis and Metrics**: A `synthesis_node` merges the final outputs into a single solution, and a `metrics_node` calculates a perplexity score for the epoch.
-2.  **Dynamic Annealing of Critique**: An `update_critique_prompt` node analyzes the hidden-layer outputs and dynamically rewrites the critique agent's system prompt. This global loss function dynamically swaps personas—from a "lazy manager" to a "philosopher king" or a "harsh drill sergeant"—to prevent the network from getting stuck in local minima.
-3.  **The Crossroads of Progress**: A `progress_assessor` node evaluates whether the solution represents "significant progress."
-4.  **Path A: The "Eureka!" Path**: If a breakthrough is achieved, a `problem_reframer` node formulates a new, more challenging problem.
-5.  **Path B: The "Refinement" Path**: If not, the `critique_chain` scrutinizes the solution and generates detailed critiques.
-6.  **Updating the "Neural" Weights**: This feedback propagates backward, and an `update_agent_prompts_node` modifies each agent's core system prompt for the next cycle.
+2.  **Problem Re-framing**: The core of the learning loop. A `problem_reframer` node analyzes the synthesized solution and formulates a new, more ambitious problem that represents the "next logical step." This prevents the network from stagnating and pushes it toward deeper insights.
+3.  **Decomposition of the New Problem**: The newly framed problem is then broken down again into a new set of granular sub-problems.
+4.  **Updating the "Neural" Weights**: This new set of sub-problems is propagated backward through the network. An `update_agent_prompts_node` modifies each agent's core system prompt to align with its new, more advanced task for the next epoch.
 
 ### The Final Harvest Pass: Consolidating Knowledge
 
@@ -138,11 +135,11 @@ The current focus is on polishing and debugging existing features to reach a bet
 3.  **Install dependencies:** `pip install -r requirements.txt`.
 4.  **Install and Run Ollama**:
     *   Follow the official instructions to install Ollama.
-    *   Download the primary model (default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`).
+    *   Download a primary model for the agents (default is `dengcao/Qwen3-3B-A3B-Instruct-2507:latest`).
         ```bash
-        ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
+        ollama pull dengcao/Qwen3-3B-A3B-Instruct-2507:latest
         ```
-    *   **Download the compulsory summarization model.** local-deepthink requires `qwen3:1.7b`.
+    *   **Download the compulsory summarization model.** local-deepthink requires `qwen3:1.7b` for its internal processes.
         ```bash
         ollama pull qwen3:1.7b
         ```
