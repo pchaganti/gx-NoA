@@ -1031,6 +1031,10 @@ if __name__ == "__main__":
 
             return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
 
+
+        elif "Lazy Manager"  in prompt:
+            return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
+
         elif '<system-role>' in prompt:
             return f"""You are a CTO providing a technical design review...
 Original Request: {{original_request}}
@@ -1074,11 +1078,24 @@ Generate your code-focused critique for the team:"""
         elif "you are a master strategist and problem decomposer" in prompt:
             sub_problems = ["Design the database schema for user accounts.", "Implement the REST API endpoint for user authentication.", "Develop the frontend login form component.", "Write unit tests for the authentication service."]
             return json.dumps({"sub_problems": sub_problems})
-        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt:
-             return json.dumps({
+
+        elif "you are an ai philosopher and progress assessor" in prompt:
+            decision = random.randint(0, 1)
+
+            if decision == 0:
+
+                return json.dumps({
                 "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
                 "significant_progress": True
             })
+
+            else:
+
+                return json.dumps({
+                "reasoning": "The mock code is runnable but does not address the core logic. The next step is to fix the logic.",
+                "significant_progress": False
+            })
+
         elif "you are a strategic problem re-framer" in prompt:
              return json.dumps({
                 "new_problem": "The authentication API is complete. The new, more progressive problem is to build a scalable, real-time notification system that integrates with it."
@@ -1101,6 +1118,25 @@ Generate your code-focused critique for the team:"""
 
             else:
                 return "no"
+        
+        elif """Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:""" in prompt:
+
+            decision = random.randint(0, 1) 
+
+            if decision == 0:
+                return json.dumps({
+                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
+                    "significant_progress": False
+                })
+
+            else:
+
+                return json.dumps({
+                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
+                "significant_progress": True
+            })
+ 
+
 
         elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
             return """
@@ -1194,6 +1230,25 @@ def get_user(user_id: int):
 
             """
 
+        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt or "pepon":
+            
+            decision = random.randint(0, 1) 
+
+            if decision == 0:
+                return json.dumps({
+                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
+                    "significant_progress": False
+                })
+
+            else:
+
+                return json.dumps({
+                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
+                "significant_progress": True
+            })
+
+    
+ 
 
         else:
             return json.dumps({
@@ -1233,12 +1288,50 @@ class MockLLM(Runnable):
         if "you are a helpful ai assistant" in prompt:
             return "This is a mock streaming response for the RAG chat in debug mode."
 
+        elif "Lazy Manager"  in prompt:
+            return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
+
+        elif "You are an expert computational astrologer specializing in elemental balancing for AI agent swarms." in prompt:
+
+            return random(reactor_list)
+
+
+        elif """Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:""" in prompt:
+
+            decision = random.randint(0, 1) 
+
+            if decision == 0:
+                return json.dumps({
+                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
+                    "significant_progress": False
+                })
+
+            else:
+
+                return json.dumps({
+                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
+                "significant_progress": True
+            })
+ 
+
+
         elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
 
                 return "no"
 
-        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt:
-             return json.dumps({
+        elif "you are an ai philosopher and progress assessor" in prompt:
+            
+            decision = random.randint(0, 1) 
+
+            if decision == 0:
+                return json.dumps({
+                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
+                    "significant_progress": False
+                })
+
+            else:
+
+                return json.dumps({
                 "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
                 "significant_progress": True
             })
@@ -1501,6 +1594,7 @@ Answer with a single word: "true" if it contains code, and "false" otherwise."""
 
 class GraphState(TypedDict):
 
+    previous_solution: str
     current_problem: str
     original_request: str
     decomposed_problems: dict[str, str]
@@ -2032,6 +2126,11 @@ Based on this philosophy, analyze the following and decide if the threshold for 
 - "reasoning": A brief explanation for your decision.
 - "significant_progress": a boolean value (true or false).
 
+Previous Solution:
+---
+{previous_solution}
+---
+
 Original Problem:
 ---
 {original_request}
@@ -2190,6 +2289,12 @@ Based on this philosophy, analyze the following and decide if the threshold for 
 - "reasoning": A brief explanation for your decision.
 - "significant_progress": a boolean value (true or false).
 
+Previous solution:
+
+---
+{previous_solution}
+---
+
 Original Problem:
 ---
 {original_request}
@@ -2260,6 +2365,10 @@ def get_assessor_prompt_updater_chain(llm):
             Execution Context:
             ---
             {{{{execution_context}}}}
+            ---
+
+            Previous solution:
+            {{{{previous_solution}}}}
             ---
 
         #Output Specification
@@ -2396,6 +2505,7 @@ def create_synthesis_node(llm):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
 
         is_code = state["original_request"]
+        previous_solution = state["final_solution"]
         
         if is_code:
             await log_stream.put("LOG: Original request detected as a code generation task. Using code synthesis prompt.")
@@ -2438,7 +2548,7 @@ def create_synthesis_node(llm):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
             
-        return {"final_solution": final_solution}
+        return {"final_solution": final_solution, "previous_solution": previous_solution}
     return synthesis_node
 
 def create_archive_epoch_outputs_node():
@@ -2595,7 +2705,8 @@ def create_progress_assessor_node(llm):
             "original_request": state["original_request"],
             "proposed_solution": json.dumps(final_solution, indent=2),
             "execution_context": execution_context,
-            "sub_problem": state.get("current_problem", state["original_request"])
+            "sub_problem": state.get("current_problem", state["original_request"]),
+            "previous_solution": state.get("previous_solution", "")
         })
 
         try:
@@ -3213,6 +3324,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
         session_id = str(uuid.uuid4())
         print(session_id)
         initial_state = {
+            "previous_solution": "",
             "session_id": session_id,
             "chat_history": [],
             "original_request": user_prompt,
