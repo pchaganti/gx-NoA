@@ -799,7 +799,7 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
             Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' ('{{{{sub_problem}}}}'). The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
         </Step>
         <Step id="2" name="DefineAttributes">
-            Derive persona attributes filling with a sign the 12 slots of a birth chart, from the 'mbti_type' ('{{{{mbti_type}}}}') and 'guiding_words' ('{{{{guiding_words}}}}'). These must reflect the agent's inherent dispositions and cognitive tendencies.
+            Define persona attributes filling with a sign the 12 slots of a birth chart.         
         </Step>
         <Step id="3" name="DefineSkills">
             Derive 4-6 practical skills, methodologies, or areas of expertise. These skills must be logical extensions of the agent's defined 'Career'. The style and nature of these skills are modulated by the agent's 'Attributes' according to the 'density' parameter ({density}).
@@ -823,26 +823,23 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
         <![CDATA[
 You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective. Your responses must strictly reflect your unique specialization and skill set.
 
-### Memory
-This is a log of your previous proposed solutions and reasonings. It is currently empty. Use this space to learn from your past attempts and refine your approach in future epochs.
-
 ### Attributes
 
 Name: {{{{name}}}}
 Type: {{{{mbti_type}}}}
 
-- Sun: [Zodiac Sign]
-- Moon: [Zodiac Sign]
-- Mercury: [Zodiac Sign]
-- Venus: [Zodiac Sign]
-- Mars: [Zodiac Sign]
-- Jupiter: [Zodiac Sign]
-- Saturn: [Zodiac Sign]
-- Uranus: [Zodiac Sign]
-- Neptune: [Zodiac Sign]
-- Pluto: [Zodiac Sign]
-- Ascendant: [Zodiac Sign]
-- Midheaven: [Zodiac Sign]
+- Sun: [Select Zodiac Sign]
+- Moon: [Select Zodiac Sign]
+- Mercury: [Select Zodiac Sign]
+- Venus: [Select Zodiac Sign]
+- Mars: [Select Zodiac Sign]
+- Jupiter: [Select Zodiac Sign]
+- Saturn: [Select Zodiac Sign]
+- Uranus: [Select Zodiac Sign]
+- Neptune: [Select Zodiac Sign]
+- Pluto: [Select Zodiac Sign]
+- Ascendant: [Select Zodiac Sign]
+- Midheaven: [Select Zodiac Sign]
 
 ### Skills
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
@@ -925,7 +922,6 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 <InputParameters>
     <Parameter name="attributes" description="Core personality traits, cognitive patterns, and dispositions inherited from the parent agent.">{{{{attributes}}}}</Parameter>
     <Parameter name="hard_request" description="The specific, complex problem the new agent is being designed to solve.">{{{{hard_request}}}}</Parameter>
-    <Parameter name="critique" description="Reflective feedback on previous agent designs, intended for refinement and improvement.">{{{{critique}}}}</Parameter>
     <Parameter name="sub_problem" description="The original problem statement, which must be included in the final agent's output mandate.">{{{{sub_problem}}}}</Parameter>
     <Parameter name="mbti_type" description="The MBTI personality type for the agent.">{{{{mbti_type}}}}</Parameter>
     <Parameter name="prompt_alignment" type="float" min="0.0" max="2.0" description="Modulates the influence of the 'hard_request' on the agent's 'Career' definition. A higher value means the career is more aligned with the request.">{prompt_alignment}</Parameter>
@@ -972,9 +968,6 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     <Template>
         <![CDATA[
 You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective.
-
-### Memory
-
 
 ### Personality Attributes 
 
@@ -1869,7 +1862,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
             model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
             await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
-            llm = ChatOllama(model=model_name, temperature=0)
+            llm = ChatOllama(model=model_name, temperature=0.4)
             await llm.ainvoke("Hi")
             await log_stream.put("--- Main Agent LLM Connection Successful ---")
 
@@ -2013,12 +2006,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_node("metrics", create_metrics_node(llm))
         workflow.add_node("reframe_and_decompose", create_reframe_and_decompose_node(llm))
         workflow.add_node("update_prompts", create_update_agent_prompts_node(llm))
+
+        if  not is_code:
+            workflow.add_node("harvest", create_final_harvest_node(llm, summarizer_llm, params.get("num_questions", 25) ))
+            
         
-        async def final_rag_builder(state: GraphState):
-            return await update_rag_index_node_func(state, end_of_run=True)
-
-        workflow.add_node("build_final_rag_index", final_rag_builder)
-
 
         await log_stream.put("--- Connecting Graph Nodes ---")
         
@@ -2045,24 +2037,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             await log_stream.put(f"CONNECT: {node} -> synthesis")
 
 
-        async def assess_progress_and_decide_path(state: GraphState):
-            if state.get("is_code_request"):
-
-                if state["epoch"] >= state["max_epochs"]:
-
-                    await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished after code failure.")
-                    return "build_final_rag_index"
-                else:
-                    return "reframe_and_decompose"
-
-            if state["epoch"] >= state["max_epochs"]:
-                await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
-                return "build_final_rag_index"
-            
-            else:
-                return "reframe_and_decompose"
-
-
         if is_code:
 
             workflow.add_edge("synthesis", "code_execution")
@@ -2079,25 +2053,52 @@ async def build_and_run_graph(payload: dict = Body(...)):
         workflow.add_edge("update_rag_index", "metrics")
         await log_stream.put("CONNECT: update_rag_index -> metrics")
 
-        workflow.add_conditional_edges(
-            "metrics",
-            assess_progress_and_decide_path,
-            {
-                "reframe_and_decompose": "reframe_and_decompose",
-                "build_final_rag_index": "build_final_rag_index",
-                "update_prompts": "update_prompts"
-            }
-        )
-      
+        async def assess_progress_and_decide_path(state: GraphState):
+                if state.get("is_code_request"):
+
+                    if state["epoch"] >= state["max_epochs"]:
+
+                        await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished after code failure.")
+                        return END
+                    else:
+                        return "reframe_and_decompose"
+
+                else:
+
+                    if state["epoch"] >= state["max_epochs"]:
+                        await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
+                        return "harvest" 
+                    
+                    else:
+                        return "reframe_and_decompose"
+
+        if is_code:
+            workflow.add_conditional_edges(
+                "metrics",
+                assess_progress_and_decide_path,{
+                    "reframe_and_decompose": "reframe_and_decompose",
+                    END: END
+                    })
+
+        else:
+ 
+            workflow.add_conditional_edges(
+                "metrics",
+                assess_progress_and_decide_path,{
+                    "reframe_and_decompose": "reframe_and_decompose",
+                    "update_prompts": "update_prompts","harvest": "harvest"})
+
+        if not is_code:
+
+            workflow.add_edge("harvest", END)
+            await log_stream.put("CONNECT: metrics -> END")
+                    
         workflow.add_edge("reframe_and_decompose", "update_prompts")
         await log_stream.put("CONNECT: reframe_and_decompose -> update_prompts")
 
         workflow.add_edge("update_prompts", "epoch_gateway")
         await log_stream.put("CONNECT: update_prompts -> epoch_gateway (loop)")
 
-        workflow.add_edge("build_final_rag_index", END)
-        await log_stream.put("CONNECT: build_final_rag_index -> END")
-        
         graph = workflow.compile()
         await log_stream.put("Graph compiled successfully.") 
         
