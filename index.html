@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Free Deep Think</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css">
+    <link rel="stylesheet" href="static/prism-okaidia.min.css">
+    <link rel="stylesheet" href="static/prism-toolbar.min.css">
     <style>
         :root {
             --primary-color: #0E1117;
@@ -372,7 +372,9 @@
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>
 
-                    Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers, to run inference. I presume the foundation of training and architecture are allready figured out, so i want you to create a new inference algorithm that helps exsiting architectures acheive AGI. For this conceptualziation assume the world is full of spinning wheels (harmonic oscillators), like we see them in atoms, solar systems, galaxies, human hierarchies...etc, and data represents a measured state of the "wheel" at a given time. Abudant training data samples the full state of the "wheel" by offering all the posible data of the wheel full state. This is where understanding is reached: by spinning the whole wheel and assimilating all possible perspectives. Current inference algoritms on the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their responses can be shallow. The training algorithms encode the wheels but inference algorithms do not extract them very well. I want you to make in python with excellent documentation: 1. An inference algorithm to achieve AGI through better inference using a PID like approach with perturbative feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. Figure out a good way to integrate PID loops into transformer inference so transformers learn on inference. 2. a gradio app to monitor an inference run on a mocked transformer which should be built to be sufficiently dense to provide realistic output/input.
+                    
+                    Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers, to run inference. I presume the foundation of training and architecture are allready figured out, so i want you to create a new inference algorithm that helps exsiting architectures acheive AGI. For this conceptualziation assume the world is full of spinning wheels (harmonic oscillators), like we see them in atoms, solar systems, galaxies, human hierarchies...etc, and data represents a measured state of the "wheel" at a given time. Abudant training data samples the full state of the "wheel" by offering all the posible data of the wheel full state. This is where understanding is reached: by spinning the whole wheel and assimilating all possible perspectives. Current inference algoritms on the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their responses can be shallow. The training algorithms encode the wheels but inference algorithms do not extract them very well. I want you to make in python with excellent documentation: 1. An inference algorithm to achieve AGI through better inference using a PID like approach with perturbative feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. Figure out a good way to integrate PID loops into transformer inference so transformers learn on inference. 2. a gradio app to monitor the algorithm during an inference run on a mocked transformer which should be built to be sufficiently dense to provide realistic output/input.
+
 
                 </textarea>
                 <button type="submit" id="run-button">Build and Run Graph</button>
@@ -1047,9 +1049,9 @@
         }
     });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/copy-to-clipboard/prism-copy-to-clipboard.min.js"></script>
+<script src="static/prism-core.min.js"></script>
+<script src="static/prism-autoloader.min.js"></script>
+<script src="static/prism-toolbar.min.js"></script>
+<script src="static/prism-copy-to-clipboard.min.js"></script>
 </body>
 </html>

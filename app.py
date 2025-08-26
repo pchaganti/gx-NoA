@@ -1398,7 +1398,6 @@ def create_code_execution_node(llm):
         await log_stream.put(f"--- [SANDBOX] Synthesized Code Result: {'Success' if success else 'Failure'} ---")
         await log_stream.put(output)
 
-        await log_stream.put("LOG: Code execution successful. Generating module card.")
         module_card_chain = get_module_card_chain(llm)
         module_card = await module_card_chain.ainvoke({"code": synthesized_code})
             
@@ -1580,15 +1579,6 @@ def create_update_agent_prompts_node(llm):
     async def update_agent_prompts_node(state: GraphState):
         await log_stream.put("--- [REFLECTION PASS] Entering Agent Prompt Update Node (Targeted Backpropagation) ---")
         params = state["params"]
-        critiques = state.get("critiques", {})
-        
-        if not critiques and not state.get("significant_progress_made"):
-            await log_stream.put("LOG: No critiques and no significant progress. Skipping reflection pass.")
-            new_epoch = state["epoch"] + 1
-            return {"epoch": new_epoch, "agent_outputs": {}}
-        elif state.get("significant_progress_made"):
-            await log_stream.put("LOG: Significant progress was made. Updating prompts based on new sub-problems.")
-            critiques = {} 
 
         all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
         
@@ -1606,17 +1596,7 @@ def create_update_agent_prompts_node(llm):
                 async def update_single_prompt(layer_idx, agent_idx, prompt, agent_id):
                     await log_stream.put(f"[PRE-UPDATE PROMPT] System prompt for {agent_id}:\n---\n{prompt}\n---")
                     
-                    critique_for_this_agent = ""
-                    if not state.get("significant_progress_made"):
-                        if layer_idx == len(all_prompts_copy) - 2:
-                            critique_for_this_agent = critiques.get("global_critique", "")
-                        else:
-                            critique_for_this_agent = critiques.get(agent_id, "")
-
-                        if not critique_for_this_agent:
-                            await log_stream.put(f"WARNING: [BACKPROP] No critique found for {agent_id}. Skipping update.")
-                            return layer_idx, agent_idx, prompt 
-                    
+                                   
                     analysis_str = await attribute_chain.ainvoke({"agent_prompt": prompt})
                     try:
                         analysis = clean_and_parse_json(analysis_str)
@@ -1636,7 +1616,6 @@ def create_update_agent_prompts_node(llm):
                     new_prompt = await dense_spanner_chain.ainvoke({
                         "attributes": analysis.get("attributes"),
                         "hard_request": analysis.get("hard_request"),   
-                        "critique": critique_for_this_agent,
                         "sub_problem": agent_sub_problem,
                         "mbti_type": mbti_type, 
                         "name": name
@@ -2064,12 +2043,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
         async def assess_progress_and_decide_path(state: GraphState):
             if state.get("is_code_request"):
-                await log_stream.put("LOG: Synthesized code execution failed. Skipping re-framing and proceeding to next epoch if available.")
+
                 if state["epoch"] >= state["max_epochs"]:
+
                     await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished after code failure.")
                     return "build_final_rag_index"
                 else:
-                    return "update_prompts"
+                    return "reframe_and_decompose"
 
             if state["epoch"] >= state["max_epochs"]:
                 await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
@@ -2077,6 +2057,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             
             else:
                 return "reframe_and_decompose"
+
 
         if is_code:
 
