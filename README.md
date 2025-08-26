@@ -1,136 +1,118 @@
 ![thumbnail](https://github.com/user-attachments/assets/13694758-a5c9-40c5-9c07-c7a168e660cf)
 
-# Network of Agents (NoA): Democratizing Deep Thought 🧠
+# local-deepthink: Democratizing Deep Thought 🧠
 
 I've been thinking a lot about how we, as people, develop ideas. It's rarely a single, brilliant flash of insight. Our minds are shaped by the countless small interactions we have throughout the day—a conversation here, an article there. This environment of constant, varied input seems just as important as the act of thinking itself.
 
-I wanted to see if I could recreate a small-scale version of that "soup" required for true insight, for local LLMs. The result is this project, Network of Agents (NoA).
+I wanted to see if I could recreate a small-scale version of that "soup" required for true insight for local LLMs. The result is this project, **local-deepthink**. It's a system that runs a novel conceptual algorithm called a **Qualitative Neural Network (QNN)**. In a QNN, different AI agents are treated like "neurons" that collaborate and critique each other to refine ideas, effectively trading slower response times for higher quality and more comprehensive outputs.
+
+https://www.youtube.com/watch?v=GSTtLWpM3uU
 
 ## ⚠️ Alpha Software - We Need Your Help! ⚠️
-Please be aware that NoA is currently in an alpha stage. It is experimental research software, and you may encounter bugs, unexpected behavior, or breaking changes.
+Please be aware that local-deepthink is currently in an alpha stage. It is experimental research software. You may encounter bugs, unexpected behavior, or breaking changes.
 
-Your feedback is invaluable. If you run into issues, have ideas, or want to contribute, please **open an issue** on our GitHub repository. Helping us identify and squash bugs is one of the most important contributions you can make right now!
+Your feedback is invaluable. If you run into a crash or have ideas, please **open an issue** on our GitHub repository with your graph monitor trace log. Helping us identify and squash bugs is one of the most important contributions you can make right now!
 
 ## **Is true "deep thinking" only for trillion-dollar companies?**
-NoA is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepThink offer powerful reasoning by giving their massive models more "thinking time" in a closed environment, NoA explores a different path: **emergent intelligence**. We simulate a society of AI agents that collaborate, critique, and evolve their understanding collectively. The best part is that you don't need a supercomputer. NoA is designed to turn even a modest 32gb RAM laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models (like a quantized 30B-a3b parameter version of Qwen), you can leave the graph-network running for hours or even days, allowing it to iteratively refine its approach and "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.  
 
-https://github.com/user-attachments/assets/009abf33-9083-4d6c-a5fa-3936bba48243
+**local-deepthink** is a research platform that challenges the paradigm of centralized, proprietary AI. While systems like Google's DeepMind offer powerful reasoning by giving their massive models more "thinking time" in a closed environment (for a high price), local-deepthink explores a different path: **emergent intelligence on affordable local hardware**. We simulate a society of AI agents that collaborate, evolve, and deepen their understanding collectively over time.
 
+Essentially, you can think of this project as a way to **max out a model's performance by trading response time for quality**. The best part is that you don't need a supercomputer. local-deepthink is designed to turn even a modest 32gb RAM CPU-only laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models, you can leave the network running for hours or even days, allowing it to "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
+
+## Use Cases
+The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for problems where the only clue you have is a vague question or for one-shotting very long prompting sessions. Best part? Soon you will be able to export the QNN into a JSON file and take it with you at the weight of only megabytes and plug it somewhere else to whatever LLM you like. If you create an RPG world, you could export its QNN and have other people prompt it.
+
+*   **For Non-Programmers: Ultra-Long Creative Generation**
+    Think of local-deepthink as a way to handle prompts that require ultra-long or deeply creative outputs. Do you want to theory-craft a complex system or design the lore of an entire RPG world? Normally, this requires prompting a model repeatedly and figuring out different system prompts. With local-deepthink, you give the system a high-level goal, and the QNN figures out the rest. At the end of the run, it delivers a comprehensive, queryable knowledge base, and an interrogator chain can use your points of interest to generate an exhaustive final report.
+
+*   **For Programmers & Researchers: Conceptual Algorithm Design**
+    If you are a researcher building algorithms from scratch, you can use local-deepthink to conceptualize new, SOTA (State-of-the-Art) algorithms. The system can synthesize agent outputs into a final, runnable code block, making it an ideal tool for exploring novel solutions where external dependencies can be plugged in later.
 
 ## Changelog
 
-*   **Experimental Code Generation & Execution:** A new "Coder Mode" has been introduced for requests that involve generating runnable code. The network now uses specialized coder agents and a code-synthesis process. Crucially, the `progress_assessor` agent can now **execute the generated Python code in a sandboxed environment** to check for errors and verify its output, providing more robust feedback for the next epoch.
-
-*   **Interactive RAG Chat & Diagnostic Tool:** The process allows you to directly **chat with the generated RAG index** o, that allows you to send raw queries directly to the hidden layer, providing a powerful diagnostic feature to interrogate the massive "cube of thinking text" from all hidden layers. 
-
-*   **Final Knowledge Harvest & RAG:** The run doesn't just end with a final answer anymore. All agent outputs from all epochs are now archived into a multi-layered RAPTOR (Recursive Abstractive Processing over Trees of RAG) index. Upon completion, an `interrogator` agent generates a series of expert-level questions informed by both the original problem and your chat session, and a `paper_formatter` agent uses the RAG index to write a formal academic-style paper answering each question. The final output is now a downloadable ZIP file containing this collection of research papers.
-
-*   **Dynamic Critique & Assessor Annealing:** The network's "loss function" now evolves more deeply. A new meta-process analyzes the collective output of the agents after each epoch to determine their collective affinity. It then selects a "pseudo-neurotransmitter" that dynamically rewrites the system prompts of both the `critique` and `progress_assessor` agents, changing their personas to provide different styles of feedback and evaluation for the next epoch.
-
-*   **Dynamic Problem Re-framing:** The network can now assess its own progress. If it determines it has made a "significant breakthrough," it formulates a new, more advanced problem that builds upon its success. This turns the process from simple refinement into a genuine journey of discovery.
-
-*   **Divide and Conquer - Automatic Problem Decomposition:** NoA now starts by breaking down the user's initial problem into smaller, granular sub-problems. Each agent is assigned a unique piece of the puzzle, ensuring a more focused and diverse approach from the start.
-
-*   **Keeping an Eye on Things - Perplexity Metrics & Chart:** A new `metrics` node calculates the average perplexity of all agent outputs after each epoch. We plot this on a live chart in the GUI, giving you a visual heuristic for the network's coherence over time.
-
-*   **Better Memory for the Long Haul - Dynamic Summarization:** To support extra-long mining sessions, a specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights without overflowing the context window.
+*   **Interactive RAG Chat & Diagnostic Tool:** The process now pauses after the final epoch, allowing you to directly **chat with the generated RAG index**. This powerful diagnostic feature lets you interrogate the massive "cube of thinking text" from all hidden layers, ask follow-up questions, and gain extra insights.
+*   **Final Knowledge Harvest & RAG:** The run now archives all agent outputs into a multi-layered RAPTOR index. Upon completion, `interrogator` and `paper_formatter` agents use this RAG index to write a formal academic-style paper answering expert-level questions about the problem.
+*   **Dynamic Problem Re-framing:** The network can now assess its own progress. After each cycle (epoch), it formulates a new, more advanced problem that builds upon its previous solution, forcing the agents to continuously deepen their understanding.
+*   **Divide and Conquer - Automatic Problem Decomposition:** local-deepthink now starts by breaking down the user's initial problem into smaller, granular sub-problems, assigning each agent a unique piece of the puzzle.
+*   **Perplexity Metrics & Chart:** A `metrics` node calculates the average perplexity of all agent outputs after each epoch, plotted on a live chart in the GUI.
+*   **Dynamic Summarization:** A specialized chain now automatically creates a concise summary of an agent's older memories if its memory log gets too long, preserving key insights while managing context length.
 
 ## The Core Idea: Qualitative Backpropagation
 
-Here’s the part that I'm most curious about. I was inspired by the concept of backpropagation in neural networks. It's a numerical algorithm, of course, but I wondered if the core principle could be applied qualitatively. What if, instead of sending back a numerical error signal, you sent back a "reflection"?
+The core experiment is the **Qualitative Neural Network (QNN)**, an algorithm inspired by backpropagation in traditional neural networks. It's a numerical algorithm, of course, but what if the principle could be applied qualitatively? Instead of sending back a numerical error signal, you send back a "reflection."
 
-After the network produces a solution, a "critique" agent reviews it and provides criticism. This feedback is then used to **automatically re-write the core system prompts** of the agents that contributed. The goal is for the network to "learn" from its mistakes over multiple cycles, refining not just its answers, but its own internal structure and approach.
+After the network produces a solution, a "reflection pass" analyzes the result and **automatically re-writes the core system prompts** of the agents that contributed. The goal is for the network to "learn" from its own output over multiple cycles (epochs), refining not just its answers, but its own internal structure and approach. QNNs are also extremely human-interpretable, unlike their numerical counterparts.
 
 ### The Trade-Off: Speed for Depth
 
-The obvious trade-off here is speed. It’s the opposite of instantaneous. A 6-layer network with 6 agents per layer, running for 20 cycles, can easily take 12 hours to complete. You're trading quick computation for a slow, iterative process of refinement.
+The obvious trade-off here is speed. A 6-layer network with 6 agents per layer, running for 20 epochs, can easily take 12 hours to complete. You're trading quick computation for a slow, iterative process of refinement. The algorithm excels in problems where creativity and insight override pure precision, like developing new frameworks in the social sciences.
 
-The algorithm does really well in problems where creativity and insight override pure precision. It can come up with new frameworks for the social sciences, for instance. Physics and math, not so much.
+## The QNN Algorithm: From Individual Agents to a Collective Mind
 
-
-## The NoA Algorithm: From Individual Agents to a Collective Mind
-
-The core of NoA is a novel algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a unique "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
+The core of local-deepthink is the novel QNN algorithm that orchestrates LLM agents into a dynamic, layered network. This architecture facilitates a "forward pass" for problem-solving, a "reflection pass" for learning, and a final "harvest pass" for knowledge extraction.
 
 ### The Forward Pass
 
-In NoA, the "weights" and "biases" of the network are not numerical values but the rich, descriptive personas of its agents, defined in natural language.
+In a QNN, the "weights" and "biases" of the network are not numerical values but the rich, descriptive personas of its agents, defined in natural language.
 
-1.  **Input Layer & Decomposition**: The process starts with a user's high-level problem. A `master strategist` node first **decomposes this problem into smaller, distinct sub-problems**. NoA then generates abstract "seed verbs" and assigns them to diverse MBTI personality archetypes. An `input-spanner` chain forges the first layer of agents, each with a unique persona, a specialized career, a distinct set of skills, and its own **assigned sub-problem**.
+1.  **Input Layer & Decomposition**: The process starts with a user's high-level problem. A `master strategist` node first **decomposes this problem into smaller, distinct sub-problems**. These are then assigned to the first layer of agents.
+2.  **Building Depth with Dense Layers**: A `dense-spanner` chain analyzes the agents of the preceding layer and spawns a new agent in the next layer, specifically engineered to tackle a tailored challenge.
+3.  **Action**: A user's prompt initiates a cascade of information through the network until the final layer is reached, constituting a full "forward pass" of collaborative inference.
 
-2.  **Building Depth with Dense Layers**: A `dense-spanner` chain analyzes the agents of the preceding layer, identifies their core attributes, and formulates a "hard request"—a tailored challenge. It then spawns a new agent in the next layer, specifically engineered to tackle this challenge, progressively increasing the system's intellectual depth.
+### The Reflection Pass: Learning Through Evolving Goals
 
-3.  **Action**: A user's prompt initiates a cascade of information through the network. The input layer agents process their assigned sub-problems, and their structured JSON outputs are broadcast to every agent in the subsequent layer. This dense, layer-by-layer processing continues until the final layer is reached, constituting a full "forward pass" of collaborative inference.
+This is where a QNN truly differs from a simple multi-agent system. Instead of simply correcting errors, the network learns by continuously raising the bar.
 
-### The Reflection Pass: Learning, Critiquing, and Evolving Goals
-
-This is where NoA truly differs from a simple multi-agent system. The reflection pass is a multi-stage process where the network assesses its own performance and decides how to adapt.
-
-1.  **Synthesis and Metrics**: After the forward pass, a `synthesis_node` merges the outputs from the final agent layer into a single, coherent solution. Immediately after, a `metrics_node` analyzes all agent outputs from the epoch to calculate a perplexity score.
-
-2.  **Dynamic Annealing of Critique & Assessment**: Before any critique is generated, an `update_personas` node analyzes the tone and content of the agents' outputs. It uses a unique heuristic to select a new persona and dynamically rewrites the system prompts for both the **`critique` and `progress_assessor` agents**. This ensures both the *style* of feedback and the *criteria for progress* adapt to the network's current state.
-
-3.  **The Crossroads of Progress**: The synthesized solution is passed to the dynamically-configured `progress_assessor` node. This AI philosopher evaluates whether the solution represents "significant progress." For code-related tasks, this node **executes the generated code in a sandbox** to check for errors, using the outcome as a key factor in its assessment. This decision dictates the course of the next epoch.
-
-4.  **Path A: The "Eureka!" Path (Significant Progress)**: If a breakthrough is achieved, the network's goal shifts to advancement. A `problem_reframer` node formulates a **new, more challenging problem** that builds on the recent success. This new problem is then decomposed and assigned to the agents.
-
-5.  **Path B: The "Refinement" Path (No Significant Progress)**: If the solution is not a major leap forward, the system focuses on iterative improvement. The `critique_chain` scrutinizes the solution and generates global and individual critiques.
-
-6.  **Updating the "Neural" Weights**: This feedback—either a new mission or a detailed critique—propagates backward through the network. An `update_agent_prompts_node` uses this signal to modify each agent's core system prompt, refining their skills, attributes, and roles.
-
-This entire cycle is one "epoch." By running multiple epochs, the network engages in a process of collective sense-making that can now not only deepen its understanding but also evolve its own objectives.
+1.  **Synthesis and Metrics**: A `synthesis_node` merges the final outputs into a single solution, and a `metrics_node` calculates a perplexity score for the epoch.
+2.  **Problem Re-framing**: The core of the learning loop. A `problem_reframer` node analyzes the synthesized solution and formulates a new, more ambitious problem that represents the "next logical step." This prevents the network from stagnating and pushes it toward deeper insights.
+3.  **Decomposition of the New Problem**: The newly framed problem is then broken down again into a new set of granular sub-problems.
+4.  **Updating the "Neural" Weights**: This new set of sub-problems is propagated backward through the network. An `update_agent_prompts_node` modifies each agent's core system prompt to align with its new, more advanced task for the next epoch.
 
 ### The Final Harvest Pass: Consolidating Knowledge
 
-When the final epoch is complete, the process is not over. The network enters a final phase to extract and structure the knowledge it has generated.
-
-1.  **Archival and RAG Indexing**: An `archive_epoch_outputs` node gathers every single agent output from every epoch of the entire run. This collection of documents is then used to build a comprehensive, multi-layered RAPTOR RAG index, creating a searchable knowledge base of the entire thought process.
-
-2.  **Pause for Interactive Chat**: At this point, the network pauses. The user is presented with a chat interface, allowing them to directly query the newly created RAG index. This serves as a powerful diagnostic tool, enabling the user to probe the network's collective "mind," ask clarifying questions, and explore threads of reasoning before the final summarization.
-
-3.  **Interrogation and Synthesis**: When the user concludes the chat session, the entire conversation is converted into documents and added to the knowledge base, which is re-indexed. A `final_harvest` node then takes over. It uses an `interrogator` agent to generate a series of deep, expert-level questions about the original problem, now also taking context from the **user's chat session**. For each question, it performs a retrieval query against the RAG index and feeds the context to a `paper_formatter` agent.
-
-4.  **Generating the Final Report**: The `paper_formatter` synthesizes the retrieved context into a formal, academic-style markdown document. The final output of the entire run is a downloadable ZIP archive containing this collection of research papers, representing the network's total accumulated knowledge on the topic.
+1.  **Archival and RAG Indexing**: All agent outputs from every epoch are used to build a comprehensive RAPTOR RAG index.
+2.  **Pause for Interactive Chat & Diagnosis**: The network pauses, allowing you to directly query the RAG index. Because QNNs are highly interpretable, you can even diagnose a specific "neuron" by asking the chat about `agent_1_1` to get that specific agent's entire history.
+3.  **Interrogation and Synthesis**: When you're done, your chat is added to the knowledge base. An `interrogator` agent then formulates expert-level questions about the original problem based on your points of interest.
+4.  **Generating the Final Report**: A `paper_formatter` agent uses the RAG index to answer these questions, synthesizing the information into formal research papers. The final output is a downloadable ZIP archive of this report.
 
 ## Vision & Long-Term Roadmap: Training a World Language Model
 
-Beyond solving individual problems, every NoA run generates an incredibly valuable asset: a complete, structured trace of a multi-agent collaborative process. This isn't just a log file; it's a dataset capturing the evolution of thought. It includes the initial agent personas, the layer-by-layer Chain-of-Thought (CoT) traces, the critiques, the diff of how each agent's core prompts evolved, and now, a complete RAG index of the entire process.
+Every local-deepthink run generates a complete, structured trace of a multi-agent collaborative process—a dataset capturing the evolution of thought. We see this as **powerful, multi-dimensional data for training next-generation reasoning models.**
 
-We conceptualize these collected traces as a new form of data: **powerful, multi-factorial, and multi-dimensional data for training next-generation reasoning models.** Unlike traditional datasets which capture static information, this data captures the *dynamics* of reasoning. It shows how diverse viewpoints clash, converge, and synthesize a solution.
+Our ultimate objective is to use this data to train a true **"World Language Model" (WLM)**. A WLM would move beyond predicting the next token to understanding the fundamental patterns of collaboration, critique, and collective intelligence. The exciting possibility is that fine-tuning a model on thousands of these QNN logs might make static system prompts obsolete, as the trained LLM would learn to implicitly figure them out and dynamically switch its reasoning process on the fly.
 
-Our ultimate objective is to use this emergent data to train a true **"World Language Model" (WLM)**.
+## Mid-Term Research Goals & How You Can Help
+This is still alpha software, and we need your help. Besides the value you get after "mining" a solution, it's also super entertaining to watch the neurons interact with each other! If you have the hardware, please consider helping us benchmark.
 
-A WLM, as we envision it, moves beyond predicting the next token. It would be a model trained on the fundamental patterns of collaboration, critique, and collective intelligence. It would learn the implicit "language" of how diverse agents interact to build something greater than the sum of their parts. By training a foundation model on thousands of these solution-mining runs, we hypothesize it could develop a more robust, generalized reasoning capability—one that intrinsically understands context, causality, and problem decomposition from a systemic perspective.
+*   **Hunt Bugs**: If you run into a crash, please open an issue with your graph monitor trace log.
+*   **Deep Runs & Benchmarking**: I don't have access to systems like Google's DeepMind, so it would be fantastic if someone with a powerful local rig could run and benchmark moderate-to-large QNNs.
+*   **Thinking Models Support**: Help integrate support for dedicated "thinking models".
+*   **P2P Networking for Distributed Mining:** My background is in Python and AI, not distributed systems. A long-term vision is a P2P networking layer to allow multiple users to connect their instances and collectively "mine" a solution to a massive problem. If you have experience here, I would love to collaborate.
+*   **Checkpoint Import/Export**: Implement a mechanism that allows you to save a QNN run and pick it up where you left off, making the system more crash-resistant.
 
-This represents the grand ambition of the NoA project: to not only solve hard problems but to create a data flywheel that can be used to forge a new paradigm of reasoning AI.
+## What's Next?
+The current focus is on polishing and debugging existing features to reach a beta phase. After that, the next iteration will introduce specialized modes and advanced capabilities:
 
-## Mid-Term Research Goals
+*   **Story Telling Mode:** A dedicated mode for generating complex narratives, characters, and plots.
+*   **World Simulation Mode:** For creating and simulating intricate worlds with consistent lore, physics, and histories, perfect for RPGs and theoretical systems.
+*   **Recursive Module Stitching:** An advanced feature enabling the system to design, code, and recursively assemble different software modules to create complex, full-stack applications from a high-level prompt.
+*   **Export your QNN:** Soon you will be able to import and export your QNN in plain JSON format, so other people can prompt it, at just a few mbs of size.
 
-These are the core research avenues we are actively exploring to enhance the network's capabilities.
+## Hyperparameters & Hardware Guidelines ⚙️
 
+*   **`CoT trace depth`**: The number of layers in your agent network.
+*   **`Number of epochs`**: One full cycle of a forward and reflection pass.
+*   **`Vector word size`**: The number of "seed verbs" for initial agent creation.
+*   **`Number of Questions for Final Harvest`**: The number of questions the `interrogator` agent generates.
+*   **`Prompt alignment` (0.1 - 2.0)**: How strongly an agent's career is influenced by the user's prompt.
+*   **`Density` (0.1 - 2.0)**: Modulates the influence of the previous layer when creating new agents.
+*   **`Learning rate` (0.1 - 2.0)**: Controls the magnitude of change an agent makes to its prompt.
 
-*   **Enhance Combinatorial Heuristics**: The philosophical underpinning of NoA is that complex solutions emerge from the combinatorial power of language. The current "pseudo-neurotransmitter" system is a first step. We plan to research and implement more advanced heuristics to guide the LLM agents, improving their ability to reason symbolically and generate novel solutions.
-
-*   **Develop More Sophisticated Metrics**: While perplexity provides a starting point, we plan to research and implement more multi-faceted metrics to track the network's health, cognitive diversity, and the quality of its emergent solutions over time.
-*   **Peer-to-Peer Networking for Distributed Mining:** To truly democratize deep thought, we will add an optional P2P networking layer. This will allow multiple users to connect their NoA instances, distributing the agent computation across a network of machines to collectively "mine" a solution.
-
-
-## Hyperparameters Explained: Tuning Your Theory Crafting Mining Rig ⚙️
-
-
-The behavior of the NoA network is governed by several key hyperparameters, allowing you to architect the collaborative "mining" process.
-
-*   **`CoT trace depth`**: The number of layers in your agent network. Deeper networks allow for more steps of abstraction.
-*   **`Number of epochs`**: One full cycle of a forward pass (inference) and a reflection pass (learning). More epochs allow the network more time to "mine" a solution.
-*   **`Vector word size`**: The number of "seed verbs" for initial agent creation. A larger size provides a richer starting point.
-*   **`Number of Questions for Final Harvest`**: The number of expert-level questions the `interrogator` agent will generate to create the final report.
-*   **`Prompt alignment` (0.1 - 2.0)**: Controls how strongly an agent's career is influenced by the user's prompt. Higher values lead to more specialization.
-*   **`Density` (0.1 - 2.0)**: Modulates the influence of the previous layer when creating new agents. High density leads to refinement; low density encourages novelty.
-*   **`Learning rate` (0.1 - 2.0)**: Controls the magnitude of change an agent makes to its prompt in response to critique.
+#### Hardware Recommendations:
+*   **CPU-Only Laptop (32GB RAM)**: 2x2 or 4x4 networks with 3-4 epochs are ideal.
+*   **High-End Rig (64GB RAM + 24GB GPU)**: 6x6 up to 10x10 networks with 2-10 epochs should be doable in 20-45 minutes.
 
 ## Technical Setup
-
-The application is built with a Python backend and a vanilla HTML/CSS/JS frontend.
 
 *   **Backend**: FastAPI, LangChain, LangGraph, Ollama
 *   **Frontend**: HTML, CSS, JavaScript
@@ -139,10 +121,9 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
-    cd NoA
+    git clone https://github.com/andres-ulloa-de-la-torre/local-deepthink
+    cd local-deepthink
     ```
-
 2.  **Create and activate a virtual environment:**
     ```bash
     python -m venv venv
@@ -151,45 +132,33 @@ The application is built with a Python backend and a vanilla HTML/CSS/JS fronten
     # On macOS/Linux
     source venv/bin/activate
     ```
-
 3.  **Install dependencies:** `pip install -r requirements.txt`.
-
-4.  **Install and Run Ollama**: This application requires a running Ollama server for local inference.
+4.  **Install and Run Ollama**:
     *   Follow the official instructions to install Ollama.
-    *   Download the primary model. The default is `dengcao/Qwen3-30B-A3B-Instruct-2507:latest`.
+    *   Download a primary model for the agents (default is `dengcao/Qwen3-3B-A3B-Instruct-2507:latest`).
         ```bash
-        ollama pull dengcao/Qwen3-30B-A3B-Instruct-2507:latest
+        ollama pull dengcao/Qwen3-3B-A3B-Instruct-2507:latest
         ```
-    *   **Download the compulsory summarization model.** NoA requires `qwen3:1.7b` for its internal summarization tasks (memory, RAG indexing). This is not optional.
+    *   **Download the compulsory summarization model.** local-deepthink requires `qwen3:1.7b` for its internal processes.
         ```bash
         ollama pull qwen3:1.7b
         ```
-    *   Ensure the Ollama application is running in the background.
-
+    *   Ensure the Ollama application is running.
 5.  **Run the application:**
     ```bash
     uvicorn app:app --reload
     ```
-
-6.  **Access the GUI:** Open your web browser and navigate to `http://127.0.0.1:8000`.
+6.  **Access the GUI:** Open your browser to `http://127.0.0.1:8000`.
 
 ## How It Works
 
-1.  **Architect the Network**: Use the GUI to set the hyperparameters that define your network's structure and learning capacity.
-2.  **Pose a Problem**: Enter the high-level prompt you want the agent network to solve.
-3.  **Build and Run**: Click the "Build and Run Graph" button to initiate the process.
-4.  **Observe the Emergence**: The backend dynamically constructs the agent network using LangGraph. You can monitor the entire process—agent creation, forward inference, and reflective learning—in the real-time log viewer.
-5.  **Chat and Diagnose**: Once the epochs are complete, the GUI will present a chat interface. Use this to directly query the RAG index of the network's entire thought process. To perform a raw query on the RAG index, start your message with `diag:`.
-6.  **Harvest and Download**: When you are finished chatting, click the "HARVEST" button. This will incorporate your chat history and generate the final report. A download link for a ZIP file containing the research papers will appear.
+1.  **Architect the Network**: Use the GUI to set the hyperparameters for your QNN.
+2.  **Pose a Problem**: Enter the high-level prompt you want the network to solve.
+3.  **Build and Run**: Click the "Build and Run Graph" button.
+4.  **Observe the Emergence**: Monitor the process in the real-time log viewer.
+5.  **Chat and Diagnose**: Once epochs are complete, use the chat interface to query the RAG index of the network's entire thought process.
+6.  **Harvest and Download**: When finished chatting, click "HARVEST" to generate and download the final ZIP report.
 
-## Let's Collaborate: Building a P2P Network
-
-This is where I'd love to get some community input.
-
-My long-term vision is to go beyond a single machine. I dream of building a P2P networking layer that would allow multiple users to connect their instances of the app. We could create a shared, distributed network where our machines could collaborate to tackle truly massive problems.
-
-However, my background is in Python and AI, and I'm not an expert in distributed systems. **If you're someone who knows about peer-to-peer networking and this idea sounds at all interesting to you, I would genuinely love to hear from you and potentially collaborate.**
-
-It’s an open-source experiment, and I’d be grateful for any thoughts, feedback, or ideas you might have.
+It’s an open-source experiment, and I’d be grateful for any thoughts, feedback, or ideas you might have. Please support the repo if you want to see more open-source work like this!
 
 Thanks.

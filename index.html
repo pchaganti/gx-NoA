@@ -319,20 +319,21 @@
                 </div>
                 <label for="prompt">Prompt:</label>
                 <textarea id="prompt" name="prompt" required>
-                    
-                Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers,
+         
 
-                    to run inference. I presume the foundation of training and architecture are allready figured out, so i want a new inference algorithm. For this conceptualziation assume
-                    
-                    the world is full of spinning wheels, and data represents a measured state of the "wheel" at a given time. Abudant trining data samples the full state of the "wheel" by offering all the posible data of the wheel state.
 
-                    Current inference algoritm in the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their reponses can be shallow.
+ Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers, to run inference. I presume the foundation of training and architecture are allready figured out, so i want you to create a new inference algorithm that helps exsiting architectures acheive AGI. For this conceptualziation assume
 
-                    I want you to make in python with excellent documentation:
+the world is full of spinning wheels (harmonic oscillators), like we see them in atoms, solar systems, galaxies, human hierarchies...etrc, and data represents a measured state of the "wheel" at a given time. Abudant training data samples the full state of the "wheel" by offering all the posible data of the wheel full state. This is where understanding is reached: by spinning the whole wheel and assimilating all possibly perspectives.
 
-                        1. An inference algorithm that uses a PID like approach with perturbaitve feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. The inference algorithm should sample all its progressive output and feed it back into the transformer.
+ Current inference algoritms in the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their responses can be shallow. The training algorithms encode the wheels but inference algorithms do not extract them very well.
 
-                        2. The inference algorithm should be easily pluggable to a huggignface transformer
+ I want you to make in python with excellent documentation:
+
+1. An inference algorithm to achieve AGI through better inference using a PID like approach with perturbative feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. Figure out a good way to integrate PID loops into transformer inference so transformers learn on inference. 
+
+ 2. The inference algorithm should be coded from scratch without using external dependencies. The transformer algorithm this algorithm runs inference for shall be mocked.
+
 
 
                 </textarea>
@@ -760,20 +761,26 @@
                 }
                 return;
             }
-            
-            if (result.code_solution) {
+                    if (result.code_solution) {
                 addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-         
+
                 const rawCode = result.code_solution;
+                
+                // 1. First, extract the code from the backticks as before.
                 const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(rawCode);
-                const cleanCode = codeMatch ? codeMatch[1].trim() : rawCode.trim();
+                let cleanCode = codeMatch ? codeMatch[1].trim() : rawCode.trim();
+
+                // 2. **THIS IS THE FIX:** Replace all literal '\\n' with actual newlines.
+                cleanCode = cleanCode.replace(/\\n/g, '\n');
 
                 if(codeOutput) {
-                    codeOutput.textContent = cleanCode; 
+                    // 3. Now set the textContent with the *corrected* string
+                    codeOutput.textContent = cleanCode;
+                    
+                    // 4. Finally, let Prism highlight the formatted code
                     Prism.highlightElement(codeOutput);   
                 }
 
-                if(codeOutput) codeOutput.textContent = cleanCode; // Display the clean code
                 if(codeReasoning) codeReasoning.textContent = result.reasoning;
                 if(codeResultContainer) codeResultContainer.classList.remove('hidden');
                 if(runInterface) runInterface.classList.add('hidden');
@@ -784,9 +791,7 @@
                     runButton.disabled = false;
                     runButton.textContent = 'Build and Run Graph';
                 }
-            
-
-            } else if( result.message = "Chat is now active."){
+            }else if( result.message = "Chat is now active."){
                 
                 //Hide diagnostic chat and enable harvest chat
                 if(diagnosticChatContainer) diagnosticChatContainer.classList.add('hidden');
