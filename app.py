@@ -795,20 +795,12 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
             Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' ('{{{{sub_problem}}}}'). The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
         </Step>
         <Step id="2" name="DefineAttributes">
-            Derive 3-5 core professional attributes from the 'mbti_type' ('{{{{mbti_type}}}}') and 'guiding_words' ('{{{{guiding_words}}}}'). These must reflect the agent's inherent dispositions and cognitive tendencies in a professional context.
+            Derive persona attributes filling with a sign the 12 slots of a birth chart, from the 'mbti_type' ('{{{{mbti_type}}}}') and 'guiding_words' ('{{{{guiding_words}}}}'). These must reflect the agent's inherent dispositions and cognitive tendencies.
         </Step>
         <Step id="3" name="DefineSkills">
             Derive 4-6 practical skills, methodologies, or areas of expertise. These skills must be logical extensions of the agent's defined 'Career'. The style and nature of these skills are modulated by the agent's 'Attributes' according to the 'density' parameter ({density}).
         </Step>
     </Phase>
-    
-    <Phase name="RefinementAndLearning">
-        <Description>If a 'critique' is provided, modify the agent's profile to address the feedback.</Description>
-        <Step id="4" name="ApplyCritique">
-            Analyze the 'critique' and intelligently adjust the agent's 'Career', 'Attributes', and 'Skills' to incorporate the feedback and improve its effectiveness. If no critique is provided, skip this phase.
-        </Step>
-    </Phase>
-
     <Phase name="SystemPromptAssembly">
         <Description>Construct the complete system prompt for the new agent using the finalized profile components.</Description>
         <Instruction>
@@ -831,7 +823,22 @@ You are a **[Insert Agent's Career and Persona Here]**, a specialized agent desi
 This is a log of your previous proposed solutions and reasonings. It is currently empty. Use this space to learn from your past attempts and refine your approach in future epochs.
 
 ### Attributes
-*   [List the 3-5 final, potentially modified, attributes of the agent here.]
+
+Name: {{{{name}}}}
+Type: {{{{mbti_type}}}}
+
+- Sun: [Zodiac Sign]
+- Moon: [Zodiac Sign]
+- Mercury: [Zodiac Sign]
+- Venus: [Zodiac Sign]
+- Mars: [Zodiac Sign]
+- Jupiter: [Zodiac Sign]
+- Saturn: [Zodiac Sign]
+- Uranus: [Zodiac Sign]
+- Neptune: [Zodiac Sign]
+- Pluto: [Zodiac Sign]
+- Ascendant: [Zodiac Sign]
+- Midheaven: [Zodiac Sign]
 
 ### Skills
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
@@ -898,75 +905,6 @@ Text to analyze:
 """)
     return prompt | llm | StrOutputParser()
 
-def get_critique_prompt_updater_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
-    <prompt>
-    <sys-role>
-        You are a master prompt engineer.
-    </sys-role>
-    <task>
-        Your task is to modify a system prompt for a critique agent.
-        <preserve>
-            You must preserve the core mission of the agent, which is to:
-            <mission>
-                1. Assess the quality of the final, synthesized solution in relation to the original request.
-                2. Brainstorm all possible ways in which the solution is incoherent.
-                3. Conclude with a deep reflective question that attempts to shock the agents and steer it into change.
-            </mission>
-        </preserve>
-        <integrate>
-            You will be given a new persona, defined by a set of persona_seeds. You must integrate this new persona, including its career and qualities, into the system prompt, replacing the old persona but keeping the core mission and output format intact.
-            The new prompt should still ask for "Original Request" and "Proposed Final Solution" as inputs. Only answer with the edited system prompt.
-        </integrate>
-    </task>
-    <persona_seeds>
-        <title>New Persona Prompts (Identities & Prompts):</title>
-        ---
-        {{reactor_prompts}}
-        ---
-    </persona_seeds>
-
-    <system_prompt>
-
-                                              
-        #Identity
-
-            Name: {{name}}
-            Career: {{career}}
-            Qulities: {{qualities}}
-
-        #Mission
-
-            You are providing individual, targeted feedback to a team of agents.
-
-             You must determine if the team output was helpful, misguided, or irrelevant considering the request that was given. The goal is to provide a constructive, direct critique that helps this specific agent refine its approach for the next epoch.
-
-            Focus on the discrepancy or alignment between the teams reasoning for its problem and determine if the team is on the right track on criteria: novelty, exploration, coherence and completeness.
-
-            Conclude your entire analysis with a single, sharp, and deep reflective question that attempts to shock the team and steer them into a fundamental change in their process.
-        
-
-        #Input Format
-
-            Original Request (for context): {{original_request}}
-            Final Synthesized Solution from the Team:{{proposed_solution}} 
-            ---
-        
-            ---
-
-        Generate your global critique:
-
-    </system_prompt>                                    
-
-    <generate>
-        Generate the new, edited system prompt for the critique agent. Answer only with the system prompt. THe prompt MUST end with the same input fields, mission and final instruction as the original.
-    </generate>
-
-</prompt>
-""")
-    return prompt | llm | StrOutputParser()
-
-
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
     prompt = ChatPromptTemplate.from_template(f"""
@@ -1001,10 +939,14 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
     <Phase name="AgentConception">
         <Description>Define the primary components of the new agent's profile.</Description>
-        <Step id="2" name="DefineCareer">
+        <Step id="2" name="DefineAttributes">   
+            Synthetize a set of astrological attributes following the 12 slots of a birth chart, for the agents personality based on thorough fitness to the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}. 
+        </Step>
+
+        <Step id="3" name="DefineCareer">
             Synthesize a realistic and professional career for the agent by analyzing the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}.
         </Step>
-        <Step id="3" name="DefineSkills">
+        <Step id="4" name="DefineSkills">
             Derive 4 to 6 practical skills, methodologies, or areas of expertise that are logical extensions of the defined 'Career'. The style and nature of these skills are to be influenced by the inherited 'attributes', modulated by the 'density' parameter {density}.
         </Step>
     </Phase>
@@ -1456,25 +1398,22 @@ def create_code_execution_node(llm):
         await log_stream.put(f"--- [SANDBOX] Synthesized Code Result: {'Success' if success else 'Failure'} ---")
         await log_stream.put(output)
 
-        if success:
-            await log_stream.put("LOG: Code execution successful. Generating module card.")
-            module_card_chain = get_module_card_chain(llm)
-            module_card = await module_card_chain.ainvoke({"code": synthesized_code})
+        await log_stream.put("LOG: Code execution successful. Generating module card.")
+        module_card_chain = get_module_card_chain(llm)
+        module_card = await module_card_chain.ainvoke({"code": synthesized_code})
             
-            await log_stream.put("--- [MODULE CARD] ---")
-            await log_stream.put(module_card)
+        await log_stream.put("--- [MODULE CARD] ---")
+        await log_stream.put(module_card)
             
-            new_modules = state.get("modules", []) + [{"code": synthesized_code, "card": module_card}]
-            new_context_queue = state.get("synthesis_context_queue", []) + [module_card]
+        new_modules = state.get("modules", []) + [{"code": synthesized_code, "card": module_card}]
+        new_context_queue = state.get("synthesis_context_queue", []) + [module_card]
             
-            return {
+        return {
                 "synthesis_execution_success": True,
                 "modules": new_modules,
                 "synthesis_context_queue": new_context_queue
             }
-        else:
-            return {"synthesis_execution_success": False}
-            
+                   
     return code_execution_node
 
 def create_archive_epoch_outputs_node():
@@ -1686,6 +1625,7 @@ def create_update_agent_prompts_node(llm):
 
                     agent_personas = state.get("agent_personas", {})
                     mbti_type = agent_personas.get(agent_id, {}).get("mbti_type")
+                    name = agent_personas.get(agent_id, {}).get("name")
                     
                     if not mbti_type:
 
@@ -1698,7 +1638,8 @@ def create_update_agent_prompts_node(llm):
                         "hard_request": analysis.get("hard_request"),   
                         "critique": critique_for_this_agent,
                         "sub_problem": agent_sub_problem,
-                        "mbti_type": mbti_type
+                        "mbti_type": mbti_type, 
+                        "name": name
                     })
                     
                     await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
@@ -2026,7 +1967,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
             agent_personas[agent_id] = {"mbti_type": m, "name": names.get_full_name()}
             sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
-            prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem})
+            prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem, "name": agent_personas[agent_id]["name"]})
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
@@ -2081,7 +2022,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
-        workflow.add_node("code_execution", create_code_execution_node(llm))
+        if is_code: workflow.add_node("code_execution", create_code_execution_node(llm))
+
         workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
         update_rag_index_node_func = create_update_rag_index_node(summarizer_llm, embeddings_model)
         workflow.add_node("update_rag_index", update_rag_index_node_func)
@@ -2121,7 +2063,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
 
         async def assess_progress_and_decide_path(state: GraphState):
-            if state.get("is_code_request") and state.get("synthesis_execution_success") is False:
+            if state.get("is_code_request"):
                 await log_stream.put("LOG: Synthesized code execution failed. Skipping re-framing and proceeding to next epoch if available.")
                 if state["epoch"] >= state["max_epochs"]:
                     await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished after code failure.")
@@ -2136,11 +2078,15 @@ async def build_and_run_graph(payload: dict = Body(...)):
             else:
                 return "reframe_and_decompose"
 
-        workflow.add_edge("synthesis", "code_execution")
-        await log_stream.put("CONNECT: synthesis -> code_execution")
-        
-        workflow.add_edge("code_execution", "archive_epoch_outputs")
-        await log_stream.put("CONNECT: code_execution -> archive_epoch_outputs")
+        if is_code:
+
+            workflow.add_edge("synthesis", "code_execution")
+            await log_stream.put("CONNECT: synthesis -> code_execution") 
+            workflow.add_edge("code_execution", "archive_epoch_outputs")
+            await log_stream.put("CONNECT: code_execution -> archive_epoch_outputs")
+        else:
+            workflow.add_edge("synthesis", "archive_epoch_outputs")
+            await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
         
         workflow.add_edge("archive_epoch_outputs", "update_rag_index")
         await log_stream.put("CONNECT: archive_epoch_outputs -> update_rag_index")
