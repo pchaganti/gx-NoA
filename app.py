@@ -31,16 +31,20 @@ from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
 from sklearn.cluster import KMeans
 from contextlib import redirect_stdout
+from fastapi.staticfiles import StaticFiles
 
 
 load_dotenv()
 
 app = FastAPI()
 
+app.mount("/js", StaticFiles(directory="js"), name="js")
+app.mount("/css", StaticFiles(directory="css"), name="css")
+
 log_stream = asyncio.Queue()
 
 sessions = {}
-final_reports = {} # Use a dictionary for final reports, keyed by session ID
+final_reports = {} 
 
 class RAPTORRetriever(BaseRetriever):
     raptor_index: Any
