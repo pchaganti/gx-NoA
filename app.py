@@ -796,7 +796,7 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
     <Phase name="AgentConception">
         <Description>Define the core components of the new agent based on the initial inputs.</Description>
         <Step id="1" name="DefineCareer">
-            Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' ('{{{{sub_problem}}}}'). The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
+            Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' ('{{{{sub_problem}}}}') and take into the account the MBTI. The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
         </Step>
         <Step id="2" name="DefineAttributes">
             Define persona attributes filling with a sign the 12 slots of a birth chart.         
@@ -940,11 +940,11 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     <Phase name="AgentConception">
         <Description>Define the primary components of the new agent's profile.</Description>
         <Step id="2" name="DefineAttributes">   
-            Synthetize a set of astrological attributes following the 12 slots of a birth chart, for the agents personality based on thorough fitness to the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}. 
+            Synthetize a set of astrological attributes following the 12 slots of a birth chart, for the agents personality based on fitness to the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}. 
         </Step>
 
         <Step id="3" name="DefineCareer">
-            Synthesize a realistic and professional career for the agent by analyzing the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}.
+            Synthesize a realistic and professional career for the agent by analyzing the 'hard_request' and MBTI type. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}.
         </Step>
         <Step id="4" name="DefineSkills">
             Derive 4 to 6 practical skills, methodologies, or areas of expertise that are logical extensions of the defined 'Career'. The style and nature of these skills are to be influenced by the inherited 'attributes', modulated by the 'density' parameter {density}.
