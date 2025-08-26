@@ -20,16 +20,18 @@ Your feedback is invaluable. If you run into a crash or have ideas, please **ope
 Essentially, you can think of this project as a way to **max out a model's performance by trading response time for quality**. The best part is that you don't need a supercomputer. local-deepthink is designed to turn even a modest 32gb RAM CPU-only laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models, you can leave the network running for hours or even days, allowing it to "mine" a sophisticated solution to a hard problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
 ## Use Cases
-The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for problems where the only clue you have is a vague question or for one-shotting very long prompting sessions. Best part? Soon you will be able to export the QNN into a JSON file and take it with you at the weight of only megabytes and plug it somewhere else to whatever LLM you like. If you create an RPG world, you could export its QNN and have other people prompt it.
+The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for problems where the only clue you have is a vague question or for one-shotting very long prompting sessions. Best part? You can now export the QNN into a JSON file and take it with you at the weight of only megabytes and plug it somewhere else to whatever LLM you like. If you create an RPG world, you could export its QNN and have other people prompt it.
 
 *   **For Non-Programmers: Ultra-Long Creative Generation**
     Think of local-deepthink as a way to handle prompts that require ultra-long or deeply creative outputs. Do you want to theory-craft a complex system or design the lore of an entire RPG world? Normally, this requires prompting a model repeatedly and figuring out different system prompts. With local-deepthink, you give the system a high-level goal, and the QNN figures out the rest. At the end of the run, it delivers a comprehensive, queryable knowledge base, and an interrogator chain can use your points of interest to generate an exhaustive final report.
 
-*   **For Programmers & Researchers: Conceptual Algorithm Design**
-    If you are a researcher building algorithms from scratch, you can use local-deepthink to conceptualize new, SOTA (State-of-the-Art) algorithms. The system can synthesize agent outputs into a final, runnable code block, making it an ideal tool for exploring novel solutions where external dependencies can be plugged in later.
+*   **For Programmers & Researchers: Full Stack App Generation**
+    
 
 ## Changelog
 
+*   **QNN Export/Import:** You can now export the entire state of a trained agent network (QNN) to a JSON file. This QNN can be imported and used for inference on new problems without rerunning the entire epoch process.
+*   **Code Generation & Sandbox:** The system can now generate, synthesize, and safely execute Python code. A new `code_execution` node validates the final code, and successful modules provide context for future epochs.
 *   **Interactive RAG Chat & Diagnostic Tool:** The process now pauses after the final epoch, allowing you to directly **chat with the generated RAG index**. This powerful diagnostic feature lets you interrogate the massive "cube of thinking text" from all hidden layers, ask follow-up questions, and gain extra insights.
 *   **Final Knowledge Harvest & RAG:** The run now archives all agent outputs into a multi-layered RAPTOR index. Upon completion, `interrogator` and `paper_formatter` agents use this RAG index to write a formal academic-style paper answering expert-level questions about the problem.
 *   **Dynamic Problem Re-framing:** The network can now assess its own progress. After each cycle (epoch), it formulates a new, more advanced problem that builds upon its previous solution, forcing the agents to continuously deepen their understanding.
@@ -77,7 +79,7 @@ This is where a QNN truly differs from a simple multi-agent system. Instead of s
 
 ## Vision & Long-Term Roadmap: Training a World Language Model
 
-Every local-deepthink run generates a complete, structured trace of a multi-agent collaborative process—a dataset capturing the evolution of thought. We see this as **powerful, multi-dimensional data for training next-generation reasoning models.**
+Every local-deepthink run generates a complete, structured trace of a multi-agent collaborative process—a dataset capturing the evolution of thought. With the new export feature, these QNN JSON files can now be collected. We see this as **powerful, multi-dimensional data for training next-generation reasoning models.**
 
 Our ultimate objective is to use this data to train a true **"World Language Model" (WLM)**. A WLM would move beyond predicting the next token to understanding the fundamental patterns of collaboration, critique, and collective intelligence. The exciting possibility is that fine-tuning a model on thousands of these QNN logs might make static system prompts obsolete, as the trained LLM would learn to implicitly figure them out and dynamically switch its reasoning process on the fly.
 
@@ -88,15 +90,15 @@ This is still alpha software, and we need your help. Besides the value you get a
 *   **Deep Runs & Benchmarking**: I don't have access to systems like Google's DeepMind, so it would be fantastic if someone with a powerful local rig could run and benchmark moderate-to-large QNNs.
 *   **Thinking Models Support**: Help integrate support for dedicated "thinking models".
 *   **P2P Networking for Distributed Mining:** My background is in Python and AI, not distributed systems. A long-term vision is a P2P networking layer to allow multiple users to connect their instances and collectively "mine" a solution to a massive problem. If you have experience here, I would love to collaborate.
-*   **Checkpoint Import/Export**: Implement a mechanism that allows you to save a QNN run and pick it up where you left off, making the system more crash-resistant.
+*   **Checkpoint Import/Export**: A basic version is implemented, but expanding this to allow saving a run mid-epoch would make the system more crash-resistant.
 
 ## What's Next?
 The current focus is on polishing and debugging existing features to reach a beta phase. After that, the next iteration will introduce specialized modes and advanced capabilities:
 
 *   **Story Telling Mode:** A dedicated mode for generating complex narratives, characters, and plots.
 *   **World Simulation Mode:** For creating and simulating intricate worlds with consistent lore, physics, and histories, perfect for RPGs and theoretical systems.
-*   **Recursive Module Stitching:** An advanced feature enabling the system to design, code, and recursively assemble different software modules to create complex, full-stack applications from a high-level prompt.
-*   **Export your QNN:** Soon you will be able to import and export your QNN in plain JSON format, so other people can prompt it, at just a few mbs of size.
+*   **Recursive Module Stitching:** The initial implementation allows code validation and context feedback. The next step is to enable the system to design, code, and recursively assemble different software modules to create complex, full-stack applications from a high-level prompt.
+*   **Export your QNN:** This is now implemented! You can import and export your QNN in plain JSON format, so other people can prompt it, at just a few MBs of size.
 
 ## Hyperparameters & Hardware Guidelines ⚙️
 
@@ -146,7 +148,7 @@ The current focus is on polishing and debugging existing features to reach a bet
     *   Ensure the Ollama application is running.
 5.  **Run the application:**
     ```bash
-    uvicorn app:app --reload
+    uvicorn new:app --reload
     ```
 6.  **Access the GUI:** Open your browser to `http://127.0.0.1:8000`.
 
@@ -158,6 +160,7 @@ The current focus is on polishing and debugging existing features to reach a bet
 4.  **Observe the Emergence**: Monitor the process in the real-time log viewer.
 5.  **Chat and Diagnose**: Once epochs are complete, use the chat interface to query the RAG index of the network's entire thought process.
 6.  **Harvest and Download**: When finished chatting, click "HARVEST" to generate and download the final ZIP report.
+7.  **(Optional) Export, Import, and Infer**: Use the `Export QNN` button to save your network. Later, use the `Import QNN` button to load it and run new prompts against the trained agent structure.
 
 It’s an open-source experiment, and I’d be grateful for any thoughts, feedback, or ideas you might have. Please support the repo if you want to see more open-source work like this!
 

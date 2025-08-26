@@ -1,7 +1,9 @@
-import os
+import io
+from contextlib import redirect_stdout, redirect_stderr
+import names
 import re
 import uvicorn
-from fastapi import FastAPI, Request, Body
+from fastapi import FastAPI, Request, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from langchain_community.chat_models import ChatOllama
 from langchain_community.embeddings import OllamaEmbeddings
@@ -186,6 +188,30 @@ class CoderMockLLM(Runnable):
 
         if "you are a helpful ai assistant" in prompt:
             return "This is a mock streaming response for the RAG chat in Coder debug mode."
+
+        if "<title>" in prompt:
+
+            return f"""
+                Module card:
+
+                Methods:
+
+                    __enter__
+                    __exict__
+
+                Attributes:
+
+                    __name__
+                    __doc__
+           
+                Attributes:
+
+                    __name__
+                    __doc__
+                    __qualname___
+
+            """
+
         elif "create the system prompt of an agent" in prompt:
             return f"""
 You are a Senior Python Developer agent.
@@ -214,47 +240,9 @@ You are now a Principal Software Architect.
 You must reply in the following JSON format: "original_problem": "An evolved sub-problem about system architecture.", "proposed_solution": "", "reasoning": "", "skills_used": []
             """
 
-        elif "you are a synthesis agent" in prompt or "you are an expert code synthesis agent" in prompt:
-            code_solution = """```python
-# main.py
-# This is a synthesized mock solution from the Coder Debug Mode.
-
-class APIClient:
-    def __init__(self, base_url):
-        self.base_url = base_url
-
-    def get_data(self, endpoint):
-        '''Fetches data from a given endpoint.'''
-        print(f"Fetching data from {self.base_url}/{endpoint}")
-        # CORRECTED: Added empty list as value for the "data" key.
-        return {"status": "success", "data": []}
-
-class DataProcessor:
-    def process(self, data):
-        '''Processes the fetched data.'''
-        if not data:
-            return []
-        processed = [item * 2 for item in data.get("data", [])]
-        print(f"Processed data: {processed}")
-        return processed
-
-def main():
-    '''Main application logic.'''
-    client = APIClient("https://api.example.com")
-    raw_data = client.get_data("items")
-    processor = DataProcessor()
-    final_data = processor.process(raw_data)
-    print(f"Final result: {final_data}")
-
-if __name__ == "__main__":
-    main()
-```"""
-            # CORRECTED: The return value is now a valid JSON string, which the backend expects.
-            return json.dumps({
-                "proposed_solution": code_solution,
-                "reasoning": "This response was synthesized by the CoderMockLLM.",
-                "skills_used": ["python", "mocking", "synthesis"]
-            }) 
+        elif "you are an expert code synthesis agent" in prompt:
+            code_solution = "```python\ndef sample_function():\n    return 'Hello from coder agent " + str(random.randint(100,999)) + "'\n```" 
+            return  code_solution
 
         elif "you are a critique agent" in prompt or "you are a senior emeritus manager" in prompt or "CTO" in prompt:
 
@@ -308,22 +296,6 @@ Generate your code-focused critique for the team:"""
             sub_problems = ["Design the database schema for user accounts.", "Implement the REST API endpoint for user authentication.", "Develop the frontend login form component.", "Write unit tests for the authentication service."]
             return json.dumps({"sub_problems": sub_problems})
 
-        elif "you are an ai philosopher and progress assessor" in prompt:
-            decision = random.randint(0, 1)
-
-            if decision == 0:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
-                "significant_progress": True
-            })
-
-            else:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable but does not address the core logic. The next step is to fix the logic.",
-                "significant_progress": False
-            })
 
         elif "you are a strategic problem re-framer" in prompt:
              return json.dumps({
@@ -336,10 +308,8 @@ Generate your code-focused critique for the team:"""
             return json.dumps({"questions": questions})
         elif "you are an ai assistant that summarizes academic texts" in prompt:
             return "This is a mock summary of a cluster of code modules, generated in Coder debug mode for the RAPTOR index."
-        elif "you are an expert computational astrologer" in prompt:
-            return random.choice(reactor_list)
-
         elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
+                
 
             pick = random.randint(0,1)
             if pick == 0:
@@ -347,25 +317,7 @@ Generate your code-focused critique for the team:"""
 
             else:
                 return "no"
-        
-        elif """Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:""" in prompt:
-
-            decision = random.randint(0, 1) 
-
-            if decision == 0:
-                return json.dumps({
-                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
-                    "significant_progress": False
-                })
-
-            else:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
-                "significant_progress": True
-            })
- 
-
+       
 
         elif "academic paper" in prompt or "you are a research scientist and academic writer" in prompt:
             return """
@@ -459,27 +411,9 @@ def get_user(user_id: int):
 
             """
 
-        elif "you are an ai philosopher and progress assessor" in prompt or "CTO" in prompt or "assessor" in prompt or "significant progress" in prompt or "pepon":
-            
-            decision = random.randint(0, 1) 
-
-            if decision == 0:
-                return json.dumps({
-                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
-                    "significant_progress": False
-                })
-
-            else:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
-                "significant_progress": True
-            })
-
-    
- 
 
         else:
+
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to a coder agent.",
                 "proposed_solution": "```python\ndef sample_function():\n    return 'Hello from coder agent " + str(random.randint(100,999)) + "'\n```",
@@ -487,6 +421,8 @@ def get_user(user_id: int):
                 "skills_used": ["python", "mocking", f"api_design_{random.randint(1,5)}"]
             })
 
+            
+           
     async def astream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         prompt = str(input_data).lower()
         if "you are a helpful ai assistant" in prompt:
@@ -520,51 +456,12 @@ class MockLLM(Runnable):
         elif "Lazy Manager"  in prompt:
             return "This is a constructive code critique. The solution lacks proper error handling and the function names are not descriptive enough. Consider refactoring for clarity."
 
-        elif "You are an expert computational astrologer specializing in elemental balancing for AI agent swarms." in prompt:
-
-            return random(reactor_list)
-
-
-        elif """Your task is to evaluate a synthesized solution against an original problem and determine if "significant progress" has been made. "Significant progress" is a rigorous standard that goes beyond mere correctness. Your assessment must be based on the following four pillars:""" in prompt:
-
-            decision = random.randint(0, 1) 
-
-            if decision == 0:
-                return json.dumps({
-                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
-                    "significant_progress": False
-                })
-
-            else:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
-                "significant_progress": True
-            })
- 
-
+   
 
         elif "runnable code block (e.g., Python, JavaScript, etc.)." in prompt:
 
                 return "no"
 
-        elif "you are an ai philosopher and progress assessor" in prompt:
-            
-            decision = random.randint(0, 1) 
-
-            if decision == 0:
-                return json.dumps({
-                    "reasoning": "The mock code is not runnable and does not address the core logic, which does not constitute significant progress.",
-                    "significant_progress": False
-                })
-
-            else:
-
-                return json.dumps({
-                "reasoning": "The mock code is runnable and addresses the core logic, which constitutes significant progress. The next step is to add features.",
-                "significant_progress": True
-            })
- 
 
         elif "<updater_instructions>" in prompt:
 
@@ -656,8 +553,7 @@ You must reply in the following JSON format: "original_problem": "An evolved sub
             return json.dumps({"questions": questions})
         elif "you are an ai assistant that summarizes academic texts" in prompt:
             return "This is a mock summary of a cluster of documents, generated in debug mode for the RAPTOR index."
-        elif "you are an expert computational astrologer" in prompt:
-            return random.choice(reactor_list)
+  
         elif  "<updater_assessor_instructions>" in prompt:
 
             return """
@@ -822,7 +718,9 @@ Answer with a single word: "true" if it contains code, and "false" otherwise."""
             yield result
 
 class GraphState(TypedDict):
-
+    modules: List[dict]
+    synthesis_context_queue: List[str] 
+    agent_personas: dict
     previous_solution: str
     current_problem: str
     original_request: str
@@ -842,6 +740,31 @@ class GraphState(TypedDict):
     is_code_request: bool
     session_id: str
     chat_history: List[dict]
+
+def execute_code_in_sandbox(code: str) -> (bool, str):
+    """
+    Executes a string of Python code and captures its stdout/stderr.
+    Returns a tuple of (success: bool, output: str).
+    """
+    if not code:
+        return True, "No code to execute."
+        
+    # Extract code from markdown block if present
+    code_match = re.search(r"```(?:python\n)?([\s\S]*?)```", code)
+    if code_match:
+        code = code_match.group(1).strip()
+
+    output_buffer = io.StringIO()
+    try:
+        with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
+            # Using a restricted globals dict for a little more safety
+            exec(code, {'__builtins__': {
+                'print': print, 'range': range, 'len': len, 'str': str, 'int': int, 'float': float, 
+                'list': list, 'dict': dict, 'set': set, 'tuple': tuple, 'True': True, 'False': False, 'None': None
+            }})
+        return True, output_buffer.getvalue()
+    except Exception as e:
+        return False, f"{output_buffer.getvalue()}\n\nERROR: {type(e).__name__}: {e}"
 
 
 def get_input_spanner_chain(llm, prompt_alignment, density):
@@ -1043,6 +966,7 @@ def get_critique_prompt_updater_chain(llm):
 """)
     return prompt | llm | StrOutputParser()
 
+
 def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 
     prompt = ChatPromptTemplate.from_template(f"""
@@ -1061,8 +985,9 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     <Parameter name="hard_request" description="The specific, complex problem the new agent is being designed to solve.">{{{{hard_request}}}}</Parameter>
     <Parameter name="critique" description="Reflective feedback on previous agent designs, intended for refinement and improvement.">{{{{critique}}}}</Parameter>
     <Parameter name="sub_problem" description="The original problem statement, which must be included in the final agent's output mandate.">{{{{sub_problem}}}}</Parameter>
+    <Parameter name="mbti_type" description="The MBTI personality type for the agent.">{{{{mbti_type}}}}</Parameter>
     <Parameter name="prompt_alignment" type="float" min="0.0" max="2.0" description="Modulates the influence of the 'hard_request' on the agent's 'Career' definition. A higher value means the career is more aligned with the request.">{prompt_alignment}</Parameter>
-    <Parameter name="density" type="float" min="0.0" max="2.0" description="Controls the influence of the inherited 'attributes' on the agent's 'Skills'. A higher value results in skills that are more stylistic extensions of the attributes.">{density}</Parameter>
+    <Parameter name="density" type="float" min="0.0" max="2.0" an description="Controls the influence of the inherited 'attributes' on the agent's 'Skills'. A higher value results in skills that are more stylistic extensions of the attributes.">{density}</Parameter>
     <Parameter name="learning_rate" type="float" min="0.0" max="2.0" description="Determines the magnitude of adjustments to the agent's profile based on the 'critique'. A higher value leads to more significant changes.">{learning_rate}</Parameter>
 </InputParameters>
 
@@ -1084,14 +1009,7 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
         </Step>
     </Phase>
 
-    <Phase name="RefinementAndLearning">
-        <Description>Modify the agent's profile based on the 'critique' to evolve its capabilities.</Description>
-        <Step id="4" name="ApplyCritique">
-            Review the 'critique' and adjust the agent's 'Career', 'Attributes', and 'Skills' accordingly. The magnitude of these adjustments is determined by the 'learning_rate' parameter {learning_rate}.
-        </Step>
-    </Phase>
-
-    <Phase name="SystemPromptAssembly">
+     <Phase name="SystemPromptAssembly">
         <Description>Construct the complete and final system prompt for the new agent.</Description>
         <Instruction>
             - Use direct, second-person phrasing (e.g., "You are," "Your skills are").
@@ -1112,8 +1030,23 @@ You are a **[Insert Agent's Career and Persona Here]**, a specialized agent desi
 ### Memory
 This is a log of your previous proposed solutions and reasonings. It is currently empty. Use this space to learn from your past attempts and refine your approach in future epochs.
 
-### Attributes
-*   [List the 3-5 final, potentially modified, attributes of the agent here.]
+### YOUR PERSONALITY ATTRIBUTES
+
+Name: {{{{name}}}}
+Type: {{{{mbti_type}}}}
+
+- Sun: [Zodiac Sign]
+- Moon: [Zodiac Sign]
+- Mercury: [Zodiac Sign]
+- Venus: [Zodiac Sign]
+- Mars: [Zodiac Sign]
+- Jupiter: [Zodiac Sign]
+- Saturn: [Zodiac Sign]
+- Uranus: [Zodiac Sign]
+- Neptune: [Zodiac Sign]
+- Pluto: [Zodiac Sign]
+- Ascendant: [Zodiac Sign]
+- Midheaven: [Zodiac Sign]
 
 ### Skills
 *   [List the 4-6 final, potentially modified, skills of the agent here.]
@@ -1133,6 +1066,50 @@ This is a log of your previous proposed solutions and reasonings. It is currentl
    """ )
     return prompt | llm | StrOutputParser()
 
+
+def get_module_card_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+
+<title>
+You are a software documentation specialist. 
+</title>
+                                              
+Your task is to analyze a given Python code module and create a concise "module card" summarizing its functionality.
+
+The module card should contain:
+1.  **Imports**: A list of necessary imports.
+2.  **Interface**: A list of public functions or class methods with their signatures and a brief description of what they do.
+
+Python Code:
+---
+{code}
+---
+
+Generate the module card based on the code provided.
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_code_synthesis_chain(llm):
+    prompt = ChatPromptTemplate.from_template("""
+You are an expert code synthesis agent. Your role is to combine multiple code snippets and solutions from different agents into a single, cohesive, and runnable application.
+You must analyze the different approaches, merge them logically, handle potential conflicts, and produce a final, well-structured code file.
+The final output should be a single block of code.
+
+Consider the following existing modules that have already been successfully built. You can use their interfaces in your solution.
+---
+Existing Modules Context:
+{synthesis_context}
+---
+
+Original Problem: {original_request}
+Agent Solutions (containing code snippets):
+{agent_solutions}
+
+Synthesize the final, complete code application:
+""")
+    return prompt | llm | StrOutputParser()
+
 def get_synthesis_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 You are a synthesis agent. Your role is to combine the solutions from multiple agents into a single, coherent, and comprehensive answer.
@@ -1147,10 +1124,6 @@ Synthesize the final solution:
 """)
     return prompt | llm | StrOutputParser()
 
-
-def get_individual_critique_chain(llm):
-    prompt = ChatPromptTemplate.from_template(INITIAL_INDIVIDUAL_CRITIQUE_PROMPT_TEMPLATE)
-    return prompt | llm | StrOutputParser()
 
 def get_problem_decomposition_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
@@ -1286,21 +1259,6 @@ User Request:
 """)
     return prompt | llm | StrOutputParser()
 
-
-def get_code_synthesis_chain(llm):
-    prompt = ChatPromptTemplate.from_template("""
-You are an expert code synthesis agent. Your role is to combine multiple code snippets and solutions from different agents into a single, cohesive, and runnable application.
-You must analyze the different approaches, merge them logically, handle potential conflicts, and produce a final, well-structured code file.
-The final output should be a single block of code.
-
-Original Problem: {original_request}
-Agent Solutions (containing code snippets):
-{agent_solutions}
-
-Synthesize the final, complete code application:
-""")
-    return prompt | llm | StrOutputParser()
-
 def create_agent_node(llm, node_id):
     """
     Creates a node in the graph that represents an agent.
@@ -1325,7 +1283,6 @@ def create_agent_node(llm, node_id):
         
         if layer_index == 0:
             await log_stream.put(f"LOG: Agent {node_id} (Layer 0) is processing its sub-problem.")
-            # Use the specific sub-problem for this agent
             input_data = state["decomposed_problems"].get(node_id, state["original_request"])
         else:
             prev_layer_index = layer_index - 1
@@ -1370,19 +1327,19 @@ def create_agent_node(llm, node_id):
 
 
         full_prompt = f"""
-System Prompt (Your Persona & Task):
+#System Prompt (Your Persona & Task):
 ---
 {agent_prompt}
 ---
-Your Memory (Your Past Actions from Previous Epochs):
+#Your Memory (Your Past Actions from Previous Epochs):
 ---
 {memory_str if memory_str else "You have no past actions in memory."}
 ---
-Input Data to Process:
+#Input Data to Process:
 ---
 {input_data}
 ---
-Your JSON formatted response:
+#Your JSON formatted response:
 """
         await log_stream.put(f"LOG: Agent {node_id} prompt:\n{full_prompt}")
         
@@ -1400,6 +1357,20 @@ Your JSON formatted response:
                 "reasoning": f"Invalid JSON: {response_str}",
                 "skills_used": []
             }
+        
+        if state.get("is_code_request") and layer_index > 0:
+            await log_stream.put(f"--- [SANDBOX] Testing code from Agent {node_id} ---")
+            code_to_test = response_json.get("proposed_solution", "")
+            success, output = execute_code_in_sandbox(code_to_test)
+            sandbox_log = {
+                "sandbox_execution_log": {
+                    "success": success,
+                    "output": output
+                }
+            }
+            agent_memory_history.append(sandbox_log)
+            await log_stream.put(f"--- [SANDBOX] Agent {node_id} Result: {'Success' if success else 'Failure'} ---")
+            await log_stream.put(output)
             
         agent_memory_history.append(response_json)
         current_memory[node_id] = agent_memory_history
@@ -1415,15 +1386,21 @@ def create_synthesis_node(llm):
     async def synthesis_node(state: GraphState):
         await log_stream.put("--- [FORWARD PASS] Entering Synthesis Node ---")
 
-        is_code = state["original_request"]
-        previous_solution = state["final_solution"]
+        is_code = state.get("is_code_request", False) 
+        previous_solution = state.get("final_solution")
         
         if is_code:
             await log_stream.put("LOG: Original request detected as a code generation task. Using code synthesis prompt.")
             synthesis_chain = get_code_synthesis_chain(llm)
+
+            synthesis_context = "\n\n".join(state.get("synthesis_context_queue", []))
+            if not synthesis_context:
+                synthesis_context = "No modules have been successfully built yet."
+            await log_stream.put(f"LOG: Providing synthesis agent with context from {len(state.get('synthesis_context_queue', []))} modules.")
         else:
             await log_stream.put("LOG: Original request is not a code task. Using standard synthesis prompt.")
             synthesis_chain = get_synthesis_chain(llm)
+            synthesis_context = "" 
 
         last_agent_layer_idx = len(state['all_layers_prompts']) - 1
         num_agents_last_layer = len(state['all_layers_prompts'][last_agent_layer_idx])
@@ -1440,10 +1417,14 @@ def create_synthesis_node(llm):
             await log_stream.put("WARNING: Synthesis node received no inputs.")
             return {"final_solution": {"error": "Synthesis node received no inputs."}}
 
-        final_solution_str = await synthesis_chain.ainvoke({
+        invoke_params = {
             "original_request": state["original_request"],
             "agent_solutions": json.dumps(last_layer_outputs, indent=2)
-        })
+        }
+        if is_code:
+            invoke_params["synthesis_context"] = synthesis_context
+
+        final_solution_str = await synthesis_chain.ainvoke(invoke_params)
         
         try:
             if is_code:
@@ -1454,13 +1435,47 @@ def create_synthesis_node(llm):
                 }
             else:
                  final_solution = clean_and_parse_json(final_solution_str)
-            await log_stream.put(f"SUCCESS: Synthesis complete. Final solution:\n{json.dumps(final_solution_str, indent=2)}")
+            await log_stream.put(f"SUCCESS: Synthesis complete.")
         except (json.JSONDecodeError, AttributeError):
             await log_stream.put(f"ERROR: Could not decode JSON from synthesis chain. Result: {final_solution_str}")
             final_solution = {"error": "Failed to synthesize final solution.", "raw": final_solution_str}
             
         return {"final_solution": final_solution, "previous_solution": previous_solution}
     return synthesis_node
+
+def create_code_execution_node(llm):
+    async def code_execution_node(state: GraphState):
+        if not state.get("is_code_request"):
+            return {"synthesis_execution_success": True} 
+
+        await log_stream.put("--- [SANDBOX] Testing Synthesized Code ---")
+        synthesized_code = state.get("final_solution", {}).get("proposed_solution", "")
+        
+        success, output = execute_code_in_sandbox(synthesized_code)
+        
+        await log_stream.put(f"--- [SANDBOX] Synthesized Code Result: {'Success' if success else 'Failure'} ---")
+        await log_stream.put(output)
+
+        if success:
+            await log_stream.put("LOG: Code execution successful. Generating module card.")
+            module_card_chain = get_module_card_chain(llm)
+            module_card = await module_card_chain.ainvoke({"code": synthesized_code})
+            
+            await log_stream.put("--- [MODULE CARD] ---")
+            await log_stream.put(module_card)
+            
+            new_modules = state.get("modules", []) + [{"code": synthesized_code, "card": module_card}]
+            new_context_queue = state.get("synthesis_context_queue", []) + [module_card]
+            
+            return {
+                "synthesis_execution_success": True,
+                "modules": new_modules,
+                "synthesis_context_queue": new_context_queue
+            }
+        else:
+            return {"synthesis_execution_success": False}
+            
+    return code_execution_node
 
 def create_archive_epoch_outputs_node():
     async def archive_epoch_outputs_node(state: GraphState):
@@ -1669,12 +1684,21 @@ def create_update_agent_prompts_node(llm):
                     except (json.JSONDecodeError, AttributeError):
                         analysis = {"attributes": "", "hard_request": ""}
 
+                    agent_personas = state.get("agent_personas", {})
+                    mbti_type = agent_personas.get(agent_id, {}).get("mbti_type")
+                    
+                    if not mbti_type:
+
+                        mbti_type = random.choice(params.get("mbti_archetypes", ["INTP"]))
+                        await log_stream.put(f"WARNING: Could not find persistent MBTI for {agent_id}. Using random: {mbti_type}")
+
                     agent_sub_problem = state.get("decomposed_problems", {}).get(agent_id, state["original_request"])
                     new_prompt = await dense_spanner_chain.ainvoke({
                         "attributes": analysis.get("attributes"),
                         "hard_request": analysis.get("hard_request"),   
                         "critique": critique_for_this_agent,
                         "sub_problem": agent_sub_problem,
+                        "mbti_type": mbti_type
                     })
                     
                     await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
@@ -1784,6 +1808,118 @@ def get_index():
         return HTMLResponse(content=f.read(), status_code=200)
 
 
+@app.post("/run_inference_from_state")
+async def run_inference_from_state(payload: dict = Body(...)):
+
+    await log_stream.put("--- [INFERENCE-ONLY] Received request to run inference from imported state. ---")
+    try:
+        imported_state = payload.get("imported_state")
+        user_prompt = payload.get("prompt")
+        params = imported_state.get("params", {})
+
+        if not imported_state or not user_prompt:
+            return JSONResponse(content={"error": "Invalid payload. 'imported_state' and 'prompt' are required."}, status_code=400)
+
+        if params.get("coder_debug_mode") == 'true':
+            llm = CoderMockLLM()
+        elif params.get("debug_mode") == 'true':
+            llm = MockLLM()
+        else:
+            model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
+            llm = ChatOllama(model=model_name, temperature=0)
+
+        imported_state["original_request"] = user_prompt
+        imported_state["current_problem"] = user_prompt
+        imported_state["agent_outputs"] = {} 
+
+        workflow = StateGraph(GraphState)
+        all_layers_prompts = imported_state["all_layers_prompts"]
+        cot_trace_depth = len(all_layers_prompts)
+
+        agent_chain = ChatPromptTemplate.from_template("{input}") | llm | StrOutputParser()
+
+        async def inference_agent_logic(state: GraphState, node_id: str):
+            await log_stream.put(f"--- [INFERENCE] Invoking Agent: {node_id} ---")
+            layer_index_str, agent_index_str = node_id.split('_')[1:]
+            layer_index = int(layer_index_str)
+            agent_prompt = state['all_layers_prompts'][layer_index][int(agent_index_str)]
+
+            if layer_index == 0:
+                input_data = state["original_request"]
+            else:
+                prev_layer_index = layer_index - 1
+                num_agents_prev_layer = len(state['all_layers_prompts'][prev_layer_index])
+                prev_layer_outputs = [state["agent_outputs"].get(f"agent_{prev_layer_index}_{k}", {}) for k in range(num_agents_prev_layer)]
+                input_data = json.dumps(prev_layer_outputs)
+
+            full_prompt = f"{agent_prompt}\n\nInput Data to Process:\n---\n{input_data}\n---\nYour JSON formatted response:"
+            response_str = await agent_chain.ainvoke({"input": full_prompt})
+
+            try:
+                response_json = clean_and_parse_json(response_str)
+            except Exception:
+                response_json = {"proposed_solution": response_str, "reasoning": "Inference output could not be parsed as JSON."}
+
+            current_outputs = state.get("agent_outputs", {}).copy()
+            current_outputs[node_id] = response_json
+            return {"agent_outputs": current_outputs}
+
+        def create_inference_node_function(node_id_for_closure: str):
+            async def node_function(state: GraphState):
+                return await inference_agent_logic(state, node_id_for_closure)
+            return node_function
+
+        for i, layer_prompts in enumerate(all_layers_prompts):
+            for j, _ in enumerate(layer_prompts):
+                node_id = f"agent_{i}_{j}"
+                workflow.add_node(node_id, create_inference_node_function(node_id))
+
+        workflow.add_node("synthesis", create_synthesis_node(llm))
+
+        first_layer_nodes = [f"agent_0_{j}" for j in range(len(all_layers_prompts[0]))]
+        workflow.set_entry_point(first_layer_nodes[0])
+        if len(first_layer_nodes) > 1:
+
+            for node in first_layer_nodes[1:]:
+                 workflow.add_edge(first_layer_nodes[0], node)
+
+        for i in range(cot_trace_depth - 1):
+            for current_node in [f"agent_{i}_{j}" for j in range(len(all_layers_prompts[i]))]:
+                for next_node in [f"agent_{i+1}_{k}" for k in range(len(all_layers_prompts[i+1]))]:
+                    workflow.add_edge(current_node, next_node)
+
+        for node in [f"agent_{cot_trace_depth-1}_{j}" for j in range(len(all_layers_prompts[cot_trace_depth-1]))]:
+            workflow.add_edge(node, "synthesis")
+
+        workflow.add_edge("synthesis", END)
+        graph = workflow.compile()
+
+        ascii_diagram = graph.get_graph().draw_ascii()
+        await log_stream.put(ascii_diagram)
+
+
+        final_result_node = None
+        async for output in graph.astream(imported_state):
+            if "synthesis" in output:
+                final_result_node = output["synthesis"]
+
+        await log_stream.put("--- [INFERENCE-ONLY] Run complete. ---")
+
+        return JSONResponse(content={
+            "message": "Inference complete.",
+            "code_solution": final_result_node.get("final_solution", {}).get("proposed_solution", "No solution generated."),
+            "reasoning": final_result_node.get("final_solution", {}).get("reasoning", "No reasoning provided."),
+            "is_inference": True
+        })
+
+    except Exception as e:
+        error_message = f"An error occurred during inference: {e}"
+        await log_stream.put(error_message)
+        await log_stream.put(traceback.format_exc())
+        return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
+
+
+
 
 @app.post("/build_and_run_graph")
 async def build_and_run_graph(payload: dict = Body(...)):
@@ -1792,7 +1928,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
     summarizer_llm = None
     try:
         params = payload.get("params")
-
 
         if params.get("coder_debug_mode") == 'true':
             await log_stream.put(f"--- 💻 CODER DEBUG MODE ENABLED 💻 ---")
@@ -1825,10 +1960,13 @@ async def build_and_run_graph(payload: dict = Body(...)):
     cot_trace_depth = int(params.get('cot_trace_depth', 3))
 
     code_detection_chain = get_code_detector_chain(llm)
-    is_code = code_detection_chain.ainvoke({"text": user_prompt})
+    is_code = (await code_detection_chain.ainvoke({"text": user_prompt})).strip().lower() == 'true'
 
-    if params.get("coder_debug_mode") == "false" and params.get("debug_mode") == "true":
+    if params.get("coder_debug_mode") == "true":
+        is_code = True
+    elif params.get("debug_mode") == "true":
         is_code = False
+
 
     if not mbti_archetypes or len(mbti_archetypes) < 2:
         error_message = "Validation failed: You must select at least 2 MBTI archetypes."
@@ -1853,7 +1991,6 @@ async def build_and_run_graph(payload: dict = Body(...)):
             if len(sub_problems_list) != total_agents_to_create:
                 raise ValueError(f"Decomposition failed: Expected {total_agents_to_create} subproblems, but got {len(sub_problems_list)}.")
             await log_stream.put(f"SUCCESS: Decomposed problem into {len(sub_problems_list)} subproblems.")
-            await log_stream.put(f"Subproblems: {sub_problems_list}")
         except Exception as e:
             await log_stream.put(f"ERROR: Failed to decompose problem. Error: {e}. Defaulting to using the original prompt for all agents.")
             sub_problems_list = [user_prompt] * total_agents_to_create
@@ -1879,20 +2016,24 @@ async def build_and_run_graph(payload: dict = Body(...)):
         await log_stream.put(f"Seed verbs generated: {seeds}")
 
         all_layers_prompts = []
+        agent_personas = {} 
         input_spanner_chain = get_input_spanner_chain(llm, params['prompt_alignment'], params['density'])
         
         await log_stream.put("--- Creating Layer 0 Agents ---")
         layer_0_prompts = []
         for j, (m, gw) in enumerate(seeds.items()):
             agent_id = f"agent_0_{j}"
+
+            agent_personas[agent_id] = {"mbti_type": m, "name": names.get_full_name()}
             sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
             prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem})
-            await log_stream.put(f"Prompt for agent {agent_id}: {prompt}")
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
         dense_spanner_chain = get_dense_spanner_chain(llm, params['prompt_alignment'], params['density'], params['learning_rate'])
+        
+        agent_name_list = [names.get_full_name() for _ in range(total_agents_to_create)]
 
         for i in range(1, cot_trace_depth):
             await log_stream.put(f"--- Creating Layer {i} Agents ---")
@@ -1907,13 +2048,20 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 
                 agent_id = f"agent_{i}_{j}"
                 sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
+                
+                assigned_mbti = random.choice(mbti_archetypes)
+                assigned_name = agent_name_list.pop() if agent_name_list else names.get_full_name()
+                agent_personas[agent_id] = {"mbti_type": assigned_mbti, "name": assigned_name} 
+                await log_stream.put(f"LOG: Assigned Persona {assigned_name} (MBTI: {assigned_mbti}) to hidden agent {agent_id}")
+                
                 new_prompt = await dense_spanner_chain.ainvoke({
                     "attributes": analysis.get("attributes"),
                     "hard_request": analysis.get("hard_request"),
                     "critique": "",
                     "sub_problem": sub_problem,
+                    "mbti_type": assigned_mbti,
+                    "name": assigned_name
                 })
-                await log_stream.put(f"Prompt for agent {agent_id}: {new_prompt}")
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
         
@@ -1933,6 +2081,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 workflow.add_node(node_id, create_agent_node(llm, node_id))
         
         workflow.add_node("synthesis", create_synthesis_node(llm))
+        workflow.add_node("code_execution", create_code_execution_node(llm))
         workflow.add_node("archive_epoch_outputs", create_archive_epoch_outputs_node())
         update_rag_index_node_func = create_update_rag_index_node(summarizer_llm, embeddings_model)
         workflow.add_node("update_rag_index", update_rag_index_node_func)
@@ -1972,6 +2121,14 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
 
         async def assess_progress_and_decide_path(state: GraphState):
+            if state.get("is_code_request") and state.get("synthesis_execution_success") is False:
+                await log_stream.put("LOG: Synthesized code execution failed. Skipping re-framing and proceeding to next epoch if available.")
+                if state["epoch"] >= state["max_epochs"]:
+                    await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished after code failure.")
+                    return "build_final_rag_index"
+                else:
+                    return "update_prompts"
+
             if state["epoch"] >= state["max_epochs"]:
                 await log_stream.put(f"LOG: Final epoch ({state['epoch']}) finished. Proceeding to final RAG indexing before chat.")
                 return "build_final_rag_index"
@@ -1979,11 +2136,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
             else:
                 return "reframe_and_decompose"
 
-
-        await log_stream.put("CONNECT: progress_assessor -> assess_progress_and_decide_path (conditional)")
-
-        workflow.add_edge("synthesis", "archive_epoch_outputs")
-        await log_stream.put("CONNECT: synthesis -> archive_epoch_outputs")
+        workflow.add_edge("synthesis", "code_execution")
+        await log_stream.put("CONNECT: synthesis -> code_execution")
+        
+        workflow.add_edge("code_execution", "archive_epoch_outputs")
+        await log_stream.put("CONNECT: code_execution -> archive_epoch_outputs")
         
         workflow.add_edge("archive_epoch_outputs", "update_rag_index")
         await log_stream.put("CONNECT: archive_epoch_outputs -> update_rag_index")
@@ -1996,11 +2153,11 @@ async def build_and_run_graph(payload: dict = Body(...)):
             assess_progress_and_decide_path,
             {
                 "reframe_and_decompose": "reframe_and_decompose",
-                "build_final_rag_index": "build_final_rag_index"
+                "build_final_rag_index": "build_final_rag_index",
+                "update_prompts": "update_prompts"
             }
         )
       
-
         workflow.add_edge("reframe_and_decompose", "update_prompts")
         await log_stream.put("CONNECT: reframe_and_decompose -> update_prompts")
 
@@ -2017,57 +2174,66 @@ async def build_and_run_graph(payload: dict = Body(...)):
         await log_stream.put(ascii_art)
         
         session_id = str(uuid.uuid4())
-        print(session_id)
+
         initial_state = {
-            "previous_solution": "",
             "session_id": session_id,
-            "chat_history": [],
             "original_request": user_prompt,
             "current_problem": user_prompt,
             "decomposed_problems": decomposed_problems_map,
-            "layers": [], "critiques": {}, "epoch": 0,
+            "epoch": 1,
             "max_epochs": int(params["num_epochs"]),
-            "params": params, "all_layers_prompts": all_layers_prompts,
-            "agent_outputs": {}, "memory": {}, "final_solution": None,
+            "params": params, 
+            "all_layers_prompts": all_layers_prompts,
+            "agent_personas": agent_personas,
+            "is_code_request": is_code, 
+            "agent_outputs": {}, 
+            "memory": {}, 
+            "final_solution": None,
+            "previous_solution": "",
+            "chat_history": [],
+            "layers": [], 
+            "critiques": {}, 
             "perplexity_history": [],
-            "significant_progress_made": False,
             "raptor_index": None,
             "all_rag_documents": [],
-            "academic_papers": None,
-            "is_code_request": is_code,
+            "academic_papers": None, 
             "summarizer_llm": summarizer_llm,
-            "embeddings_model": embeddings_model
+            "embeddings_model": embeddings_model, 
+            "modules": [],
+            "synthesis_context_queue": [],
+            "synthesis_execution_success": True 
         }
-        initial_state["llm"] = llm # Store the llm instance for the chat
+        initial_state["llm"] = llm 
         sessions[session_id] = initial_state
         
         await log_stream.put(f"--- Starting Execution (Epochs: {params['num_epochs']}) ---")
         
-        async for output in graph.astream(initial_state, {'recursion_limit': int(params["num_epochs"]) * 1000}):
+        final_state_value = None
+        async for output in graph.astream(initial_state, {'recursion_limit': (int(params["num_epochs"]) + 5) * len(all_layers_prompts) * 5}):
             for node_name, node_output in output.items():
                 await log_stream.put(f"--- Node Finished Processing: {node_name} ---")
                 if node_output is not None:
-                    current_session_state = sessions[session_id]
+                    current_session_state = sessions.get(session_id, initial_state)
                     for key, value in node_output.items():
-                        if key in ['agent_outputs', 'memory']:
-                            if key in current_session_state and isinstance(current_session_state[key], dict):
-                                current_session_state[key].update(value)
-                            else:
-                                current_session_state[key] = value
+                        if key in ['agent_outputs', 'memory', 'agent_personas', 'critiques'] and isinstance(current_session_state.get(key), dict):
+                            current_session_state[key].update(value)
                         else:
                             current_session_state[key] = value
                     sessions[session_id] = current_session_state
                     final_state_value = current_session_state
         
+        if not final_state_value:
+             final_state_value = sessions.get(session_id, {})
 
         if is_code:
-
             final_code_solution = final_state_value.get("final_solution", {})
-            await log_stream.put(f"--- 💻 Code Generation Finished. Returning final code. ---")
+            final_modules = final_state_value.get("modules", [])
+            await log_stream.put(f"--- 💻 Code Generation Finished. Returning final code and {len(final_modules)} modules. ---")
             return JSONResponse(content={
                 "message": "Code generation complete.",
                 "code_solution": final_code_solution.get("proposed_solution", "# No code generated."),
-                "reasoning": final_code_solution.get("reasoning", "No reasoning provided.")
+                "reasoning": final_code_solution.get("reasoning", "No reasoning provided."),
+                "modules": final_modules
             })
         else:
             await log_stream.put("--- Agent Execution Finished. Pausing for User Chat. ---")
@@ -2081,6 +2247,62 @@ async def build_and_run_graph(payload: dict = Body(...)):
         error_message = f"An error occurred during graph execution: {e}"
         await log_stream.put(error_message)
         await log_stream.put(traceback.format_exc())
+        return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
+
+@app.get("/export_qnn/{session_id}")
+async def export_qnn(session_id: str):
+    """
+    Exports the current state of a session graph to a JSON file.
+    """
+    if session_id not in sessions:
+        return JSONResponse(content={"error": "Session not found."}, status_code=404)
+
+    state_to_export = sessions[session_id].copy()
+
+
+    state_to_export.pop('llm', None)
+    state_to_export.pop('summarizer_llm', None)
+    state_to_export.pop('embeddings_model', None)
+    state_to_export.pop('raptor_index', None) 
+
+    for idx, document in enumerate(state_to_export['all_rag_documents']):
+        state_to_export['all_rag_documents'][idx] = document.dict()
+    
+
+    await log_stream.put(f"--- [EXPORT] Exporting QNN for session {session_id} ---")
+
+    return JSONResponse(
+        content=state_to_export,
+        headers={"Content-Disposition": f"attachment; filename=qnn_state_{session_id}.json"}
+    )
+
+@app.post("/import_qnn")
+async def import_qnn(file: UploadFile = File(...)):
+    """
+    Imports a QNN JSON file to initialize a new session.
+    """
+    try:
+        content = await file.read()
+        imported_state = json.loads(content)
+        
+        session_id = str(uuid.uuid4())
+        imported_state['session_id'] = session_id
+
+        for idx, document in enumerate(imported_state['all_rag_documents']): 
+
+            imported_state['all_rag_documents'][idx] = Document.from_dict(document)
+
+        sessions[session_id] = imported_state
+        await log_stream.put(f"--- [IMPORT] Successfully imported QNN file. New Session ID: {session_id} ---")
+        
+        return JSONResponse(content={
+            "message": "QNN file imported successfully.",
+            "session_id": session_id,
+            "imported_params": imported_state.get("params", {})
+        })
+    except Exception as e:
+        error_message = f"Failed to import QNN file: {e}"
+        await log_stream.put(error_message)
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
@@ -2262,8 +2484,7 @@ async def stream_log(request: Request):
 @app.get("/download_report/{session_id}")
 async def download_report(session_id: str):
 
-    print(final_reports.keys())
-    print(session_id)
+
     papers = final_reports.get(session_id, {})
 
     if not papers:
