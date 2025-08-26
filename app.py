@@ -2111,7 +2111,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
             "original_request": user_prompt,
             "current_problem": user_prompt,
             "decomposed_problems": decomposed_problems_map,
-            "epoch": 1,
+            "epoch": 0,
             "max_epochs": int(params["num_epochs"]),
             "params": params, 
             "all_layers_prompts": all_layers_prompts,
