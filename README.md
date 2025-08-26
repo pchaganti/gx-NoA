@@ -26,7 +26,7 @@ The **Qualitative Neural Network (QNN)** algorithm that powers this system is gr
 *   **For Non-Programmers: Ultra-Long Creative Generation**
     Think of local-deepthink as a way to handle prompts that require ultra-long or deeply creative outputs. Do you want to theory-craft a complex system or design the lore of an entire RPG world? Normally, this requires prompting a model repeatedly and figuring out different system prompts. With local-deepthink, you give the system a high-level goal, and the QNN figures out the rest. At the end of the run, it delivers a comprehensive, queryable knowledge base, and an interrogator chain can use your points of interest to generate an exhaustive final report.
 
-*   **For Programmers & Researchers: Full Stack App Generation**: This is an experimental feature. As of right now the system can accumulate attempts and offer one final synthetized solution. This works well for algorithm design. Noe are trying to decompose the synthesis in modules that are aftwerads stitched together through abstract interface cards. It wont work on a few epochs, so if you can test it on high epochs and open an issue, it would be appreciated. 
+*   **For Programmers & Researchers: Full Stack App Generation**: This is an experimental feature. As of right now the system can accumulate attempts and offer one final synthetized solution. This works well for algorithm design. Now we are trying to decompose the synthesis in modules that are aftwerads stitched together through abstract interface cards. It wont work on a few epochs, so if you can test it on high epochs and open an issue, it would be appreciated. 
     
 
 ## Changelog
