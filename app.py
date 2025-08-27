@@ -796,10 +796,11 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
     <Phase name="AgentConception">
         <Description>Define the core components of the new agent based on the initial inputs.</Description>
         <Step id="1" name="DefineCareer">
-            Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' ('{{{{sub_problem}}}}') and take into the account the MBTI. The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
+            Synthesize a realistic, professional career for the agent. This career must be a logical choice for tackling the 'sub_problem' and take into the account the MBTI. The degree of specialization is determined by the 'prompt_alignment' parameter {prompt_alignment}).
         </Step>
         <Step id="2" name="DefineAttributes">
-            Define persona attributes filling with a sign the 12 slots of a birth chart.         
+            - Fill creatively with a zodiac sign the 12 slots of a birth chart on the basis of the 'guiding_words' {{guiding_words}} and the 'mbti_type' {{mbti_type}}..
+            - DO NOT DEFINE YOURSELF AN MBTI OR A NAME FOR THE AGENT.
         </Step>
         <Step id="3" name="DefineSkills">
             Derive 4-6 practical skills, methodologies, or areas of expertise. These skills must be logical extensions of the agent's defined 'Career'. The style and nature of these skills are modulated by the agent's 'Attributes' according to the 'density' parameter ({density}).
@@ -821,12 +822,12 @@ def get_input_spanner_chain(llm, prompt_alignment, density):
     </FormatInstructions>
     <Template>
         <![CDATA[
-You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective. Your responses must strictly reflect your unique specialization and skill set.
+You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective. Your responses must strictly reflect your personality and skilset.
+
+{{name}}
+{{mbti_type}}
 
 ### Attributes
-
-Name: {{{{name}}}}
-Type: {{{{mbti_type}}}}
 
 - Sun: [Select Zodiac Sign]
 - Moon: [Select Zodiac Sign]
@@ -846,7 +847,7 @@ Type: {{{{mbti_type}}}}
 
 ---
 **Output Mandate:** 
-
+  
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
@@ -864,7 +865,7 @@ def get_attribute_and_hard_request_generator_chain(llm, vector_word_size):
     prompt = ChatPromptTemplate.from_template(f"""
 You are an analyst of AI agents. Your task is to analyze the system prompt of an agent and perform two things:
 1.  Detect a set of attributes (verbs and nouns) that describe the agent's capabilities and personality. The number of attributes should be {vector_word_size}.
-2.  Generate a "hard request": a request that the agent will struggle to answer or fulfill given its identity, but that is still within the realm of possibility for a different kind of agent. The request should be reasonable and semantically plausible for an AI-simulated human.
+2.  Generate a "hard request": a request that the agent will struggle to answer or fulfill given its identity, something opposite to agents system prompt. The request should be reasonable and semantically plausible for an AI-simulated human.
 
 You must output a JSON object with two keys: "attributes" (a string of space-separated words) and "hard_request" (a string).
 
@@ -920,10 +921,10 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
 </MetaAgent>
 
 <InputParameters>
-    <Parameter name="attributes" description="Core personality traits, cognitive patterns, and dispositions inherited from the parent agent.">{{{{attributes}}}}</Parameter>
-    <Parameter name="hard_request" description="The specific, complex problem the new agent is being designed to solve.">{{{{hard_request}}}}</Parameter>
-    <Parameter name="sub_problem" description="The original problem statement, which must be included in the final agent's output mandate.">{{{{sub_problem}}}}</Parameter>
-    <Parameter name="mbti_type" description="The MBTI personality type for the agent.">{{{{mbti_type}}}}</Parameter>
+    <Parameter name="attributes" description="Core personality traits, cognitive patterns, and dispositions inherited from the parent agent.">{{attributes}}</Parameter>
+    <Parameter name="hard_request" description="The specific, complex problem the new agent is being designed to solve.">{{hard_request}}</Parameter>
+    <Parameter name="sub_problem" description="The original problem statement, which must be included in the final agent's output mandate.">{{sub_problem}}</Parameter>
+    <Parameter name="mbti_type" description="The MBTI personality type for the agent.">{{mbti_type}}</Parameter>
     <Parameter name="prompt_alignment" type="float" min="0.0" max="2.0" description="Modulates the influence of the 'hard_request' on the agent's 'Career' definition. A higher value means the career is more aligned with the request.">{prompt_alignment}</Parameter>
     <Parameter name="density" type="float" min="0.0" max="2.0" an description="Controls the influence of the inherited 'attributes' on the agent's 'Skills'. A higher value results in skills that are more stylistic extensions of the attributes.">{density}</Parameter>
     <Parameter name="learning_rate" type="float" min="0.0" max="2.0" description="Determines the magnitude of adjustments to the agent's profile based on the 'critique'. A higher value leads to more significant changes.">{learning_rate}</Parameter>
@@ -940,7 +941,7 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     <Phase name="AgentConception">
         <Description>Define the primary components of the new agent's profile.</Description>
         <Step id="2" name="DefineAttributes">   
-            Synthetize a set of astrological attributes following the 12 slots of a birth chart, for the agents personality based on fitness to the 'hard_request'. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}. 
+            Fill creatively 12 astrological zodiac signs for the agents personality based on fitness to the 'hard_request' and MBTI type {{mbti_type}}. The influence of the request on this choice is modulated by the 'prompt_alignment' parameter {prompt_alignment}. 
         </Step>
 
         <Step id="3" name="DefineCareer">
@@ -955,8 +956,10 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
         <Description>Construct the complete and final system prompt for the new agent.</Description>
         <Instruction>
             - Use direct, second-person phrasing (e.g., "You are," "Your skills are").
+            - DO NOT DEFINE YOURSELF AN MBTI AND NAME FOR THE AGENT.
             - The prompt must be structured exactly according to the provided agent template in the 'OutputSpecification'.
             - Ensure all placeholders in the template are filled with the refined agent characteristics.
+            - Do not define yourself a name or mbti type for the agent, this will be provided later on as input parameters.
         </Instruction>
     </Phase>
 </ExecutionPlan>
@@ -967,12 +970,14 @@ def get_dense_spanner_chain(llm, prompt_alignment, density, learning_rate):
     </FormatInstructions>
     <Template>
         <![CDATA[
-You are a **[Insert Agent's Career and Persona Here]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective.
+You are a **[Insert Agent's Career]**, a specialized agent designed to tackle complex problems. Your entire purpose is to collaborate within a multi-agent framework to resolve your assigned objective.
+Your responses must strictly reflect your personality and skillset.
+
+ {{name}}
+ {{mbti_type}}
+
 
 ### Personality Attributes 
-
-Name: {{{{name}}}}
-Type: {{{{mbti_type}}}}
 
 - Sun: [Select a Zodiac Sign]
 - Moon: [Select a Zodiac Sign]
@@ -993,7 +998,7 @@ Type: {{{{mbti_type}}}}
 ---
 **Output Mandate:** 
 
-  "original_problem": "{{{{sub_problem}}}}",
+  "original_problem": {{sub_problem}},
   "proposed_solution": "",
   "reasoning": "",
   "skills_used": ""
@@ -1768,7 +1773,7 @@ async def run_inference_from_state(payload: dict = Body(...)):
             llm = MockLLM()
         else:
             model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
-            llm = ChatOllama(model=model_name, temperature=0)
+            llm = ChatOllama(model=model_name, temperature=0.8)
 
         imported_state["original_request"] = user_prompt
         imported_state["current_problem"] = user_prompt
@@ -1968,7 +1973,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
             agent_personas[agent_id] = {"mbti_type": m, "name": names.get_full_name()}
             sub_problem = decomposed_problems_map.get(agent_id, user_prompt)
-            prompt = await input_spanner_chain.ainvoke({"mbti_type": m, "guiding_words": gw, "sub_problem": sub_problem, "name": agent_personas[agent_id]["name"]})
+            prompt = await input_spanner_chain.ainvoke({"mbti_type": agent_personas[agent_id]["mbti_type"], "guiding_words": gw, "sub_problem": sub_problem, "name": agent_personas[agent_id]["name"]})
+            await log_stream.put(f"Created Agent {agent_id} with prompt: {prompt}")
             layer_0_prompts.append(prompt)
         all_layers_prompts.append(layer_0_prompts)
         
@@ -2004,6 +2010,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                     "mbti_type": assigned_mbti,
                     "name": assigned_name
                 })
+                await log_stream.put(f"Created Agent {agent_id} with prompt: {new_prompt}")
                 current_layer_prompts.append(new_prompt)
             all_layers_prompts.append(current_layer_prompts)
         
