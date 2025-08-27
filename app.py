@@ -1042,6 +1042,12 @@ Existing Modules Context:
 ---
 
 Original Problem: {original_request}
+                                            
+Current problem:
+---
+{current_problem}
+---
+
 Agent Solutions (containing code snippets):
 {agent_solutions}
 
@@ -1056,6 +1062,14 @@ You will receive a list of JSON objects, each representing a solution from a dif
 Your task is to synthesize these solutions, considering the original problem, and produce a final answer in the same JSON format.
 
 Original Problem: {original_request}
+
+Current problem:
+---
+{current_problem}
+---
+
+                                              
+
 Agent Solutions:
 {agent_solutions}
 
@@ -1367,7 +1381,8 @@ def create_synthesis_node(llm):
 
         invoke_params = {
             "original_request": state["original_request"],
-            "agent_solutions": json.dumps(last_layer_outputs, indent=2)
+            "agent_solutions": json.dumps(last_layer_outputs, indent=2),
+            "current_problem": state["current_problem"]
         }
         if is_code:
             invoke_params["synthesis_context"] = synthesis_context
@@ -1537,7 +1552,7 @@ def create_reframe_and_decompose_node(llm):
         new_problem_str = await reframer_chain.ainvoke({
             "original_request": original_request,
             "final_solution": json.dumps(final_solution, indent=2),
-            "current_problem": state.get("current_problem")
+            "current_problem": state.get("current_problem"),
             "previous_solution": state.get("previous_solution")
         })
         try:
