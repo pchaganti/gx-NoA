@@ -1104,13 +1104,13 @@ def get_problem_reframer_chain(llm):
     prompt = ChatPromptTemplate.from_template("""
 You are a strategic problem re-framer. You have been informed that an AI agent team has made a significant breakthrough on a problem.
 
-Your task is to formulate wether the team needs to deepen with a more complex solution, or widen and perfect the current one. If the problem statement is code, and 
+Your task is to formulate wether the team needs to deepen with a more complex solution, or widen and perfect the current one, referring previous solutions with the new one. 
+                                            
+If the problem statement is code, and the current solution could be more modular and granular, you must set the next goal to improve the current solution with more breath instead of synthesis
                                               
-the current solution could be more modular and granular, you must set the next goal to improve the current solution with more breath instead of synthesis
-                                              
-- if however the solution is already up to a good standard of breadth, you must set a next step that builds upon the success of the solution but its stil grounded in the original problem and still tries to achieve the same goal.
+- if however the solution is already up to a good standard of breadth, you must set a next step that builds upon the success of the solution but stil grounded in the original problem  trying to achieve the same goal.
 
-The new problem should represent the "next logical step"; a more ambitious goal, or a more grounded approach if the solution is still not granular enough. Compare previous solutions to current ones, check if references are appropiately used and decide the next step.
+The new problem should represent the "next logical step"; a more ambitious goal, or a more grounded approach if the solution is still not granular enough. Compare previous solutions to current ones, check if references and imports to previous work are appropiately used and decide the next step.
 
 Original Problem:
 ---
@@ -1125,6 +1125,10 @@ Previous Solution:
 ---
 {previous_solution}
 ---
+
+Previous solutions documentation:
+                                              
+{module_cards}
 
 The Breakthrough Solution:
 ---
@@ -1558,7 +1562,8 @@ def create_reframe_and_decompose_node(llm):
             "original_request": original_request,
             "final_solution": json.dumps(final_solution, indent=2),
             "current_problem": state.get("current_problem"),
-            "previous_solution": state.get("previous_solution")
+            "previous_solution": state.get("previous_solution"),
+            "module_cards": state.get("synthesis_context_queue"),
         })
         try:
             new_problem_data = clean_and_parse_json(new_problem_str)
