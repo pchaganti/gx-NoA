@@ -1088,6 +1088,7 @@ def get_problem_decomposition_chain(llm):
 You are a master strategist and problem decomposer. Your task is to break down a complex, high-level problem into a series of smaller, more manageable, and granular subproblems.
 You will be given a main problem and the total number of subproblems to generate.
 Each subproblem should represent a distinct line of inquiry, a specific component to be developed, or a unique perspective to be explored, which, when combined, will contribute to solving the main problem.
+If the problem is code, you must generate a list of subproblems that are specifications for code snippets that can be used to solve the main problem.
 
 The output must be a JSON object with a single key "sub_problems", which is a list of strings. The list must contain exactly {num_sub_problems} unique subproblems.
 
@@ -1913,6 +1914,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
 
     code_detection_chain = get_code_detector_chain(llm)
     is_code = (await code_detection_chain.ainvoke({"text": user_prompt})).strip().lower() == 'true'
+    await log_stream.put(f"Is Code: {is_code}")
 
     if params.get("coder_debug_mode") == "true":
         is_code = True
