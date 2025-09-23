@@ -115,7 +115,7 @@ The current focus is on polishing and debugging existing features to reach a bet
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/andres-ulloa-de-la-torre/local-deepthink
+    git clone https://github.com/iblameandrew/local-deepthink
     cd local-deepthink
     ```
 2.  **Create and activate a virtual environment:**
