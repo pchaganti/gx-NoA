@@ -25,11 +25,11 @@ The **Qualitative Neural Network (QNN)** algorithm that powers this system is gr
 
 ## Changelog
 
-*  **Brainstorming Mode**: New chat-based interface with 5 AI expert personas (Dr. Synthia Logic, Marcus Visionary, Elena Pragmatic, Professor Critique, Aria Empathy) that reflect on your ideas from different perspectives and synthesize a final response. Powered by Gemini 3 Flash Preview.
+*  **Brainstorming Mode**: New chat-based interface that dynamically generates QNN neuron personas as experts. The system analyzes problem complexity, decomposes it into sub-problems, and creates 2-5 specialized AI agents using the same `input_spanner_chain` that powers Algorithm Design Mode. Each agent has its own MBTI type, career, and specialty tailored to the problem. Powered by Gemini 3 Flash Preview.
 *  **Gemini Backend Integration**: Added support for Google's Gemini 3 Flash Preview model as the backend for brainstorming mode. API key stored securely in localStorage.
-*  **Mode Switcher**: UI now features two distinct modes - "Algorithm Design Mode" (original QNN functionality) and "Brainstorming Mode" (new expert chat interface).
+*  **Mode Switcher**: UI now features two distinct modes - "Algorithm Design Mode" (original QNN functionality) and "Brainstorming Mode" (dynamic QNN expert chat interface).
 *  **Mirror Descent**: Renamed the qualitative backpropagation mechanism to "Mirror Descent" to better reflect the reflective nature of the prompt update process.
-*  **Complexity-Based QNN Sizing**: Brainstorming mode automatically estimates problem complexity and adjusts QNN parameters accordingly.
+*  **Complexity-Based QNN Sizing**: Brainstorming mode automatically estimates problem complexity and determines the number of QNN agents (2-5) and epochs accordingly.
 *  **Hidden-layer-fixed**: Issue with meta-prompting in the hidden layer fixed. Agents are now moderately divergent from a strict skill alignment, as originally intended. Specialization is one thing; the individual that serves as recipient for the toolset is another. Keeping both distinct is important to make answers smoother.
 *   **QNN Export/Import:** You can now export the entire state of a trained agent network (QNN) to a JSON file. This QNN can be imported and used for inference on new problems without rerunning the entire epoch process.
 *   **Code Generation & Sandbox:** The system can now generate, synthesize, and safely execute Python code. A new `code_execution` node validates the final code, and successful modules provide context for future epochs.
