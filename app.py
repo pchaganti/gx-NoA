@@ -1660,14 +1660,20 @@ async def build_and_run_graph(payload: dict = Body(...)):
             
             try:
                 complexity_data = clean_and_parse_json(complexity_result_str)
-                params['num_epochs'] = int(complexity_data.get("recommended_epochs", 2))
+                # User determines epochs (default 2), Complexity determines Topology
+                if 'num_epochs' not in params:
+                     params['num_epochs'] = 2
+                else:
+                     params['num_epochs'] = int(params['num_epochs'])
+                     
                 cot_trace_depth = int(complexity_data.get("recommended_layers", 2))
                 width = int(complexity_data.get("recommended_width", 3))
                 
                 await log_stream.put(f"LOG: Topology: {cot_trace_depth} Layers x {width} Width x {params['num_epochs']} Epochs.")
             except Exception as e:
                 await log_stream.put(f"WARNING: Complexity estimation failed. Using defaults. Error: {e}")
-                params['num_epochs'] = 1
+                if 'num_epochs' not in params: params['num_epochs'] = 2
+                else: params['num_epochs'] = int(params['num_epochs'])
                 cot_trace_depth = 2
                 width = 3
 
