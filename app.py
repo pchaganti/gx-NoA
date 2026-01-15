@@ -61,6 +61,47 @@ from deepthink.chains import (
     get_brainstorming_spanner_chain
 )
 
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+
+class TokenUsageTracker(BaseCallbackHandler):
+    def __init__(self, log_stream):
+        self.log_stream = log_stream
+        self.total_tokens = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+
+    async def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        try:
+            # Aggregate usage from all generations
+            if response.llm_output and "token_usage" in response.llm_output:
+                 usage = response.llm_output["token_usage"]
+                 self.total_tokens += usage.get("total_tokens", 0)
+                 self.prompt_tokens += usage.get("prompt_tokens", 0)
+                 self.completion_tokens += usage.get("completion_tokens", 0)
+            
+            # Check for standard usage_metadata in generations
+            if hasattr(response, 'generations'):
+                for generation_list in response.generations:
+                    for generation in generation_list:
+                        if hasattr(generation, 'message') and hasattr(generation.message, 'usage_metadata'):
+                            usage = generation.message.usage_metadata
+                            self.total_tokens += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+                            self.prompt_tokens += usage.get("input_tokens", 0)
+                            self.completion_tokens += usage.get("output_tokens", 0)
+            
+            # Emit Update
+            data = {
+                "total": self.total_tokens,
+                "prompt": self.prompt_tokens,
+                "completion": self.completion_tokens
+            }
+            await self.log_stream.put(f"TOKEN_USAGE: {json.dumps(data)}")
+            
+        except Exception as e:
+            print(f"Token tracking error: {e}")
+
+
 
 load_dotenv()
 # Note: google-generativeai may need to be installed: pip install google-generativeai
