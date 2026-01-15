@@ -25,7 +25,7 @@ from langchain_core.runnables.config import RunnableConfig
 from langchain_core.retrievers import BaseRetriever
 from typing import Dict, Any, TypedDict, Annotated, Tuple
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
