@@ -25,7 +25,8 @@ The **Qualitative Neural Network (QNN)** algorithm that powers this system is gr
 
 ## Changelog
 
-*  **Brainstorming Mode**: New chat-based interface that dynamically generates QNN neuron personas as experts. The system analyzes problem complexity, decomposes it into sub-problems, and creates 2-5 specialized AI agents using the same `input_spanner_chain` that powers Algorithm Design Mode. Each agent has its own MBTI type, career, and specialty tailored to the problem. Powered by Gemini 3 Flash Preview.
+*  **Brainstorming Mode**: A specialized mode for exploring ideas and concepts. It utilizes the full QNN engine to dynamically generate a panel of expert personas (e.g., "Dr. Logic", "Creative Visionary") based on your prompt. These agents collaborate and reflect over multiple epochs, providing a depth of insight that a single prompt cannot match. Features a dedicated chat-like interface that displays expert reflections and a final synthesized answer directly in the chat.
+*  **Parallel QNN Topology**: Layer 0 agents now execute in parallel, correcting previous bottlenecks and ensuring a truly distributed initial analysis.
 *  **Gemini Backend Integration**: Added support for Google's Gemini 3 Flash Preview model as the backend for brainstorming mode. API key stored securely in localStorage.
 *  **Mode Switcher**: UI now features two distinct modes - "Algorithm Design Mode" (original QNN functionality) and "Brainstorming Mode" (dynamic QNN expert chat interface).
 *  **Mirror Descent**: Renamed the qualitative backpropagation mechanism to "Mirror Descent" to better reflect the reflective nature of the prompt update process.
@@ -145,8 +146,10 @@ The current focus is on polishing and debugging existing features to reach a bet
     *   Ensure the Ollama application is running.
 5.  **Run the application:**
     ```bash
-    uvicorn new:app --reload
+
+    launch.bat
     ```
+    *   Or manually: `python app.py` (Note: `launch.bat` handles git sync and dependencies automatically).
 6.  **Access the GUI:** Open your browser to `http://127.0.0.1:8000`.
 
 ## How It Works

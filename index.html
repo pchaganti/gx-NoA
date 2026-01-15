@@ -1544,7 +1544,36 @@
                 allLbelsData.push(data.epoch);
                 renderPerplexityChart();
 
+            } else if (rawMessage.startsWith('FINAL_ANSWER: ')) {
+                try {
+                    const jsonStr = rawMessage.replace('FINAL_ANSWER: ', '');
+                    const answer = JSON.parse(jsonStr);
+                    const chatDiv = document.getElementById('brainstorm-chat');
+                    if (chatDiv) {
+                        const synthesisMsgDiv = document.createElement('div');
+                        synthesisMsgDiv.style.cssText = "background: #1e3a29; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid #28a745; color: #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);";
+
+                        // Parse markdown-like bolding if needed, or just replace newlines
+                        const formattedAnswer = answer.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+                        synthesisMsgDiv.innerHTML = `<div style="color: #28a745; font-weight: bold; margin-bottom: 0.5rem;">🧠 Synthesis</div>${formattedAnswer}`;
+                        chatDiv.appendChild(synthesisMsgDiv);
+                        chatDiv.scrollTop = chatDiv.scrollHeight;
+                    }
+
+                    // Re-enable input
+                    const btn = document.getElementById('brainstorm-send-btn');
+                    const input = document.getElementById('brainstorm-input');
+                    if (btn) { btn.disabled = false; btn.innerText = 'Send'; }
+                    if (input) { input.disabled = false; input.focus(); }
+
+                } catch (e) {
+                    console.error("Failed to parse FINAL_ANSWER", e);
+                }
+                addLogMessage(rawMessage);
+
             } else if (rawMessage.includes('__start__')) {
+
                 graphContainer.textContent = rawMessage.replace('__start__', '');
                 addLogMessage(">>> ASCII Graph Rendered <<<", { color: 'cyan' });
             } else if (rawMessage.includes('__session_id__')) {

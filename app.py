@@ -988,6 +988,10 @@ def create_synthesis_node(llm):
                  "reasoning": "Brainstorm synthesis complete."
              }
              await log_stream.put(f"SUCCESS: Brainstorm synthesis complete.")
+             # Send special token for frontend to capture in Chat (JSON encoded for safety)
+             await log_stream.put(f"FINAL_ANSWER: {json.dumps(final_solution_str)}")
+
+
         else:
             # Algorithm / Code Synthesis
             invoke_params = {
