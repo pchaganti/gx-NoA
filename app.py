@@ -1590,6 +1590,9 @@ async def build_and_run_graph(payload: dict = Body(...)):
     summarizer_llm = None
     params = payload.get("params", {})
     mode = payload.get("mode", "algorithm")
+    
+    # Initialize Token Tracker
+    token_tracker = TokenUsageTracker(log_stream)
 
     try:
         # Determine Provider
@@ -1612,19 +1615,19 @@ async def build_and_run_graph(payload: dict = Body(...)):
         elif provider == "gemini":
             if not api_key:
                 return JSONResponse(content={"message": "Gemini API Key required"}, status_code=400)
-            llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", google_api_key=api_key, temperature=0.7)
+            llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", google_api_key=api_key, temperature=0.7, callbacks=[token_tracker])
             summarizer_llm = llm # Reuse for summary
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest") 
             await log_stream.put(f"--- Initializing Main Agent LLM: Gemini (gemini-3-flash-preview) ---")
             
         else:
             # Default Ollama
-            summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0)
+            summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0, callbacks=[token_tracker])
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
             model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
             await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
 
-            llm = ChatOllama(model=model_name, temperature=0.4)
+            llm = ChatOllama(model=model_name, temperature=0.4, callbacks=[token_tracker])
             await llm.ainvoke("Hi")
             await log_stream.put("--- Main Agent LLM Connection Successful ---")
 

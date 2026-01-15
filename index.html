@@ -830,6 +830,12 @@
     <div class="container">
         <div class="header-with-button">
             <h2>Real-time Graph Activity</h2>
+            <div id="token-display"
+                style="background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; color: #aaa; border: 1px solid #333; display: flex; gap: 10px;">
+                <span>Total: <b id="tokens-total" style="color: #fff;">0</b></span>
+                <span style="font-size: 0.8em; color: #777;">(In: <span id="tokens-prompt">0</span> Out: <span
+                        id="tokens-completion">0</span>)</span>
+            </div>
             <button id="download-log-button" disabled>Download Full Log</button>
         </div>
         <div id="log-container"></div>
@@ -1557,6 +1563,16 @@
                 allPerplexityValues.push(parseFloat(data.perplexity));
                 allLbelsData.push(data.epoch);
                 renderPerplexityChart();
+
+            } else if (rawMessage.startsWith('TOKEN_USAGE: ')) {
+                try {
+                    const parts = rawMessage.substring(13);
+                    const usage = JSON.parse(parts);
+                    document.getElementById('tokens-total').innerText = usage.total;
+                    document.getElementById('tokens-prompt').innerText = usage.prompt;
+                    document.getElementById('tokens-completion').innerText = usage.completion;
+                } catch (e) { console.error("Token parsing error", e); }
+                return;
 
             } else if (rawMessage.includes('FINAL_ANSWER:')) {
                 console.log("Received FINAL_ANSWER event:", rawMessage);
