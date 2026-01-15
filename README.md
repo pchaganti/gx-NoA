@@ -21,7 +21,7 @@ Essentially, you can think of this project as a way to **max out a model's perfo
 ## Use Case: Advanced Algorithm Generation
 The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for complex problems where the only clue you have is a vague question or a high-level conceptual goal. With the system now refocused exclusively on code and algorithm generation, its primary use case is to tackle difficult programming challenges.
 
-*   **For Programmers & Researchers: Full Stack App Generation**: This is an experimental feature. As of right now the system can accumulate attempts and offer one final synthetized solution. This works well for algorithm design. Now we are trying to decompose the synthesis in modules that are aftwerads stitched together through abstract interface cards. It wont work on a few epochs, so if you can test it on high epochs and open an issue, it would be appreciated.
+*   **For Researchers & Thinkers: Brainstorming (Analogue to Grok Heavy)**: A specialized mode for deep concept exploration. The system dynamically generates a panel of expert personas (e.g., "Principles of Physics", "Market Strategist") tailored to your specific query. These experts debate, reflect, and refine their ideas over multiple epochs. The final output is equivalent to weeks of human research, synthesized into a comprehensive answer, making it a powerful "thought mining" tool for complex, open-ended questions.
 
 ## Changelog
 
