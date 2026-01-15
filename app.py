@@ -32,6 +32,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from sklearn.cluster import KMeans
 from contextlib import redirect_stdout
 from fastapi.staticfiles import StaticFiles
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 load_dotenv()
@@ -45,6 +46,15 @@ log_stream = asyncio.Queue()
 
 sessions = {}
 final_reports = {} 
+
+# Brainstorming mode expert definitions
+BRAINSTORM_EXPERTS = [
+    {"name": "Dr. Synthia Logic", "specialty": "Logical Analysis", "emoji": "🧠"},
+    {"name": "Marcus Visionary", "specialty": "Creative Ideation", "emoji": "💡"},
+    {"name": "Elena Pragmatic", "specialty": "Practical Implementation", "emoji": "🔧"},
+    {"name": "Professor Critique", "specialty": "Devil's Advocate", "emoji": "🎭"},
+    {"name": "Aria Empathy", "specialty": "Human-Centered Design", "emoji": "❤️"},
+] 
 
 class RAPTORRetriever(BaseRetriever):
     raptor_index: Any
@@ -1231,6 +1241,88 @@ User Request:
 """)
     return prompt | llm | StrOutputParser()
 
+
+# ==================== BRAINSTORMING MODE CHAINS ====================
+
+def get_complexity_estimator_chain(llm):
+    """Estimates QNN size based on problem complexity."""
+    prompt = ChatPromptTemplate.from_template("""
+Analyze the complexity of the following user input/question for a brainstorming session.
+Based on the complexity, recommend an appropriate QNN (Qualitative Neural Network) size.
+
+User Input:
+---
+{user_input}
+---
+
+Consider these factors:
+1. Number of distinct concepts or domains involved
+2. Depth of analysis required
+3. Potential for conflicting perspectives
+4. Technical vs conceptual nature
+
+Respond with a JSON object:
+{{
+    "complexity_score": <1-10 integer>,
+    "recommended_layers": <2-5 integer>,
+    "recommended_epochs": <1-3 integer>,
+    "reasoning": "<brief explanation>"
+}}
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_expert_reflection_chain(llm, expert_name, expert_specialty, expert_emoji):
+    """Creates a reflection chain for a specific expert persona."""
+    prompt = ChatPromptTemplate.from_template(f"""
+You are {expert_name} ({expert_emoji}), an expert in {expert_specialty}.
+
+Your role is to provide your unique perspective on the user's question or idea, filtered through your specialty of {expert_specialty}.
+
+User's Question/Idea:
+---
+{{user_input}}
+---
+
+Previous Expert Opinions (if any):
+---
+{{previous_opinions}}
+---
+
+Provide your thoughtful reflection from your area of expertise. Be concise but insightful.
+Focus on what your specialty ({expert_specialty}) uniquely contributes to this discussion.
+
+Your response should be 2-4 sentences of substantive analysis.
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_opinion_synthesizer_chain(llm):
+    """Synthesizes all expert opinions into a final coherent response."""
+    prompt = ChatPromptTemplate.from_template("""
+You are a master synthesizer. You have received opinions from multiple experts on a user's question.
+Your task is to synthesize these diverse perspectives into a coherent, actionable response.
+
+Original User Question:
+---
+{user_input}
+---
+
+Expert Opinions:
+---
+{all_opinions}
+---
+
+Create a synthesized response that:
+1. Identifies key areas of agreement
+2. Acknowledges valuable tensions or trade-offs
+3. Provides a balanced, actionable conclusion
+4. Is concise but comprehensive (3-5 sentences)
+
+Synthesized Response:
+""")
+    return prompt | llm | StrOutputParser()
+
 def create_agent_node(llm, node_id):
     """
     Creates a node in the graph that represents an agent.
@@ -1609,8 +1701,9 @@ def create_reframe_and_decompose_node(llm):
 
 
 def create_update_agent_prompts_node(llm):
+    """Creates the mirror descent node that updates agent prompts based on reflection."""
     async def update_agent_prompts_node(state: GraphState):
-        await log_stream.put("--- [REFLECTION PASS] Entering Agent Prompt Update Node (Targeted Backpropagation) ---")
+        await log_stream.put("--- [MIRROR DESCENT] Entering Agent Prompt Update Node ---")
         params = state["params"]
 
         all_prompts_copy = [layer[:] for layer in state["all_layers_prompts"]]
@@ -1619,7 +1712,7 @@ def create_update_agent_prompts_node(llm):
         attribute_chain = get_attribute_and_hard_request_generator_chain(llm, params['vector_word_size'])
 
         for i in range(len(all_prompts_copy) -1, -1, -1):
-            await log_stream.put(f"LOG: [BACKPROP] Reflecting on Layer {i}...")
+            await log_stream.put(f"LOG: [MIRROR_DESCENT] Reflecting on Layer {i}...")
             
             update_tasks = []
             
@@ -1655,7 +1748,7 @@ def create_update_agent_prompts_node(llm):
                     })
                     
                     await log_stream.put(f"[POST-UPDATE PROMPT] Updated system prompt for {agent_id}:\n---\n{new_prompt}\n---")
-                    await log_stream.put(f"LOG: [BACKPROP] System prompt for {agent_id} has been updated.")
+                    await log_stream.put(f"LOG: [MIRROR_DESCENT] System prompt for {agent_id} has been updated.")
                     return layer_idx, agent_idx, new_prompt
 
                 update_tasks.append(update_single_prompt(i, j, agent_prompt, agent_id))
@@ -2475,6 +2568,109 @@ async def download_report(session_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=NOA_Report_{session_id}.zip"}
     )
+
+
+@app.post("/brainstorm")
+async def brainstorm(payload: dict = Body(...)):
+    """
+    Brainstorming mode endpoint - creates QNNs for expert reflection and synthesizes opinions.
+    Uses Gemini as the backend with complexity-based QNN sizing.
+    """
+    try:
+        user_input = payload.get("message", "")
+        api_key = payload.get("api_key", "")
+        
+        if not user_input:
+            return JSONResponse(content={"error": "Message is required"}, status_code=400)
+        if not api_key:
+            return JSONResponse(content={"error": "API key is required. Please save your Gemini API key in settings."}, status_code=400)
+        
+        await log_stream.put("--- [BRAINSTORM] Starting brainstorming session ---")
+        
+        # Initialize Gemini LLM with user's API key
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-3-flash-preview",
+            google_api_key=api_key,
+            temperature=0.7
+        )
+        
+        # Step 1: Estimate complexity and QNN size
+        await log_stream.put("--- [BRAINSTORM] Estimating problem complexity ---")
+        complexity_chain = get_complexity_estimator_chain(llm)
+        complexity_result_str = await complexity_chain.ainvoke({"user_input": user_input})
+        
+        try:
+            complexity_data = clean_and_parse_json(complexity_result_str)
+            complexity_score = complexity_data.get("complexity_score", 5)
+            recommended_layers = complexity_data.get("recommended_layers", 3)
+            recommended_epochs = complexity_data.get("recommended_epochs", 1)
+            await log_stream.put(f"LOG: Complexity score: {complexity_score}, Layers: {recommended_layers}, Epochs: {recommended_epochs}")
+        except Exception:
+            complexity_score = 5
+            recommended_layers = 3
+            recommended_epochs = 1
+            await log_stream.put("WARNING: Could not parse complexity. Using defaults.")
+        
+        # Step 2: Run expert reflections
+        all_opinions = []
+        expert_responses = []
+        
+        for expert in BRAINSTORM_EXPERTS:
+            await log_stream.put(f"--- [BRAINSTORM] {expert['emoji']} {expert['name']} ({expert['specialty']}) is reflecting ---")
+            
+            previous_opinions_str = "\n\n".join([
+                f"{e['emoji']} {e['name']}: {e['opinion']}" 
+                for e in expert_responses
+            ]) if expert_responses else "No previous opinions yet."
+            
+            reflection_chain = get_expert_reflection_chain(
+                llm, 
+                expert["name"], 
+                expert["specialty"],
+                expert["emoji"]
+            )
+            
+            opinion = await reflection_chain.ainvoke({
+                "user_input": user_input,
+                "previous_opinions": previous_opinions_str
+            })
+            
+            expert_responses.append({
+                "name": expert["name"],
+                "specialty": expert["specialty"],
+                "emoji": expert["emoji"],
+                "opinion": opinion
+            })
+            all_opinions.append(f"{expert['emoji']} {expert['name']} ({expert['specialty']}): {opinion}")
+            await log_stream.put(f"LOG: {expert['name']} responded: {opinion[:100]}...")
+        
+        # Step 3: Synthesize all opinions
+        await log_stream.put("--- [BRAINSTORM] Synthesizing expert opinions ---")
+        synthesizer_chain = get_opinion_synthesizer_chain(llm)
+        synthesized_response = await synthesizer_chain.ainvoke({
+            "user_input": user_input,
+            "all_opinions": "\n\n".join(all_opinions)
+        })
+        
+        await log_stream.put(f"LOG: Synthesis complete.")
+        await log_stream.put("--- [BRAINSTORM] Brainstorming session complete ---")
+        
+        return JSONResponse(content={
+            "success": True,
+            "complexity": {
+                "score": complexity_score,
+                "layers": recommended_layers,
+                "epochs": recommended_epochs
+            },
+            "experts": expert_responses,
+            "synthesis": synthesized_response
+        })
+        
+    except Exception as e:
+        error_message = f"Brainstorming error: {e}"
+        await log_stream.put(error_message)
+        await log_stream.put(traceback.format_exc())
+        return JSONResponse(content={"error": error_message, "traceback": traceback.format_exc()}, status_code=500)
 
 
 if __name__ == "__main__":

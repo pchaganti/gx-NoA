@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +17,7 @@
             --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             --border-radius: 0.5rem;
         }
+
         body {
             background-color: var(--primary-color);
             color: var(--text-color);
@@ -25,21 +27,26 @@
             font-size: 16px;
             line-height: 1.6;
         }
-        h1, h2 {
+
+        h1,
+        h2 {
             color: var(--text-color);
             border-bottom: 1px solid var(--secondary-color);
             padding-bottom: 0.5rem;
             margin-top: 2rem;
             margin-bottom: 1rem;
         }
+
         h1 {
             text-align: center;
             font-size: 2.5rem;
             border-bottom: none;
         }
+
         h2 {
             font-size: 1.75rem;
         }
+
         .container {
             width: 100%;
             max-width: 800px;
@@ -49,21 +56,28 @@
             border-radius: var(--border-radius);
             margin-bottom: 2rem;
         }
+
         .section {
             background-color: var(--secondary-color);
             padding: 2rem;
             border-radius: var(--border-radius);
             margin-bottom: 2rem;
         }
+
         .hidden {
             display: none;
         }
+
         label {
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 500;
         }
-        input, textarea, button, select {
+
+        input,
+        textarea,
+        button,
+        select {
             width: 100%;
             padding: 0.75rem;
             margin-bottom: 1rem;
@@ -75,30 +89,38 @@
             font-family: inherit;
             font-size: 1rem;
         }
-        input:focus, textarea:focus, select:focus {
+
+        input:focus,
+        textarea:focus,
+        select:focus {
             outline: none;
             border-color: var(--accent-color);
             box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.3);
         }
+
         textarea {
             min-height: 120px;
             resize: vertical;
         }
+
         button {
             cursor: pointer;
             background-color: var(--accent-color);
             color: var(--text-color);
             font-weight: bold;
             border: none;
-            transition: background-color: 0.3s ease;
+            transition: background-color 0.3s ease;
         }
+
         button:hover:not(:disabled) {
             background-color: #E03C3C;
         }
+
         button:disabled {
             background-color: #555;
             cursor: not-allowed;
         }
+
         #log-container {
             height: 400px;
             background-color: #000;
@@ -111,6 +133,7 @@
             color: #C0C0C0;
             white-space: pre-wrap;
         }
+
         #graph-container {
             min-height: 400px;
             background-color: #000;
@@ -123,10 +146,12 @@
             color: #C0C0C0;
             white-space: pre;
         }
+
         #graph-container p {
             color: #888;
-            white-space: pre-wrap; 
+            white-space: pre-wrap;
         }
+
         .mbti-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -136,20 +161,28 @@
             border-radius: var(--border-radius);
             margin-bottom: 1rem;
         }
+
         .mbti-option {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
+
         .mbti-option input[type="checkbox"] {
             width: auto;
             margin-bottom: 0;
         }
+
         .mbti-option label {
             margin-bottom: 0;
             font-weight: normal;
         }
-        #results-container pre, #hidden-outputs-container pre, #papers-container pre, #code-result-container pre, #modules-container pre {
+
+        #results-container pre,
+        #hidden-outputs-container pre,
+        #papers-container pre,
+        #code-result-container pre,
+        #modules-container pre {
             background-color: #000;
             padding: 1rem;
             border-radius: var(--border-radius);
@@ -157,6 +190,7 @@
             word-wrap: break-word;
             color: #FAFAFA;
         }
+
         .header-with-button {
             display: flex;
             justify-content: space-between;
@@ -165,21 +199,32 @@
             padding-bottom: 0.5rem;
             margin-bottom: 1rem;
         }
-        .header-with-button h2, .header-with-button h3 {
+
+        .header-with-button h2,
+        .header-with-button h3 {
             border-bottom: none;
             padding-bottom: 0;
             margin: 0;
         }
-        #download-log-button, .download-paper-button, #download-report-button, #export-qnn-button {
+
+        #download-log-button,
+        .download-paper-button,
+        #download-report-button,
+        #export-qnn-button {
             width: auto;
             padding: 0.5rem 1rem;
             margin-bottom: 0;
             font-size: 0.9rem;
             background-color: var(--secondary-color);
         }
-        #download-log-button:hover:not(:disabled), .download-paper-button:hover:not(:disabled), #download-report-button:hover:not(:disabled), #export-qnn-button:hover:not(:disabled) {
+
+        #download-log-button:hover:not(:disabled),
+        .download-paper-button:hover:not(:disabled),
+        #download-report-button:hover:not(:disabled),
+        #export-qnn-button:hover:not(:disabled) {
             background-color: #3a3b44;
         }
+
         .chat-messages {
             height: 400px;
             background-color: #000;
@@ -192,6 +237,7 @@
             flex-direction: column;
             gap: 1rem;
         }
+
         .chat-message {
             padding: 0.75rem 1rem;
             border-radius: var(--border-radius);
@@ -199,12 +245,14 @@
             line-height: 1.5;
             word-wrap: break-word;
         }
+
         .user-message {
             background-color: var(--accent-color);
             color: var(--text-color);
             align-self: flex-end;
             border-bottom-right-radius: 0;
         }
+
         .ai-message {
             background-color: var(--secondary-color);
             color: var(--text-color);
@@ -212,22 +260,29 @@
             border-bottom-left-radius: 0;
             white-space: pre-wrap;
         }
-        #chat-form, #diagnostic-chat-form {
+
+        #chat-form,
+        #diagnostic-chat-form {
             display: flex;
             gap: 1rem;
         }
-        #chat-input, #diagnostic-chat-input {
+
+        #chat-input,
+        #diagnostic-chat-input {
             flex-grow: 1;
             min-height: 50px;
             height: 50px;
             margin-bottom: 0;
             resize: none;
         }
-        #chat-send-button, #diagnostic-chat-send-button {
+
+        #chat-send-button,
+        #diagnostic-chat-send-button {
             width: auto;
             margin-bottom: 0;
             align-self: flex-end;
         }
+
         #harvest-button {
             width: auto;
             padding: 0.5rem 1.5rem;
@@ -236,16 +291,20 @@
             font-weight: bold;
             background-color: #28a745;
         }
+
         #harvest-button:hover:not(:disabled) {
             background-color: #218838;
         }
+
         #diagnostic-chat-container {
             border: 2px solid #007bff;
         }
+
         #diagnostic-chat-container h2 {
             color: #00aaff;
             border-bottom-color: #007bff;
         }
+
         .diagnostic-ai-message {
             background-color: #1c2e4a;
             color: #e0e0ff;
@@ -253,18 +312,21 @@
             border-bottom-left-radius: 0;
             white-space: pre-wrap;
         }
+
         .diagnostic-user-message {
             background-color: #0056b3;
             color: var(--text-color);
             align-self: flex-end;
             border-bottom-right-radius: 0;
         }
+
         .qnn-import-section {
             border: 2px dashed var(--accent-color);
             padding: 1.5rem;
             margin-bottom: 2rem;
             text-align: center;
         }
+
         .qnn-import-section label {
             cursor: pointer;
             background-color: var(--secondary-color);
@@ -273,9 +335,11 @@
             display: inline-block;
             margin-bottom: 1rem;
         }
+
         .qnn-import-section input[type="file"] {
             display: none;
         }
+
         #imported-qnn-info {
             background-color: #1c2e4a;
             padding: 1rem;
@@ -283,775 +347,1239 @@
             margin-top: 1rem;
             text-align: left;
         }
+
         #inference-options {
             display: flex;
             gap: 1rem;
             justify-content: center;
             margin-top: 1rem;
         }
+
         #inference-options button {
             background-color: #007bff;
             width: 50%;
         }
+
         #inference-options button:hover:not(:disabled) {
             background-color: #0056b3;
         }
+
+        /* Mode Tabs */
+        .mode-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+
+        .mode-tab {
+            padding: 1rem 2rem;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .mode-tab:hover {
+            color: var(--text-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .mode-tab.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            background: linear-gradient(145deg, #1a1d24, #22252e);
+            border: 1px solid var(--secondary-color);
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .settings-panel label {
+            margin: 0;
+            font-weight: 600;
+            color: #aaa;
+        }
+
+        .settings-panel input {
+            flex: 1;
+            min-width: 200px;
+            margin: 0;
+        }
+
+        .settings-panel button {
+            width: auto;
+            padding: 0.5rem 1.5rem;
+            margin: 0;
+        }
+
+        .api-key-status {
+            color: #28a745;
+            font-size: 0.9rem;
+        }
+
+        /* Brainstorming Mode */
+        .brainstorm-container {
+            display: none;
+        }
+
+        .brainstorm-container.active {
+            display: block;
+        }
+
+        .algorithm-container.hidden {
+            display: none;
+        }
+
+        .expert-panel {
+            background: linear-gradient(145deg, #1c2030, #252a38);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .expert-panel h3 {
+            margin: 0 0 0.75rem 0;
+            color: var(--accent-color);
+            border-bottom: none;
+        }
+
+        .expert-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .expert-badge {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .expert-badge .specialty {
+            color: #888;
+            font-size: 0.75rem;
+        }
+
+        .brainstorm-chat {
+            background: #000;
+            border: 1px solid var(--secondary-color);
+            border-radius: var(--border-radius);
+            height: 450px;
+            overflow-y: auto;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .expert-message {
+            background: linear-gradient(145deg, #1a2940, #1e3355);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            border-left: 3px solid #007bff;
+        }
+
+        .expert-message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .expert-message-header .specialty {
+            color: #888;
+            font-weight: normal;
+            font-size: 0.85rem;
+        }
+
+        .synthesis-message {
+            background: linear-gradient(145deg, #2d3a2d, #354535);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            border-left: 3px solid #28a745;
+        }
+
+        .synthesis-message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .thinking-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #888;
+            font-style: italic;
+        }
+
+        .thinking-dots {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .thinking-dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            animation: thinking 1.4s ease-in-out infinite;
+        }
+
+        .thinking-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .thinking-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes thinking {
+
+            0%,
+            80%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            40% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .brainstorm-input-form {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .brainstorm-input-form textarea {
+            flex: 1;
+            min-height: 60px;
+            margin: 0;
+            resize: none;
+        }
+
+        .brainstorm-input-form button {
+            width: auto;
+            align-self: flex-end;
+        }
     </style>
 </head>
+
 <body>
     <h1>It takes a village of agents to raise an agent</h1>
 
+    <!-- Settings Panel -->
     <div class="container">
-        <div id="qnn-import-container" class="section qnn-import-section">
-            <h2>Load a Pre-Trained Graph (QNN)</h2>
-            <p>Import a previously exported QNN JSON file to continue training or run in inference-only mode.</p>
-            <form id="import-qnn-form">
-                <label for="qnn-file-input">Select QNN File</label>
-                <input type="file" id="qnn-file-input" accept=".json">
-            </form>
-            <div id="imported-qnn-info" class="hidden">
-                <p><strong>File Loaded:</strong> <span id="loaded-filename"></span></p>
-                <p>A QNN file has been loaded. You can modify the prompt below. Then, choose an execution mode:</p>
-                <div id="inference-options">
-                    <button id="inference-continue-training-btn" hidden>Continue Training</button>
-                    <button id="inference-only-btn" >Run Inference Only</button>
+        <div class="settings-panel">
+            <label for="gemini-api-key">🔑 Gemini API Key:</label>
+            <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key...">
+            <button type="button" id="save-api-key-btn">Save</button>
+            <span id="api-key-status" class="api-key-status"></span>
+        </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="container">
+        <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="algorithm">🧬 Algorithm Design Mode</button>
+            <button class="mode-tab" data-mode="brainstorm">🧠 Brainstorming Mode</button>
+        </div>
+    </div>
+
+    <!-- Brainstorming Mode Container -->
+    <div class="container brainstorm-container" id="brainstorm-mode">
+        <div class="section">
+            <h2>🧠 Brainstorming Mode</h2>
+            <p>Chat with a panel of AI experts who will reflect on your ideas from different perspectives.</p>
+
+            <div class="expert-panel">
+                <h3>Expert Panel</h3>
+                <div class="expert-list">
+                    <div class="expert-badge">🧠 Dr. Synthia Logic <span class="specialty">Logical Analysis</span></div>
+                    <div class="expert-badge">💡 Marcus Visionary <span class="specialty">Creative Ideation</span></div>
+                    <div class="expert-badge">🔧 Elena Pragmatic <span class="specialty">Implementation</span></div>
+                    <div class="expert-badge">🎭 Professor Critique <span class="specialty">Devil's Advocate</span>
+                    </div>
+                    <div class="expert-badge">❤️ Aria Empathy <span class="specialty">Human-Centered</span></div>
                 </div>
             </div>
+
+            <div class="brainstorm-chat" id="brainstorm-chat">
+                <div style="color: #666; text-align: center; padding: 2rem;">
+                    Ask a question or share an idea to get started...
+                </div>
+            </div>
+
+            <form class="brainstorm-input-form" id="brainstorm-form">
+                <textarea id="brainstorm-input" placeholder="What would you like to brainstorm?" required></textarea>
+                <button type="submit" id="brainstorm-send-btn">Send</button>
+            </form>
         </div>
+    </div>
 
-        <div id="graph-architecture" class="section">
-            <h2>Graph Architecture</h2>
-            <form id="graph-params-form">
-                <div id="debug-options" style="display: flex; gap: 2rem; margin-bottom: 1rem; margin-top: 0.5rem;">
-                    <div class="mbti-option">
-                        <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
-                        <label for="debug_mode">🚀 Enable Debug Mode (Text)</label>
+    <!-- Algorithm Design Mode Container -->
+    <div class="algorithm-container" id="algorithm-mode">
+        <div class="container">
+            <div id="qnn-import-container" class="section qnn-import-section">
+                <h2>Load a Pre-Trained QNN</h2>
+                <p>Import a previously exported QNN JSON file to continue training or run in inference-only mode.</p>
+                <form id="import-qnn-form">
+                    <label for="qnn-file-input">Select QNN File</label>
+                    <input type="file" id="qnn-file-input" accept=".json">
+                </form>
+                <div id="imported-qnn-info" class="hidden">
+                    <p><strong>File Loaded:</strong> <span id="loaded-filename"></span></p>
+                    <p>A QNN file has been loaded. You can modify the prompt below. Then, choose an execution mode:</p>
+                    <div id="inference-options">
+                        <button id="inference-continue-training-btn" hidden>Continue Training</button>
+                        <button id="inference-only-btn">Run Inference Only</button>
                     </div>
-                    <div class="mbti-option">
-                        <input type="checkbox" id="coder_debug_mode" name="coder_debug_mode" value="true">
-                        <label for="coder_debug_mode">💻 Enable Coder Debug (Code)</label>
-                    </div>
                 </div>
-                <div id="ollama-model-section">
-                    <label for="ollama_model">Ollama Model Name:</label>
-                    <input type="text" id="ollama_model" name="ollama_model" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
-                </div>
-                <label for="cot_trace_depth">CoT trace depth (max 32):</label>
-                <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="2" max="32" min="2" required>
-                <label for="num_questions">Number of questions for final report (5-100):</label>
-                <input type="number" id="num_questions" name="num_questions" value="25" min="5" max="100" required>
-                <label for="num_epochs">Number of epochs:</label>
-                <input type="number" id="num_epochs" name="num_epochs" value="1" required>
-                <label for="vector_word_size">Vector word size (Number of verbs per agent):</label>
-                <input type="number" id="vector_word_size" name="vector_word_size" value="2" min="2" max="20" required>
-                <label for="prompt_alignment">Prompt alignment (0.1-2.0):</label>
-                <input type="number" id="prompt_alignment" name="prompt_alignment" step="0.1" min="0.1" max="2.0" value="1.0" required>
-                <label for="density">Density (0.1-2.0):</label>
-                <input type="number" id="density" name="density" step="0.1" min="0.1" max="2.0" value="1.0" required>
-                <label for="learning_rate">Learning rate (0.1-2.0):</label>
-                <input type="number" id="learning_rate" name="learning_rate" step="0.1" min="0.1" max="2.0" value="0.1" required>
-                <label>MBTI Archetypes (select at least 2):</label>
-                <div class="mbti-grid">
-                    <div class="mbti-option"><input type="checkbox" id="mbti-istj" name="mbti_archetypes" value="ISTJ" checked><label for="mbti-istj">ISTJ (Inspector)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-isfj" name="mbti_archetypes" value="ISFJ" checked><label for="mbti-isfj">ISFJ (Protector)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-infj" name="mbti_archetypes" value="INFJ"><label for="mbti-infj">INFJ (Advocate)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-intj" name="mbti_archetypes" value="INTJ"><label for="mbti-intj">INTJ (Architect)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-istp" name="mbti_archetypes" value="ISTP"><label for="mbti-istp">ISTP (Virtuoso)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-isfp" name="mbti_archetypes" value="ISFP"><label for="mbti-isfp">ISFP (Adventurer)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-infp" name="mbti_archetypes" value="INFP"><label for="mbti-infp">INFP (Mediator)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-intp" name="mbti_archetypes" value="INTP"><label for="mbti-intp">INTP (Logician)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-estp" name="mbti_archetypes" value="ESTP"><label for="mbti-estp">ESTP (Entrepreneur)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-esfp" name="mbti_archetypes" value="ESFP"><label for="mbti-esfp">ESFP (Entertainer)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-enfp" name="mbti_archetypes" value="ENFP"><label for="mbti-enfp">ENFP (Campaigner)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-entp" name="mbti_archetypes" value="ENTP"><label for="mbti-entp">ENTP (Debater)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-estj" name="mbti_archetypes" value="ESTJ"><label for="mbti-estj">ESTJ (Executive)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-esfj" name="mbti_archetypes" value="ESFJ"><label for="mbti-esfj">ESFJ (Consul)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-enfj" name="mbti_archetypes" value="ENFJ"><label for="mbti-enfj">ENFJ (Protagonist)</label></div>
-                    <div class="mbti-option"><input type="checkbox" id="mbti-entj" name="mbti_archetypes" value="ENTJ"><label for="mbti-entj">ENTJ (Commander)</label></div>
-                </div>
-                <label for="prompt">Prompt:</label>
-                <textarea id="prompt" name="prompt" required>
+            </div>
 
-                    
+            <div id="graph-architecture" class="section">
+                <h2>Graph Architecture</h2>
+                <form id="graph-params-form">
+                    <div id="debug-options" style="display: flex; gap: 2rem; margin-bottom: 1rem; margin-top: 0.5rem;">
+                        <div class="mbti-option">
+                            <input type="checkbox" id="debug_mode" name="debug_mode" value="true">
+                            <label for="debug_mode">🚀 Enable Debug Mode (Text)</label>
+                        </div>
+                        <div class="mbti-option">
+                            <input type="checkbox" id="coder_debug_mode" name="coder_debug_mode" value="true">
+                            <label for="coder_debug_mode">💻 Enable Coder Debug (Code)</label>
+                        </div>
+                    </div>
+                    <div id="ollama-model-section">
+                        <label for="ollama_model">Ollama Model Name:</label>
+                        <input type="text" id="ollama_model" name="ollama_model"
+                            value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
+                    </div>
+                    <label for="cot_trace_depth">CoT trace depth (max 32):</label>
+                    <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="2" max="32" min="2"
+                        required>
+                    <label for="num_questions">Number of questions for final report (5-100):</label>
+                    <input type="number" id="num_questions" name="num_questions" value="25" min="5" max="100" required>
+                    <label for="num_epochs">Number of epochs:</label>
+                    <input type="number" id="num_epochs" name="num_epochs" value="1" required>
+                    <label for="vector_word_size">Vector word size (Number of verbs per agent):</label>
+                    <input type="number" id="vector_word_size" name="vector_word_size" value="2" min="2" max="20"
+                        required>
+                    <label for="prompt_alignment">Prompt alignment (0.1-2.0):</label>
+                    <input type="number" id="prompt_alignment" name="prompt_alignment" step="0.1" min="0.1" max="2.0"
+                        value="1.0" required>
+                    <label for="density">Density (0.1-2.0):</label>
+                    <input type="number" id="density" name="density" step="0.1" min="0.1" max="2.0" value="1.0"
+                        required>
+                    <label for="learning_rate">Learning rate (0.1-2.0):</label>
+                    <input type="number" id="learning_rate" name="learning_rate" step="0.1" min="0.1" max="2.0"
+                        value="0.1" required>
+                    <label>MBTI Archetypes (select at least 2):</label>
+                    <div class="mbti-grid">
+                        <div class="mbti-option"><input type="checkbox" id="mbti-istj" name="mbti_archetypes"
+                                value="ISTJ" checked><label for="mbti-istj">ISTJ (Inspector)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-isfj" name="mbti_archetypes"
+                                value="ISFJ" checked><label for="mbti-isfj">ISFJ (Protector)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-infj" name="mbti_archetypes"
+                                value="INFJ"><label for="mbti-infj">INFJ (Advocate)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-intj" name="mbti_archetypes"
+                                value="INTJ"><label for="mbti-intj">INTJ (Architect)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-istp" name="mbti_archetypes"
+                                value="ISTP"><label for="mbti-istp">ISTP (Virtuoso)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-isfp" name="mbti_archetypes"
+                                value="ISFP"><label for="mbti-isfp">ISFP (Adventurer)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-infp" name="mbti_archetypes"
+                                value="INFP"><label for="mbti-infp">INFP (Mediator)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-intp" name="mbti_archetypes"
+                                value="INTP"><label for="mbti-intp">INTP (Logician)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-estp" name="mbti_archetypes"
+                                value="ESTP"><label for="mbti-estp">ESTP (Entrepreneur)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-esfp" name="mbti_archetypes"
+                                value="ESFP"><label for="mbti-esfp">ESFP (Entertainer)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-enfp" name="mbti_archetypes"
+                                value="ENFP"><label for="mbti-enfp">ENFP (Campaigner)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-entp" name="mbti_archetypes"
+                                value="ENTP"><label for="mbti-entp">ENTP (Debater)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-estj" name="mbti_archetypes"
+                                value="ESTJ"><label for="mbti-estj">ESTJ (Executive)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-esfj" name="mbti_archetypes"
+                                value="ESFJ"><label for="mbti-esfj">ESFJ (Consul)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-enfj" name="mbti_archetypes"
+                                value="ENFJ"><label for="mbti-enfj">ENFJ (Protagonist)</label></div>
+                        <div class="mbti-option"><input type="checkbox" id="mbti-entj" name="mbti_archetypes"
+                                value="ENTJ"><label for="mbti-entj">ENTJ (Commander)</label></div>
+                    </div>
+                    <label for="prompt">Prompt:</label>
+                    <textarea id="prompt" name="prompt" required>
+
+
                     Current diffusers and transformer architectures use integral samplers or differential solvers in the case of diffusers, and decoding algorithms which account as integral, in the case of transformers, to run inference. I presume the foundation of training and architecture are allready figured out, so i want you to create a new inference algorithm that helps exsiting architectures acheive AGI. For this conceptualziation assume the world is full of spinning wheels (harmonic oscillators), like we see them in atoms, solar systems, galaxies, human hierarchies...etc, and data represents a measured state of the "wheel" at a given time. Abudant training data samples the full state of the "wheel" by offering all the posible data of the wheel full state. This is where understanding is reached: by spinning the whole wheel and assimilating all possible perspectives. Current inference algoritms on the other hand, are not fully decoding the internal "implicit wheels" abstracted into the weights after training, as their responses can be shallow. The training algorithms encode the wheels but inference algorithms do not extract them very well. I want you to make in python with excellent documentation: 1. An inference algorithm to achieve AGI through better inference using a PID like approach with perturbative feedback. Instead of just using either an integrative or differential component, i want you to implement both with proportional weighting terms. Figure out a good way to integrate PID loops into transformer inference so transformers learn on inference. 2. a gradio app to monitor the algorithm during an inference run on a mocked transformer which should be built to be sufficiently dense to provide realistic output/input.
 
 
                 </textarea>
-                <button type="submit" id="run-button">Build and Run Graph</button>
-            </form>
-        </div>
-    </div>
-    
-    <div class="container" id="diagnostic-chat-container">
-        <div class="header-with-button">
-            <h2>Live Diagnostic Chat</h2>
-        </div>
-        <div id="diagnostic-chat-messages" class="chat-messages"></div>
-        <form id="diagnostic-chat-form">
-            <textarea id="diagnostic-chat-input" placeholder="Waiting for graph to start..." required disabled></textarea>
-            <button type="submit" id="diagnostic-chat-send-button" disabled>Query</button>
-        </form>
-    </div>
-
-    <div class="container" id="perplexity-chart-container">
-        <h2>Average Perplexity per Epoch</h2>
-        <canvas id="perplexityChart"></canvas>
-    </div>
-
-    <div class="container">
-        <div class="header-with-button">
-            <h2>Real-time Graph Activity</h2>
-            <button id="download-log-button" disabled>Download Full Log</button>
-        </div>
-        <div id="log-container"></div>
-    </div>
-
-    <div class="container">
-        <h2>Graph Visualization</h2>
-        <div id="graph-container">
-            <p>ASCII graph will be displayed here after the process starts...</p>
-        </div>
-    </div>
-
-    <div class="container hidden" id="chat-container">
-        <div class="header-with-button">
-            <h2>Train the interrogator: ask what you want to know, and it will appear in the final report</h2>
-            <div style="display: flex; gap: 1rem;">
-                <button id="harvest-button">HARVEST</button>
+                    <button type="submit" id="run-button">Build and Run Graph</button>
+                </form>
             </div>
         </div>
-        <div id="chat-messages" class="chat-messages"></div>
-        <form id="chat-form">
-            <textarea id="chat-input" placeholder="Ask a question about the final generated knowledge..." required></textarea>
-            <button type="submit" id="chat-send-button">Send</button>
-        </form>
+
+        <div class="container" id="diagnostic-chat-container">
+            <div class="header-with-button">
+                <h2>Live Diagnostic Chat</h2>
+            </div>
+            <div id="diagnostic-chat-messages" class="chat-messages"></div>
+            <form id="diagnostic-chat-form">
+                <textarea id="diagnostic-chat-input" placeholder="Waiting for graph to start..." required
+                    disabled></textarea>
+                <button type="submit" id="diagnostic-chat-send-button" disabled>Query</button>
+            </form>
+        </div>
+
+        <div class="container" id="perplexity-chart-container">
+            <h2>Average Perplexity per Epoch</h2>
+            <canvas id="perplexityChart"></canvas>
+        </div>
+
+        <div class="container">
+            <div class="header-with-button">
+                <h2>Real-time Graph Activity</h2>
+                <button id="download-log-button" disabled>Download Full Log</button>
+            </div>
+            <div id="log-container"></div>
+        </div>
+
+        <div class="container">
+            <h2>Graph Visualization</h2>
+            <div id="graph-container">
+                <p>ASCII graph will be displayed here after the process starts...</p>
+            </div>
+        </div>
+
+        <div class="container hidden" id="chat-container">
+            <div class="header-with-button">
+                <h2>Train the interrogator: ask what you want to know, and it will appear in the final report</h2>
+                <div style="display: flex; gap: 1rem;">
+                    <button id="harvest-button">HARVEST</button>
+                </div>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <form id="chat-form">
+                <textarea id="chat-input" placeholder="Ask a question about the final generated knowledge..."
+                    required></textarea>
+                <button type="submit" id="chat-send-button">Send</button>
+            </form>
+        </div>
+
+        <div class="container hidden" id="report-container">
+            <h2>Final Report</h2>
+            <p>The graph execution is complete. The generated academic papers have been compiled into a single zip
+                archive
+                for you to download.</p>
+            <button id="download-report-button">Download Full Report (.zip)</button>
+        </div>
+
+        <div class="container hidden" id="code-result-container">
+            <h2>Generated Code</h2>
+            <p>The graph execution is complete. The following code has been generated based on your request.</p>
+            <pre><code id="code-output" class="language-python"></code></pre>
+            <h3>Reasoning:</h3>
+            <p id="code-reasoning" style="white-space: pre-wrap;"></p>
+        </div>
+
+        <div class="container hidden" id="modules-container">
+            <h2>Successfully Built Modules</h2>
+            <p>The following modules were successfully synthesized and executed during the run.</p>
+            <div id="modules-output"></div>
+        </div>
+
+        <button id="export-qnn-button" class="hidden">Export QNN</button>
     </div>
-
-    <div class="container hidden" id="report-container">
-        <h2>Final Report</h2>
-        <p>The graph execution is complete. The generated academic papers have been compiled into a single zip archive for you to download.</p>
-        <button id="download-report-button">Download Full Report (.zip)</button>
     </div>
+    <!-- End Algorithm Design Mode Container -->
 
-    <div class="container hidden" id="code-result-container">
-        <h2>Generated Code</h2>
-        <p>The graph execution is complete. The following code has been generated based on your request.</p>
-        <pre><code id="code-output" class="language-python"></code></pre>
-        <h3>Reasoning:</h3>
-        <p id="code-reasoning" style="white-space: pre-wrap;"></p>
-    </div>
+    <script>
+        const graphParamsForm = document.getElementById('graph-params-form');
+        const runButton = document.getElementById('run-button');
+        const logContainer = document.getElementById('log-container');
+        const graphContainer = document.getElementById('graph-container');
+        const ollamaModelSection = document.getElementById('ollama-model-section');
+        const debugModeCheckbox = document.getElementById('debug_mode');
+        const coderDebugModeCheckbox = document.getElementById('coder_debug_mode');
+        const downloadLogButton = document.getElementById('download-log-button');
+        const reportContainer = document.getElementById('report-container');
+        const downloadReportButton = document.getElementById('download-report-button');
+        const perplexityChartContainer = document.getElementById('perplexity-chart-container');
+        const perplexityChartCanvas = document.getElementById('perplexityChart').getContext('2d');
+        const graphArchitectureSection = document.getElementById('graph-architecture');
 
-    <div class="container hidden" id="modules-container">
-        <h2>Successfully Built Modules</h2>
-        <p>The following modules were successfully synthesized and executed during the run.</p>
-        <div id="modules-output"></div>
-    </div>
+        const chatContainer = document.getElementById('chat-container');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const harvestButton = document.getElementById('harvest-button');
 
-    <button id="export-qnn-button" class="hidden">Export QNN</button>
+        const diagnosticChatContainer = document.getElementById('diagnostic-chat-container');
+        const diagnosticChatMessages = document.getElementById('diagnostic-chat-messages');
+        const diagnosticChatForm = document.getElementById('diagnostic-chat-form');
+        const diagnosticChatInput = document.getElementById('diagnostic-chat-input');
 
+        const codeResultContainer = document.getElementById('code-result-container');
+        const codeOutput = document.getElementById('code-output');
+        const codeReasoning = document.getElementById('code-reasoning');
 
-<script>
-    const graphParamsForm = document.getElementById('graph-params-form');
-    const runButton = document.getElementById('run-button');
-    const logContainer = document.getElementById('log-container');
-    const graphContainer = document.getElementById('graph-container');
-    const ollamaModelSection = document.getElementById('ollama-model-section');
-    const debugModeCheckbox = document.getElementById('debug_mode');
-    const coderDebugModeCheckbox = document.getElementById('coder_debug_mode');
-    const downloadLogButton = document.getElementById('download-log-button');
-    const reportContainer = document.getElementById('report-container');
-    const downloadReportButton = document.getElementById('download-report-button');
-    const perplexityChartContainer = document.getElementById('perplexity-chart-container');
-    const perplexityChartCanvas = document.getElementById('perplexityChart').getContext('2d');
-    const graphArchitectureSection = document.getElementById('graph-architecture');
-    
-    const chatContainer = document.getElementById('chat-container');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
-    const harvestButton = document.getElementById('harvest-button');
-    
-    const diagnosticChatContainer = document.getElementById('diagnostic-chat-container');
-    const diagnosticChatMessages = document.getElementById('diagnostic-chat-messages');
-    const diagnosticChatForm = document.getElementById('diagnostic-chat-form');
-    const diagnosticChatInput = document.getElementById('diagnostic-chat-input');
+        const modulesContainer = document.getElementById('modules-container');
+        const modulesOutput = document.getElementById('modules-output');
 
-    const codeResultContainer = document.getElementById('code-result-container');
-    const codeOutput = document.getElementById('code-output');
-    const codeReasoning = document.getElementById('code-reasoning');
+        const qnnImportContainer = document.getElementById('qnn-import-container');
+        const qnnFileInput = document.getElementById('qnn-file-input');
+        const importedQnnInfo = document.getElementById('imported-qnn-info');
+        const loadedFilename = document.getElementById('loaded-filename');
+        const inferenceContinueTrainingBtn = document.getElementById('inference-continue-training-btn');
+        const inferenceOnlyBtn = document.getElementById('inference-only-btn');
+        const exportQnnButton = document.getElementById('export-qnn-button');
 
-    const modulesContainer = document.getElementById('modules-container');
-    const modulesOutput = document.getElementById('modules-output');
+        let fullLogContent = '';
+        let perplexityChart = null;
+        let allPerplexityValues = [];
+        let allLbelsData = [];
+        let currentSessionId = null;
+        let importedSessionId = null;
+        let importedStateContent = null;
 
-    const qnnImportContainer = document.getElementById('qnn-import-container');
-    const qnnFileInput = document.getElementById('qnn-file-input');
-    const importedQnnInfo = document.getElementById('imported-qnn-info');
-    const loadedFilename = document.getElementById('loaded-filename');
-    const inferenceContinueTrainingBtn = document.getElementById('inference-continue-training-btn');
-    const inferenceOnlyBtn = document.getElementById('inference-only-btn');
-    const exportQnnButton = document.getElementById('export-qnn-button');
+        // Mode switching and API key elements
+        const modeTabs = document.querySelectorAll('.mode-tab');
+        const algorithmMode = document.getElementById('algorithm-mode');
+        const brainstormMode = document.getElementById('brainstorm-mode');
+        const geminiApiKeyInput = document.getElementById('gemini-api-key');
+        const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+        const apiKeyStatus = document.getElementById('api-key-status');
+        const brainstormChat = document.getElementById('brainstorm-chat');
+        const brainstormForm = document.getElementById('brainstorm-form');
+        const brainstormInput = document.getElementById('brainstorm-input');
 
-    let fullLogContent = '';
-    let perplexityChart = null;
-    let allPerplexityValues = [];
-    let allLbelsData = [];
-    let currentSessionId = null;
-    let importedSessionId = null; 
-    let importedStateContent = null; 
-
-    const handleDebugCheck = (e) => {
-        const isDebug = debugModeCheckbox.checked || coderDebugModeCheckbox.checked;
-        ollamaModelSection.classList.toggle('hidden', isDebug);
-        
-        if (e.target.id === 'debug_mode' && e.target.checked) {
-            coderDebugModeCheckbox.checked = false;
-        } else if (e.target.id === 'coder_debug_mode' && e.target.checked) {
-            debugModeCheckbox.checked = false;
+        // Load API key from localStorage on page load
+        const savedApiKey = localStorage.getItem('gemini_api_key');
+        if (savedApiKey) {
+            geminiApiKeyInput.value = savedApiKey;
+            apiKeyStatus.textContent = '✓ Key saved';
         }
-    };
 
-    debugModeCheckbox.addEventListener('change', handleDebugCheck);
-    coderDebugModeCheckbox.addEventListener('change', handleDebugCheck);
-
-    const addLogMessage = (text, options = {}) => {
-        fullLogContent += text + '\n';
-        if (downloadLogButton.disabled) {
-            downloadLogButton.disabled = false;
-        }
-        const container = document.createElement('div');
-        container.style.margin = '0';
-        container.style.lineHeight = '1.4';
-        
-        if (options.isHTML) {
-            container.innerHTML = text;
-        } else {
-            container.textContent = text;
-        }
-        
-        if (options.color) container.style.color = options.color;
-
-        logContainer.appendChild(container);
-        logContainer.scrollTop = logContainer.scrollHeight;
-    };
-    
-    const downloadLog = () => {
-        const blob = new Blob([fullLogContent], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        a.download = `noa-run-log-${timestamp}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    downloadLogButton.addEventListener('click', downloadLog);
-
-    const renderPerplexityChart = () => {
-        if (perplexityChart) {
-            perplexityChart.destroy();
-        }
-        const labels = allLbelsData;
-        const data = allPerplexityValues; 
-
-        perplexityChart = new Chart(perplexityChartCanvas, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Average Agent Perplexity',
-                    data: data,
-                    borderColor: 'rgba(255, 75, 75, 1)',
-                    backgroundColor: 'rgba(255, 75, 75, 0.2)',
-                    fill: true,
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Perplexity Score' }
-                    },
-                    x: {
-                         title: { display: true, text: 'Epoch' }
-                    }
-                }
+        // Save API key to localStorage
+        saveApiKeyBtn.addEventListener('click', () => {
+            const apiKey = geminiApiKeyInput.value.trim();
+            if (apiKey) {
+                localStorage.setItem('gemini_api_key', apiKey);
+                apiKeyStatus.textContent = '✓ Key saved';
+                setTimeout(() => { apiKeyStatus.textContent = ''; }, 2000);
+            } else {
+                localStorage.removeItem('gemini_api_key');
+                apiKeyStatus.textContent = '';
             }
         });
-    };
 
-    const handleChatSubmit = async (e) => {
-        e.preventDefault();
-        const message = chatInput.value.trim();
-        if (!message || !currentSessionId) return;
-
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'chat-message user-message';
-        userMsgDiv.textContent = message;
-        chatMessages.appendChild(userMsgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        chatInput.value = '';
-        chatInput.disabled = true;
-
-        const aiMsgDiv = document.createElement('div');
-        aiMsgDiv.className = 'chat-message ai-message';
-        aiMsgDiv.textContent = '...';
-        chatMessages.appendChild(aiMsgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId, message: message })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                aiMsgDiv.textContent = `Error: ${errorText}`;
-                return;
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let aiResponseText = '';
-            aiMsgDiv.textContent = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                aiResponseText += chunk;
-                aiMsgDiv.textContent = aiResponseText;
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        } catch (error) {
-            aiMsgDiv.textContent = `Error: ${error.message}`;
-        } finally {
-            chatInput.disabled = false;
-            chatInput.focus();
-        }
-    };
-    
-    const handleDiagnosticChatSubmit = async (e) => {
-        e.preventDefault();
-        const message = diagnosticChatInput.value.trim();
-        if (!message || !currentSessionId) return;
-
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'chat-message diagnostic-user-message';
-        userMsgDiv.textContent = message;
-        diagnosticChatMessages.appendChild(userMsgDiv);
-        diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
-
-        diagnosticChatInput.value = '';
-        diagnosticChatInput.disabled = true;
-
-        const aiMsgDiv = document.createElement('div');
-        aiMsgDiv.className = 'chat-message diagnostic-ai-message';
-        aiMsgDiv.textContent = '...';
-        diagnosticChatMessages.appendChild(aiMsgDiv);
-        diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
-
-        try {
-            const response = await fetch('/diagnostic_chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId,  message: message })
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                aiMsgDiv.textContent = `Error: ${errorText}`;
-                return;
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let aiResponseText = '';
-            aiMsgDiv.textContent = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                aiResponseText += chunk;
-                aiMsgDiv.textContent = aiResponseText;
-                diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
-            }
-        } catch (error) {
-            aiMsgDiv.textContent = `Error: ${error.message}`;
-        } finally {
-            diagnosticChatInput.disabled = false;
-            diagnosticChatInput.focus();
-        }
-    };
-
-    const handleHarvestClick = async () => {
-        if (!currentSessionId) return;
-
-        harvestButton.disabled = true;
-        chatInput.disabled = true;
-        harvestButton.textContent = 'Harvesting...';
-        addLogMessage(`--- [HARVEST] User initiated final harvest for session ${currentSessionId} ---`, { color: 'yellow' });
-
-        try {
-            const response = await fetch('/harvest', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId })
-            });
-            const result = await response.json();
-
-            if (!response.ok) {
-                addLogMessage(`Error during harvest: ${result.message}`, { color: 'red' });
-                if (result.traceback) {
-                    addLogMessage(result.traceback, { isHTML: false });
+        // Mode tab switching
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                modeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const mode = tab.dataset.mode;
+                if (mode === 'algorithm') {
+                    algorithmMode.classList.remove('hidden');
+                    brainstormMode.classList.remove('active');
+                } else {
+                    algorithmMode.classList.add('hidden');
+                    brainstormMode.classList.add('active');
                 }
-                return;
-            }
-            
-            addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-
-            if (result.message === "Harvest complete.") {
-                addLogMessage(`Report generated successfully. Session ID: ${currentSessionId}`, { color: 'cyan' });
-                reportContainer.classList.remove('hidden');
-                downloadReportButton.onclick = () => {
-                    window.location.href = `/download_report/${currentSessionId}`;
-                };
-            } else {
-                 addLogMessage(`⚠️ Server finished but no downloadable report was generated.`, { color: 'orange' });
-            }
-
-            chatContainer.classList.add('hidden');
-            graphArchitectureSection.classList.remove('hidden');
-            qnnImportContainer.classList.remove('hidden');
-            
-        } catch (error) {
-            addLogMessage(`Client-side error during harvest: ${error.message}`, { color: 'red' });
-        } finally {
-            harvestButton.disabled = false;
-            harvestButton.textContent = 'HARVEST';
-            runButton.disabled = false;
-            runButton.textContent = 'Build and Run Graph';
-        }
-    };
-
-    function parseJsonFromDataString(inputString) {
-        const jsonString = inputString.slice(5, inputString.length);
-        try {
-            return JSON.parse(jsonString);
-        } catch (error) {
-            console.error("Failed to parse JSON from event stream:", error, "String was:", jsonString);
-            return null;
-        }
-    }
-
-    async function runGraph(payload, endpointUrl) {
-        runButton.disabled = true;
-        runButton.textContent = 'Processing...';
-        downloadLogButton.disabled = true;
-        logContainer.innerHTML = '';
-        fullLogContent = '';
-        graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
-        
-        reportContainer.classList.add('hidden');
-        codeResultContainer.classList.add('hidden');
-        modulesContainer.classList.add('hidden');
-        chatContainer.classList.add('hidden');
-        graphArchitectureSection.classList.add('hidden');
-        qnnImportContainer.classList.add('hidden');
-        
-        diagnosticChatMessages.innerHTML = '';
-        allPerplexityValues = [];
-        allLbelsData = [];
-        renderPerplexityChart();
-        addLogMessage(`Sending request to endpoint: ${endpointUrl}`);
-
-       try {
-            const response = await fetch(endpointUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
             });
-            const result = await response.json();
-
-
-            if (!response.ok) {
-                addLogMessage(`Error: ${result.message}`, { color: 'red' });
-                if (result.traceback) {
-                    const pre = document.createElement('pre');
-                    pre.style.color = '#ff8c8c';
-                    pre.textContent = result.traceback;
-                    logContainer.appendChild(pre);
-                }
-            } else if (result.code_solution) {
-
-                let codeToDisplay = result.code_solution;
-
-                const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(codeToDisplay);
-                if (codeMatch) {
-                    codeToDisplay = codeMatch[1].trim();
-                }
-
-                codeToDisplay = codeToDisplay.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-
-                codeOutput.textContent = codeToDisplay;
-                Prism.highlightElement(codeOutput);
-                codeReasoning.textContent = result.reasoning;
-                codeResultContainer.classList.remove('hidden'); 
-                exportQnnButton.classList.remove('hidden');
-
-                if (result.modules && Array.isArray(result.modules) && result.modules.length > 0) {
-                    addLogMessage(`Rendering ${result.modules.length} successfully built modules.`, { color: 'cyan' });
-                    modulesOutput.innerHTML = '';
-                    result.modules.forEach((module, index) => {
-                        const moduleDiv = document.createElement('div');
-                        moduleDiv.style.marginBottom = '2rem';
-                        const cardHeader = document.createElement('h3');
-                        cardHeader.textContent = `Module ${index + 1}: Interface Card`;
-                        const cardPre = document.createElement('pre');
-                        cardPre.textContent = module.card;
-                        cardPre.style.cssText = 'background-color:#1C1E25; padding:1rem; border-radius:var(--border-radius); white-space:pre-wrap;';
-                        const codeHeader = document.createElement('h3');
-                        codeHeader.textContent = `Module ${index + 1}: Source Code`;
-                        const codePre = document.createElement('pre');
-                        const codeElem = document.createElement('code');
-                        codeElem.className = 'language-python';
-                        let codeModule = "";
-                        const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(module.code);
-                        if (codeMatch) {
-                            codeModule = codeMatch[1].trim();
-                        }
-
-                        codeToDisplay = codeModule.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                        codeElem.textContent = codeToDisplay;
-                        codePre.appendChild(codeElem);
-                        moduleDiv.append(cardHeader, cardPre, codeHeader, codePre);
-                        modulesOutput.appendChild(moduleDiv);
-                        Prism.highlightElement(codeElem);
-                    });
-                    modulesContainer.classList.remove('hidden');
-
-                }
-
-
-            } else if (result.message === "Chat is now active.") {
-                addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
-                currentSessionId = result.session_id;
-                diagnosticChatContainer.classList.add('hidden');
-                chatContainer.classList.remove('hidden');
-                chatContainer.focus();
-
-                exportQnnButton.classList.remove('hidden');
-            } else {
-                 addLogMessage(`Error: Unexpected response from server: ${JSON.stringify(result)}`, { color: 'red' });
-                 graphArchitectureSection.classList.remove('hidden');
-                 qnnImportContainer.classList.remove('hidden');
-            }
-        } catch (error) {
-            addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
-            graphArchitectureSection.classList.remove('hidden');
-            qnnImportContainer.classList.remove('hidden');
-        } finally {
-
-        }
-    }
-
-    graphParamsForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(graphParamsForm);
-        const params = {};
-        formData.forEach((value, key) => {
-            if (key === 'mbti_archetypes') {
-                if (!params[key]) params[key] = [];
-                params[key].push(value);
-            } else {
-                params[key] = value;
-            }
         });
-        if (!formData.has('debug_mode')) params.debug_mode = 'false';
-        if (!formData.has('coder_debug_mode')) params.coder_debug_mode = 'false';
-        if (!params.mbti_archetypes || params.mbti_archetypes.length < 2) {
-            alert('Please select at least 2 MBTI archetypes.');
-            return;
-        }
-        runGraph({ params }, '/build_and_run_graph');
-    });
 
-    qnnFileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-            importedStateContent = null;
-            return;
-        }
+        // Brainstorming mode handler
+        const handleBrainstormSubmit = async (e) => {
+            e.preventDefault();
+            const message = brainstormInput.value.trim();
+            const apiKey = localStorage.getItem('gemini_api_key');
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
+            if (!message) return;
+            if (!apiKey) {
+                alert('Please save your Gemini API key in the settings panel first.');
+                return;
+            }
+
+            // Clear chat and show user message
+            brainstormChat.innerHTML = '';
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'chat-message user-message';
+            userMsgDiv.textContent = message;
+            brainstormChat.appendChild(userMsgDiv);
+
+            // Show thinking indicator
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'thinking-indicator';
+            thinkingDiv.innerHTML = '<span>Experts are thinking</span><div class="thinking-dots"><span></span><span></span><span></span></div>';
+            brainstormChat.appendChild(thinkingDiv);
+            brainstormChat.scrollTop = brainstormChat.scrollHeight;
+
+            brainstormInput.value = '';
+            brainstormInput.disabled = true;
+            document.getElementById('brainstorm-send-btn').disabled = true;
+
             try {
-                importedStateContent = event.target.result;
-                const parsedState = JSON.parse(importedStateContent);
-                
-                loadedFilename.textContent = file.name;
+                const response = await fetch('/brainstorm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, api_key: apiKey })
+                });
 
-                const uploadFormData = new FormData();
-                uploadFormData.append('file', file);
-                fetch('/import_qnn', { method: 'POST', body: uploadFormData })
-                    .then(res => res.json())
-                    .then(result => {
-                        if (result.session_id) {
-                            importedSessionId = result.session_id;
-                            addLogMessage(`QNN '${file.name}' staged for 'Continue Training'. Session: ${importedSessionId}`, { color: 'cyan' });
-                        }
-                    });
+                const result = await response.json();
+                thinkingDiv.remove();
 
-                if (parsedState.params) {
-                    Object.keys(parsedState.params).forEach(key => {
-                        const input = graphParamsForm.querySelector(`[name="${key}"]`);
-                        if (input && input.type === 'checkbox') {
-                            input.checked = parsedState.params[key] === 'true';
-                        } else if (input) {
-                            input.value = parsedState.params[key];
-                        }
-                    });
-                    if (parsedState.params.mbti_archetypes) {
-                        document.querySelectorAll('input[name="mbti_archetypes"]').forEach(cb => {
-                            cb.checked = parsedState.params.mbti_archetypes.includes(cb.value);
-                        });
+                if (result.error) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'chat-message ai-message';
+                    errorDiv.style.color = '#ff6b6b';
+                    errorDiv.textContent = 'Error: ' + result.error;
+                    brainstormChat.appendChild(errorDiv);
+                } else {
+                    // Display complexity info
+                    if (result.complexity) {
+                        const complexityDiv = document.createElement('div');
+                        complexityDiv.style.cssText = 'color: #888; font-size: 0.85rem; margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.05); border-radius: 0.25rem;';
+                        complexityDiv.textContent = `Complexity: ${result.complexity.score}/10 | QNN Size: ${result.complexity.layers} layers, ${result.complexity.epochs} epochs`;
+                        brainstormChat.appendChild(complexityDiv);
                     }
+
+                    // Display each expert's response
+                    result.experts.forEach(expert => {
+                        const expertDiv = document.createElement('div');
+                        expertDiv.className = 'expert-message';
+                        expertDiv.innerHTML = `
+                            <div class="expert-message-header">
+                                <span>${expert.emoji}</span>
+                                <span>${expert.name}</span>
+                                <span class="specialty">${expert.specialty}</span>
+                            </div>
+                            <div>${expert.opinion}</div>
+                        `;
+                        brainstormChat.appendChild(expertDiv);
+                    });
+
+                    // Display synthesis
+                    const synthesisDiv = document.createElement('div');
+                    synthesisDiv.className = 'synthesis-message';
+                    synthesisDiv.innerHTML = `
+                        <div class="synthesis-message-header">
+                            <span>✨</span>
+                            <span>Synthesized Response</span>
+                        </div>
+                        <div>${result.synthesis}</div>
+                    `;
+                    brainstormChat.appendChild(synthesisDiv);
                 }
-                
-                importedQnnInfo.classList.remove('hidden');
-                graphArchitectureSection.classList.add('hidden');
+
+                brainstormChat.scrollTop = brainstormChat.scrollHeight;
 
             } catch (error) {
-                alert(`Error parsing QNN file: ${error.message}`);
-                importedStateContent = null;
+                thinkingDiv.remove();
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'chat-message ai-message';
+                errorDiv.style.color = '#ff6b6b';
+                errorDiv.textContent = 'Error: ' + error.message;
+                brainstormChat.appendChild(errorDiv);
+            } finally {
+                brainstormInput.disabled = false;
+                document.getElementById('brainstorm-send-btn').disabled = false;
+                brainstormInput.focus();
             }
         };
-        reader.readAsText(file);
-    });
-    
-    const startContinueTrainingRun = () => {
-        if (!importedSessionId) {
-            alert("No imported session staged for training. Please re-select the file.");
-            return;
-        }
-        const formData = new FormData(graphParamsForm);
-        const params = {};
-        formData.forEach((value, key) => {
-            if (key === 'mbti_archetypes') {
-                if (!params[key]) params[key] = [];
-                params[key].push(value);
-            } else {
-                params[key] = value;
+
+        brainstormForm.addEventListener('submit', handleBrainstormSubmit);
+        brainstormInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                brainstormForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             }
         });
-        runGraph({ params: params, session_id_to_load: importedSessionId }, '/build_and_run_graph');
-    };
 
-    const startInferenceOnlyRun = () => {
-        if (!importedStateContent) {
-            alert("No QNN file content loaded. Please select a file.");
-            return;
-        }
- 
-        const newPrompt = prompt("Please enter the prompt for the inference-only run:", document.getElementById('prompt').value);
 
-        if (!newPrompt || !newPrompt.trim()) {
-            alert("A prompt is required to run inference. Operation cancelled.");
-            return;
-        }
+        const handleDebugCheck = (e) => {
+            const isDebug = debugModeCheckbox.checked || coderDebugModeCheckbox.checked;
+            ollamaModelSection.classList.toggle('hidden', isDebug);
 
-        const payload = {
-            imported_state: JSON.parse(importedStateContent),
-            prompt: newPrompt
+            if (e.target.id === 'debug_mode' && e.target.checked) {
+                coderDebugModeCheckbox.checked = false;
+            } else if (e.target.id === 'coder_debug_mode' && e.target.checked) {
+                debugModeCheckbox.checked = false;
+            }
         };
-        runGraph(payload, '/run_inference_from_state');
-    };
 
+        debugModeCheckbox.addEventListener('change', handleDebugCheck);
+        coderDebugModeCheckbox.addEventListener('change', handleDebugCheck);
 
+        const addLogMessage = (text, options = {}) => {
+            fullLogContent += text + '\n';
+            if (downloadLogButton.disabled) {
+                downloadLogButton.disabled = false;
+            }
+            const container = document.createElement('div');
+            container.style.margin = '0';
+            container.style.lineHeight = '1.4';
 
-    inferenceContinueTrainingBtn.addEventListener('click', startContinueTrainingRun);
-    inferenceOnlyBtn.addEventListener('click', startInferenceOnlyRun);
+            if (options.isHTML) {
+                container.innerHTML = text;
+            } else {
+                container.textContent = text;
+            }
 
-    exportQnnButton.addEventListener('click', () => {
-        if (currentSessionId) {
-            window.location.href = `/export_qnn/${currentSessionId}`;
-        } else {
-            alert("No active session to export.");
+            if (options.color) container.style.color = options.color;
 
+            logContainer.appendChild(container);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        const downloadLog = () => {
+            const blob = new Blob([fullLogContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.download = `noa-run-log-${timestamp}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        downloadLogButton.addEventListener('click', downloadLog);
+
+        const renderPerplexityChart = () => {
+            if (perplexityChart) {
+                perplexityChart.destroy();
+            }
+            const labels = allLbelsData;
+            const data = allPerplexityValues;
+
+            perplexityChart = new Chart(perplexityChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Average Agent Perplexity',
+                        data: data,
+                        borderColor: 'rgba(255, 75, 75, 1)',
+                        backgroundColor: 'rgba(255, 75, 75, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Perplexity Score' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Epoch' }
+                        }
+                    }
+                }
+            });
+        };
+
+        const handleChatSubmit = async (e) => {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (!message || !currentSessionId) return;
+
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'chat-message user-message';
+            userMsgDiv.textContent = message;
+            chatMessages.appendChild(userMsgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            chatInput.value = '';
+            chatInput.disabled = true;
+
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'chat-message ai-message';
+            aiMsgDiv.textContent = '...';
+            chatMessages.appendChild(aiMsgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSessionId, message: message })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    aiMsgDiv.textContent = `Error: ${errorText}`;
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let aiResponseText = '';
+                aiMsgDiv.textContent = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    aiResponseText += chunk;
+                    aiMsgDiv.textContent = aiResponseText;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            } catch (error) {
+                aiMsgDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                chatInput.disabled = false;
+                chatInput.focus();
+            }
+        };
+
+        const handleDiagnosticChatSubmit = async (e) => {
+            e.preventDefault();
+            const message = diagnosticChatInput.value.trim();
+            if (!message || !currentSessionId) return;
+
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'chat-message diagnostic-user-message';
+            userMsgDiv.textContent = message;
+            diagnosticChatMessages.appendChild(userMsgDiv);
+            diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+
+            diagnosticChatInput.value = '';
+            diagnosticChatInput.disabled = true;
+
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'chat-message diagnostic-ai-message';
+            aiMsgDiv.textContent = '...';
+            diagnosticChatMessages.appendChild(aiMsgDiv);
+            diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/diagnostic_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSessionId, message: message })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    aiMsgDiv.textContent = `Error: ${errorText}`;
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let aiResponseText = '';
+                aiMsgDiv.textContent = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    aiResponseText += chunk;
+                    aiMsgDiv.textContent = aiResponseText;
+                    diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
+                }
+            } catch (error) {
+                aiMsgDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                diagnosticChatInput.disabled = false;
+                diagnosticChatInput.focus();
+            }
+        };
+
+        const handleHarvestClick = async () => {
+            if (!currentSessionId) return;
+
+            harvestButton.disabled = true;
+            chatInput.disabled = true;
+            harvestButton.textContent = 'Harvesting...';
+            addLogMessage(`--- [HARVEST] User initiated final harvest for session ${currentSessionId} ---`, { color: 'yellow' });
+
+            try {
+                const response = await fetch('/harvest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSessionId })
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    addLogMessage(`Error during harvest: ${result.message}`, { color: 'red' });
+                    if (result.traceback) {
+                        addLogMessage(result.traceback, { isHTML: false });
+                    }
+                    return;
+                }
+
+                addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+
+                if (result.message === "Harvest complete.") {
+                    addLogMessage(`Report generated successfully. Session ID: ${currentSessionId}`, { color: 'cyan' });
+                    reportContainer.classList.remove('hidden');
+                    downloadReportButton.onclick = () => {
+                        window.location.href = `/download_report/${currentSessionId}`;
+                    };
+                } else {
+                    addLogMessage(`⚠️ Server finished but no downloadable report was generated.`, { color: 'orange' });
+                }
+
+                chatContainer.classList.add('hidden');
+                graphArchitectureSection.classList.remove('hidden');
+                qnnImportContainer.classList.remove('hidden');
+
+            } catch (error) {
+                addLogMessage(`Client-side error during harvest: ${error.message}`, { color: 'red' });
+            } finally {
+                harvestButton.disabled = false;
+                harvestButton.textContent = 'HARVEST';
+                runButton.disabled = false;
+                runButton.textContent = 'Build and Run Graph';
+            }
+        };
+
+        function parseJsonFromDataString(inputString) {
+            const jsonString = inputString.slice(5, inputString.length);
+            try {
+                return JSON.parse(jsonString);
+            } catch (error) {
+                console.error("Failed to parse JSON from event stream:", error, "String was:", jsonString);
+                return null;
+            }
         }
 
-    }
+        async function runGraph(payload, endpointUrl) {
+            runButton.disabled = true;
+            runButton.textContent = 'Processing...';
+            downloadLogButton.disabled = true;
+            logContainer.innerHTML = '';
+            fullLogContent = '';
+            graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
 
-);
+            reportContainer.classList.add('hidden');
+            codeResultContainer.classList.add('hidden');
+            modulesContainer.classList.add('hidden');
+            chatContainer.classList.add('hidden');
+            graphArchitectureSection.classList.add('hidden');
+            qnnImportContainer.classList.add('hidden');
 
-    const eventSource = new EventSource('/stream_log');
-
-    eventSource.onmessage = function(event) {
-        const rawMessage = event.data;
-
-        if (rawMessage.includes('epoch') && rawMessage.includes('perplexity')) { 
-      
-            data = parseJsonFromDataString(rawMessage);
-            addLogMessage(`>>> Perplexity data received for epoch ${data.epoch}: ${data.perplexity.toFixed(2)}`, { color: 'cyan' });
-            allPerplexityValues.push(parseFloat(data.perplexity));
-            allLbelsData.push(data.epoch);
+            diagnosticChatMessages.innerHTML = '';
+            allPerplexityValues = [];
+            allLbelsData = [];
             renderPerplexityChart();
-           
-        }  else if (rawMessage.includes('__start__')) {
-            graphContainer.textContent = rawMessage.replace('__start__', '');
-            addLogMessage(">>> ASCII Graph Rendered <<<", { color: 'cyan' });
-        } else   if (rawMessage.includes('__session_id__')) {
-        session_id = rawMessage.replace('__session_id__', '');
-        currentSessionId = session_id.replace('data: ', '').trim();
-        const diagInput = document.getElementById('diagnostic-chat-input');
-        const diagButton = document.getElementById('diagnostic-chat-send-button');
-        diagInput.disabled = false;
-        diagButton.disabled = false;
-        addLogMessage(`>>> Session ID: ${currentSessionId}`, { color: 'cyan' });
-        addLogMessage(`<strong>✅ Diagnostic chat is now active.</strong>`, { isHTML: true, color: 'lime' });
-        diagInput.placeholder = "Live diagnostic rag-chat is active.";
-        return; 
-        } else{
+            addLogMessage(`Sending request to endpoint: ${endpointUrl}`);
 
-        addLogMessage(rawMessage);
+            try {
+                const response = await fetch(endpointUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+
+                if (!response.ok) {
+                    addLogMessage(`Error: ${result.message}`, { color: 'red' });
+                    if (result.traceback) {
+                        const pre = document.createElement('pre');
+                        pre.style.color = '#ff8c8c';
+                        pre.textContent = result.traceback;
+                        logContainer.appendChild(pre);
+                    }
+                } else if (result.code_solution) {
+
+                    let codeToDisplay = result.code_solution;
+
+                    const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(codeToDisplay);
+                    if (codeMatch) {
+                        codeToDisplay = codeMatch[1].trim();
+                    }
+
+                    codeToDisplay = codeToDisplay.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+
+                    codeOutput.textContent = codeToDisplay;
+                    Prism.highlightElement(codeOutput);
+                    codeReasoning.textContent = result.reasoning;
+                    codeResultContainer.classList.remove('hidden');
+                    exportQnnButton.classList.remove('hidden');
+
+                    if (result.modules && Array.isArray(result.modules) && result.modules.length > 0) {
+                        addLogMessage(`Rendering ${result.modules.length} successfully built modules.`, { color: 'cyan' });
+                        modulesOutput.innerHTML = '';
+                        result.modules.forEach((module, index) => {
+                            const moduleDiv = document.createElement('div');
+                            moduleDiv.style.marginBottom = '2rem';
+                            const cardHeader = document.createElement('h3');
+                            cardHeader.textContent = `Module ${index + 1}: Interface Card`;
+                            const cardPre = document.createElement('pre');
+                            cardPre.textContent = module.card;
+                            cardPre.style.cssText = 'background-color:#1C1E25; padding:1rem; border-radius:var(--border-radius); white-space:pre-wrap;';
+                            const codeHeader = document.createElement('h3');
+                            codeHeader.textContent = `Module ${index + 1}: Source Code`;
+                            const codePre = document.createElement('pre');
+                            const codeElem = document.createElement('code');
+                            codeElem.className = 'language-python';
+                            let codeModule = "";
+                            const codeMatch = /```(?:python\n)?([\s\S]*?)```/.exec(module.code);
+                            if (codeMatch) {
+                                codeModule = codeMatch[1].trim();
+                            }
+
+                            codeToDisplay = codeModule.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                            codeElem.textContent = codeToDisplay;
+                            codePre.appendChild(codeElem);
+                            moduleDiv.append(cardHeader, cardPre, codeHeader, codePre);
+                            modulesOutput.appendChild(moduleDiv);
+                            Prism.highlightElement(codeElem);
+                        });
+                        modulesContainer.classList.remove('hidden');
+
+                    }
+
+
+                } else if (result.message === "Chat is now active.") {
+                    addLogMessage(`<strong>✅ ${result.message}</strong>`, { isHTML: true, color: 'lime' });
+                    currentSessionId = result.session_id;
+                    diagnosticChatContainer.classList.add('hidden');
+                    chatContainer.classList.remove('hidden');
+                    chatContainer.focus();
+
+                    exportQnnButton.classList.remove('hidden');
+                } else {
+                    addLogMessage(`Error: Unexpected response from server: ${JSON.stringify(result)}`, { color: 'red' });
+                    graphArchitectureSection.classList.remove('hidden');
+                    qnnImportContainer.classList.remove('hidden');
+                }
+            } catch (error) {
+                addLogMessage(`A client-side error occurred: ${error.message}`, { color: 'red' });
+                graphArchitectureSection.classList.remove('hidden');
+                qnnImportContainer.classList.remove('hidden');
+            } finally {
+
+            }
         }
-        
-    };
 
-    eventSource.onerror = function(err) {
-        console.error("EventSource failed:", err);
-        addLogMessage("Error: Connection to server log stream lost. Please refresh and try again.", { color: 'red' });
-        eventSource.close();
-    };
-
-    chatForm.addEventListener('submit', handleChatSubmit);
-    diagnosticChatForm.addEventListener('submit', handleDiagnosticChatSubmit);
-    harvestButton.addEventListener('click', handleHarvestClick);
-    
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        graphParamsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            const formData = new FormData(graphParamsForm);
+            const params = {};
+            formData.forEach((value, key) => {
+                if (key === 'mbti_archetypes') {
+                    if (!params[key]) params[key] = [];
+                    params[key].push(value);
+                } else {
+                    params[key] = value;
+                }
+            });
+            if (!formData.has('debug_mode')) params.debug_mode = 'false';
+            if (!formData.has('coder_debug_mode')) params.coder_debug_mode = 'false';
+            if (!params.mbti_archetypes || params.mbti_archetypes.length < 2) {
+                alert('Please select at least 2 MBTI archetypes.');
+                return;
+            }
+            runGraph({ params }, '/build_and_run_graph');
+        });
+
+        qnnFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                importedStateContent = null;
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    importedStateContent = event.target.result;
+                    const parsedState = JSON.parse(importedStateContent);
+
+                    loadedFilename.textContent = file.name;
+
+                    const uploadFormData = new FormData();
+                    uploadFormData.append('file', file);
+                    fetch('/import_qnn', { method: 'POST', body: uploadFormData })
+                        .then(res => res.json())
+                        .then(result => {
+                            if (result.session_id) {
+                                importedSessionId = result.session_id;
+                                addLogMessage(`QNN '${file.name}' staged for 'Continue Training'. Session: ${importedSessionId}`, { color: 'cyan' });
+                            }
+                        });
+
+                    if (parsedState.params) {
+                        Object.keys(parsedState.params).forEach(key => {
+                            const input = graphParamsForm.querySelector(`[name="${key}"]`);
+                            if (input && input.type === 'checkbox') {
+                                input.checked = parsedState.params[key] === 'true';
+                            } else if (input) {
+                                input.value = parsedState.params[key];
+                            }
+                        });
+                        if (parsedState.params.mbti_archetypes) {
+                            document.querySelectorAll('input[name="mbti_archetypes"]').forEach(cb => {
+                                cb.checked = parsedState.params.mbti_archetypes.includes(cb.value);
+                            });
+                        }
+                    }
+
+                    importedQnnInfo.classList.remove('hidden');
+                    graphArchitectureSection.classList.add('hidden');
+
+                } catch (error) {
+                    alert(`Error parsing QNN file: ${error.message}`);
+                    importedStateContent = null;
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        const startContinueTrainingRun = () => {
+            if (!importedSessionId) {
+                alert("No imported session staged for training. Please re-select the file.");
+                return;
+            }
+            const formData = new FormData(graphParamsForm);
+            const params = {};
+            formData.forEach((value, key) => {
+                if (key === 'mbti_archetypes') {
+                    if (!params[key]) params[key] = [];
+                    params[key].push(value);
+                } else {
+                    params[key] = value;
+                }
+            });
+            runGraph({ params: params, session_id_to_load: importedSessionId }, '/build_and_run_graph');
+        };
+
+        const startInferenceOnlyRun = () => {
+            if (!importedStateContent) {
+                alert("No QNN file content loaded. Please select a file.");
+                return;
+            }
+
+            const newPrompt = prompt("Please enter the prompt for the inference-only run:", document.getElementById('prompt').value);
+
+            if (!newPrompt || !newPrompt.trim()) {
+                alert("A prompt is required to run inference. Operation cancelled.");
+                return;
+            }
+
+            const payload = {
+                imported_state: JSON.parse(importedStateContent),
+                prompt: newPrompt
+            };
+            runGraph(payload, '/run_inference_from_state');
+        };
+
+
+
+        inferenceContinueTrainingBtn.addEventListener('click', startContinueTrainingRun);
+        inferenceOnlyBtn.addEventListener('click', startInferenceOnlyRun);
+
+        exportQnnButton.addEventListener('click', () => {
+            if (currentSessionId) {
+                window.location.href = `/export_qnn/${currentSessionId}`;
+            } else {
+                alert("No active session to export.");
+
+            }
+
         }
-    });
-    
-    diagnosticChatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            diagnosticChatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-        }
-    });
-</script>
-<script src="js/prism-core.min.js"></script>
-<script src="js/prism-autoloader.min.js"></script>
-<script src="js/prism-toolbar.min.js"></script>
-<script src="js/prism-copy-to-clipboard.min.js"></script>
+
+        );
+
+        const eventSource = new EventSource('/stream_log');
+
+        eventSource.onmessage = function (event) {
+            const rawMessage = event.data;
+
+            if (rawMessage.includes('epoch') && rawMessage.includes('perplexity')) {
+
+                data = parseJsonFromDataString(rawMessage);
+                addLogMessage(`>>> Perplexity data received for epoch ${data.epoch}: ${data.perplexity.toFixed(2)}`, { color: 'cyan' });
+                allPerplexityValues.push(parseFloat(data.perplexity));
+                allLbelsData.push(data.epoch);
+                renderPerplexityChart();
+
+            } else if (rawMessage.includes('__start__')) {
+                graphContainer.textContent = rawMessage.replace('__start__', '');
+                addLogMessage(">>> ASCII Graph Rendered <<<", { color: 'cyan' });
+            } else if (rawMessage.includes('__session_id__')) {
+                session_id = rawMessage.replace('__session_id__', '');
+                currentSessionId = session_id.replace('data: ', '').trim();
+                const diagInput = document.getElementById('diagnostic-chat-input');
+                const diagButton = document.getElementById('diagnostic-chat-send-button');
+                diagInput.disabled = false;
+                diagButton.disabled = false;
+                addLogMessage(`>>> Session ID: ${currentSessionId}`, { color: 'cyan' });
+                addLogMessage(`<strong>✅ Diagnostic chat is now active.</strong>`, { isHTML: true, color: 'lime' });
+                diagInput.placeholder = "Live diagnostic rag-chat is active.";
+                return;
+            } else {
+
+                addLogMessage(rawMessage);
+            }
+
+        };
+
+        eventSource.onerror = function (err) {
+            console.error("EventSource failed:", err);
+            addLogMessage("Error: Connection to server log stream lost. Please refresh and try again.", { color: 'red' });
+            eventSource.close();
+        };
+
+        chatForm.addEventListener('submit', handleChatSubmit);
+        diagnosticChatForm.addEventListener('submit', handleDiagnosticChatSubmit);
+        harvestButton.addEventListener('click', handleHarvestClick);
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        });
+
+        diagnosticChatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                diagnosticChatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        });
+    </script>
+    <script src="js/prism-core.min.js"></script>
+    <script src="js/prism-autoloader.min.js"></script>
+    <script src="js/prism-toolbar.min.js"></script>
+    <script src="js/prism-copy-to-clipboard.min.js"></script>
 </body>
+
 </html>
