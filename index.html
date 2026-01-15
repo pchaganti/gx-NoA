@@ -764,25 +764,7 @@
             </form>
         </div>
 
-        <div class="container" id="perplexity-chart-container">
-            <h2>Average Perplexity per Epoch</h2>
-            <canvas id="perplexityChart"></canvas>
-        </div>
 
-        <div class="container">
-            <div class="header-with-button">
-                <h2>Real-time Graph Activity</h2>
-                <button id="download-log-button" disabled>Download Full Log</button>
-            </div>
-            <div id="log-container"></div>
-        </div>
-
-        <div class="container">
-            <h2>Graph Visualization</h2>
-            <div id="graph-container">
-                <p>ASCII graph will be displayed here after the process starts...</p>
-            </div>
-        </div>
 
         <div class="container hidden" id="chat-container">
             <div class="header-with-button">
@@ -825,6 +807,27 @@
     </div>
     </div>
     <!-- End Algorithm Design Mode Container -->
+
+    <!-- Shared Visualization Containers -->
+    <div class="container" id="perplexity-chart-container">
+        <h2>Average Perplexity per Epoch</h2>
+        <canvas id="perplexityChart"></canvas>
+    </div>
+
+    <div class="container">
+        <div class="header-with-button">
+            <h2>Real-time Graph Activity</h2>
+            <button id="download-log-button" disabled>Download Full Log</button>
+        </div>
+        <div id="log-container"></div>
+    </div>
+
+    <div class="container">
+        <h2>Graph Visualization</h2>
+        <div id="graph-container">
+            <p>ASCII graph will be displayed here after the process starts...</p>
+        </div>
+    </div>
 
     <script>
         const graphParamsForm = document.getElementById('graph-params-form');
@@ -962,91 +965,36 @@
                 return;
             }
 
-            // Clear chat and show user message
-            brainstormChat.innerHTML = '';
-            const userMsgDiv = document.createElement('div');
-            userMsgDiv.className = 'chat-message user-message';
-            userMsgDiv.textContent = message;
-            brainstormChat.appendChild(userMsgDiv);
-
-            // Show thinking indicator
-            const thinkingDiv = document.createElement('div');
-            thinkingDiv.className = 'thinking-indicator';
-            thinkingDiv.innerHTML = '<span>QNN agents are thinking</span><div class="thinking-dots"><span></span><span></span><span></span></div>';
-            brainstormChat.appendChild(thinkingDiv);
-            brainstormChat.scrollTop = brainstormChat.scrollHeight;
-
-            brainstormInput.value = '';
+            // Lock UI
             brainstormInput.disabled = true;
             document.getElementById('brainstorm-send-btn').disabled = true;
 
+            // Prepare params for build_and_run_graph
+            // We map 'message' to 'prompt'
+            const params = {
+                prompt: message,
+                provider: provider,
+                api_key: apiKey,
+                ollama_model: ollamaModel,
+                // Defaults for Brainstorm mode (backend determines complexities, but we can pass explicit overrides if we had UI for them)
+                // Passing reasonable defaults just in case backend needs them for fallback
+                vector_word_size: 2,
+                prompt_alignment: 1.0,
+                density: 1.0,
+                learning_rate: 0.1,
+                debug_mode: 'false'
+            };
+
             try {
-                const response = await fetch('/brainstorm', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        provider: provider,
-                        api_key: apiKey,
-                        ollama_model: ollamaModel
-                    })
-                });
-
-                const result = await response.json();
-                thinkingDiv.remove();
-
-                if (result.error) {
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'chat-message ai-message';
-                    errorDiv.style.color = '#ff6b6b';
-                    errorDiv.textContent = 'Error: ' + result.error;
-                    brainstormChat.appendChild(errorDiv);
-                } else {
-                    // Display complexity info
-                    if (result.complexity) {
-                        const complexityDiv = document.createElement('div');
-                        complexityDiv.style.cssText = 'color: #888; font-size: 0.85rem; margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.05); border-radius: 0.25rem;';
-                        complexityDiv.textContent = `Complexity: ${result.complexity.score}/10 | QNN Size: ${result.complexity.layers} layers, ${result.complexity.epochs} epochs`;
-                        brainstormChat.appendChild(complexityDiv);
-                    }
-
-                    // Display each expert's response
-                    result.experts.forEach(expert => {
-                        const expertDiv = document.createElement('div');
-                        expertDiv.className = 'expert-message';
-                        expertDiv.innerHTML = `
-                            <div class="expert-message-header">
-                                <span>${expert.emoji}</span>
-                                <span>${expert.name}</span>
-                                <span class="specialty">${expert.specialty}</span>
-                            </div>
-                            <div>${expert.opinion}</div>
-                        `;
-                        brainstormChat.appendChild(expertDiv);
-                    });
-
-                    // Display synthesis
-                    const synthesisDiv = document.createElement('div');
-                    synthesisDiv.className = 'synthesis-message';
-                    synthesisDiv.innerHTML = `
-                        <div class="synthesis-message-header">
-                            <span>✨</span>
-                            <span>Synthesized Response</span>
-                        </div>
-                        <div>${result.synthesis}</div>
-                    `;
-                    brainstormChat.appendChild(synthesisDiv);
-                }
-
-                brainstormChat.scrollTop = brainstormChat.scrollHeight;
+                // Call runGraph with mode='brainstorm'
+                // runGraph handles log clearing, SSE connection, etc.
+                await runGraph({
+                    params: params,
+                    mode: 'brainstorm'
+                }, '/build_and_run_graph');
 
             } catch (error) {
-                thinkingDiv.remove();
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'chat-message ai-message';
-                errorDiv.style.color = '#ff6b6b';
-                errorDiv.textContent = 'Error: ' + error.message;
-                brainstormChat.appendChild(errorDiv);
+                addLogMessage(`Error initiating brainstorming: ${error.message}`, { color: 'red' });
             } finally {
                 brainstormInput.disabled = false;
                 document.getElementById('brainstorm-send-btn').disabled = false;

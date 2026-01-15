@@ -7,6 +7,7 @@ from langchain_core.documents import Document
 
 class GraphState(TypedDict):
     """The state object passed through the graph during execution."""
+    mode: str # "algorithm" or "brainstorm"
     modules: List[dict]
     synthesis_context_queue: List[str] 
     agent_personas: dict

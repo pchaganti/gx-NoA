@@ -31,6 +31,10 @@ from .utility_chains import (
 from .brainstorm_chains import (
     get_complexity_estimator_chain,
     get_expert_reflection_chain,
+    get_opinion_synthesizer_chain,
+    get_brainstorming_agent_chain,
+    get_brainstorming_mirror_descent_chain,
+    get_brainstorming_synthesis_chain,
 )
 
 __all__ = [
@@ -57,4 +61,8 @@ __all__ = [
     # Brainstorm chains
     'get_complexity_estimator_chain',
     'get_expert_reflection_chain',
+    'get_brainstorming_agent_chain',
+    'get_brainstorming_mirror_descent_chain',
+    'get_brainstorming_synthesis_chain',
 ]
+
