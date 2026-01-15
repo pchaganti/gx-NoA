@@ -596,9 +596,25 @@
 
     <!-- Settings Panel -->
     <div class="container">
-        <div class="settings-panel">
-            <label for="gemini-api-key">🔑 Gemini API Key:</label>
-            <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key...">
+        <div class="settings-panel" style="flex-wrap: wrap;">
+            <label for="llm-provider">🤖 LLM Provider:</label>
+            <select id="llm-provider"
+                style="padding: 0.5rem; border-radius: 4px; background: #1a1d24; color: #fff; border: 1px solid #333;">
+                <option value="gemini">Gemini (Cloud)</option>
+                <option value="ollama">Ollama (Local)</option>
+            </select>
+
+            <div id="gemini-config" style="display: flex; gap: 0.5rem; align-items: center;">
+                <label for="gemini-api-key">🔑 API Key:</label>
+                <input type="password" id="gemini-api-key" placeholder="Gemini API key..." style="min-width: 180px;">
+            </div>
+
+            <div id="ollama-config" style="display: none; gap: 0.5rem; align-items: center;">
+                <label for="ollama-model-global">📦 Model:</label>
+                <input type="text" id="ollama-model-global" value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest"
+                    placeholder="Ollama model..." style="min-width: 250px;">
+            </div>
+
             <button type="button" id="save-api-key-btn">Save</button>
             <span id="api-key-status" class="api-key-status"></span>
         </div>
@@ -869,25 +885,51 @@
         const brainstormChat = document.getElementById('brainstorm-chat');
         const brainstormForm = document.getElementById('brainstorm-form');
         const brainstormInput = document.getElementById('brainstorm-input');
+        const llmProviderSelect = document.getElementById('llm-provider');
+        const geminiConfig = document.getElementById('gemini-config');
+        const ollamaConfig = document.getElementById('ollama-config');
+        const ollamaModelGlobal = document.getElementById('ollama-model-global');
 
-        // Load API key from localStorage on page load
+        // Load settings from localStorage on page load
+        const savedProvider = localStorage.getItem('llm_provider') || 'gemini';
         const savedApiKey = localStorage.getItem('gemini_api_key');
-        if (savedApiKey) {
-            geminiApiKeyInput.value = savedApiKey;
-            apiKeyStatus.textContent = '✓ Key saved';
+        const savedOllamaModel = localStorage.getItem('ollama_model');
+
+        llmProviderSelect.value = savedProvider;
+        if (savedApiKey) geminiApiKeyInput.value = savedApiKey;
+        if (savedOllamaModel) ollamaModelGlobal.value = savedOllamaModel;
+
+        // Show/hide config based on provider
+        const updateProviderConfig = () => {
+            if (llmProviderSelect.value === 'gemini') {
+                geminiConfig.style.display = 'flex';
+                ollamaConfig.style.display = 'none';
+            } else {
+                geminiConfig.style.display = 'none';
+                ollamaConfig.style.display = 'flex';
+            }
+        };
+        updateProviderConfig();
+
+        if (savedApiKey || savedOllamaModel) {
+            apiKeyStatus.textContent = '✓ Saved';
         }
 
-        // Save API key to localStorage
+        // Handle provider change
+        llmProviderSelect.addEventListener('change', updateProviderConfig);
+
+        // Save all settings to localStorage
         saveApiKeyBtn.addEventListener('click', () => {
+            const provider = llmProviderSelect.value;
             const apiKey = geminiApiKeyInput.value.trim();
-            if (apiKey) {
-                localStorage.setItem('gemini_api_key', apiKey);
-                apiKeyStatus.textContent = '✓ Key saved';
-                setTimeout(() => { apiKeyStatus.textContent = ''; }, 2000);
-            } else {
-                localStorage.removeItem('gemini_api_key');
-                apiKeyStatus.textContent = '';
-            }
+            const ollamaModel = ollamaModelGlobal.value.trim();
+
+            localStorage.setItem('llm_provider', provider);
+            if (apiKey) localStorage.setItem('gemini_api_key', apiKey);
+            if (ollamaModel) localStorage.setItem('ollama_model', ollamaModel);
+
+            apiKeyStatus.textContent = '✓ Saved';
+            setTimeout(() => { apiKeyStatus.textContent = ''; }, 2000);
         });
 
         // Mode tab switching
@@ -910,10 +952,12 @@
         const handleBrainstormSubmit = async (e) => {
             e.preventDefault();
             const message = brainstormInput.value.trim();
+            const provider = localStorage.getItem('llm_provider') || 'gemini';
             const apiKey = localStorage.getItem('gemini_api_key');
+            const ollamaModel = localStorage.getItem('ollama_model') || 'dengcao/Qwen3-30B-A3B-Instruct-2507:latest';
 
             if (!message) return;
-            if (!apiKey) {
+            if (provider === 'gemini' && !apiKey) {
                 alert('Please save your Gemini API key in the settings panel first.');
                 return;
             }
@@ -928,7 +972,7 @@
             // Show thinking indicator
             const thinkingDiv = document.createElement('div');
             thinkingDiv.className = 'thinking-indicator';
-            thinkingDiv.innerHTML = '<span>Experts are thinking</span><div class="thinking-dots"><span></span><span></span><span></span></div>';
+            thinkingDiv.innerHTML = '<span>QNN agents are thinking</span><div class="thinking-dots"><span></span><span></span><span></span></div>';
             brainstormChat.appendChild(thinkingDiv);
             brainstormChat.scrollTop = brainstormChat.scrollHeight;
 
@@ -940,7 +984,12 @@
                 const response = await fetch('/brainstorm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, api_key: apiKey })
+                    body: JSON.stringify({
+                        message: message,
+                        provider: provider,
+                        api_key: apiKey,
+                        ollama_model: ollamaModel
+                    })
                 });
 
                 const result = await response.json();

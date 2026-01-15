@@ -2584,26 +2584,33 @@ async def download_report(session_id: str):
 async def brainstorm(payload: dict = Body(...)):
     """
     Brainstorming mode endpoint - dynamically creates QNN agent neurons as expert personas.
-    Uses Gemini as the backend with complexity-based QNN sizing.
+    Supports both Gemini and Ollama backends with complexity-based QNN sizing.
     """
     try:
         import random
         user_input = payload.get("message", "")
+        provider = payload.get("provider", "gemini")
         api_key = payload.get("api_key", "")
+        ollama_model = payload.get("ollama_model", "dengcao/Qwen3-30B-A3B-Instruct-2507:latest")
         
         if not user_input:
             return JSONResponse(content={"error": "Message is required"}, status_code=400)
-        if not api_key:
+        if provider == "gemini" and not api_key:
             return JSONResponse(content={"error": "API key is required. Please save your Gemini API key in settings."}, status_code=400)
         
-        await log_stream.put("--- [BRAINSTORM] Starting brainstorming session ---")
+        await log_stream.put(f"--- [BRAINSTORM] Starting brainstorming session (Provider: {provider}) ---")
         
-        # Initialize Gemini LLM with user's API key
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-3-flash-preview",
-            google_api_key=api_key,
-            temperature=0.7
-        )
+        # Initialize LLM based on provider selection
+        if provider == "ollama":
+            llm = ChatOllama(model=ollama_model, temperature=0.7)
+            await log_stream.put(f"LOG: Using Ollama model: {ollama_model}")
+        else:
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-3-flash-preview",
+                google_api_key=api_key,
+                temperature=0.7
+            )
+            await log_stream.put("LOG: Using Gemini 3 Flash Preview")
         
         # Step 1: Estimate complexity and QNN size
         await log_stream.put("--- [BRAINSTORM] Estimating problem complexity ---")
