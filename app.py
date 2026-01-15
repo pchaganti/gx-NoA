@@ -1245,28 +1245,38 @@ User Request:
 # ==================== BRAINSTORMING MODE CHAINS ====================
 
 def get_complexity_estimator_chain(llm):
-    """Estimates QNN size based on problem complexity."""
+    """Estimates QNN size and generates dynamic expert personas based on problem complexity."""
     prompt = ChatPromptTemplate.from_template("""
 Analyze the complexity of the following user input/question for a brainstorming session.
-Based on the complexity, recommend an appropriate QNN (Qualitative Neural Network) size.
+Based on the complexity and nature of the problem, recommend an appropriate QNN size AND generate a custom panel of expert personas that would be most relevant to address this specific problem.
 
 User Input:
 ---
 {user_input}
 ---
 
-Consider these factors:
+Consider these factors for complexity:
 1. Number of distinct concepts or domains involved
 2. Depth of analysis required
 3. Potential for conflicting perspectives
 4. Technical vs conceptual nature
+
+For the experts, create personas that:
+1. Cover different relevant perspectives for THIS specific problem
+2. Have complementary but distinct areas of focus
+3. Can provide meaningful debate and synthesis
+4. The number of experts should match the complexity (2-5 experts)
 
 Respond with a JSON object:
 {{
     "complexity_score": <1-10 integer>,
     "recommended_layers": <2-5 integer>,
     "recommended_epochs": <1-3 integer>,
-    "reasoning": "<brief explanation>"
+    "reasoning": "<brief explanation>",
+    "experts": [
+        {{"name": "<Creative expert name>", "specialty": "<Specific expertise relevant to problem>", "emoji": "<relevant emoji>"}},
+        ...
+    ]
 }}
 """)
     return prompt | llm | StrOutputParser()
@@ -2573,10 +2583,11 @@ async def download_report(session_id: str):
 @app.post("/brainstorm")
 async def brainstorm(payload: dict = Body(...)):
     """
-    Brainstorming mode endpoint - creates QNNs for expert reflection and synthesizes opinions.
+    Brainstorming mode endpoint - dynamically creates QNN agent neurons as expert personas.
     Uses Gemini as the backend with complexity-based QNN sizing.
     """
     try:
+        import random
         user_input = payload.get("message", "")
         api_key = payload.get("api_key", "")
         
@@ -2602,32 +2613,87 @@ async def brainstorm(payload: dict = Body(...)):
         try:
             complexity_data = clean_and_parse_json(complexity_result_str)
             complexity_score = complexity_data.get("complexity_score", 5)
-            recommended_layers = complexity_data.get("recommended_layers", 3)
+            num_agents = min(max(complexity_data.get("recommended_layers", 3), 2), 5)  # 2-5 agents
             recommended_epochs = complexity_data.get("recommended_epochs", 1)
-            await log_stream.put(f"LOG: Complexity score: {complexity_score}, Layers: {recommended_layers}, Epochs: {recommended_epochs}")
+            await log_stream.put(f"LOG: Complexity score: {complexity_score}, Agents: {num_agents}, Epochs: {recommended_epochs}")
         except Exception:
             complexity_score = 5
-            recommended_layers = 3
+            num_agents = 3
             recommended_epochs = 1
             await log_stream.put("WARNING: Could not parse complexity. Using defaults.")
         
-        # Step 2: Run expert reflections
+        # Step 2: Generate QNN agent personas using input_spanner_chain
+        await log_stream.put(f"--- [BRAINSTORM] Generating {num_agents} QNN neuron personas ---")
+        
+        # Use problem decomposition to create sub-problems for each agent
+        decompose_chain = get_problem_decomposition_chain(llm)
+        decomposition_result = await decompose_chain.ainvoke({"problem": user_input})
+        
+        try:
+            decomposed = clean_and_parse_json(decomposition_result)
+            sub_problems = list(decomposed.values())[:num_agents] if decomposed else [user_input] * num_agents
+        except Exception:
+            sub_problems = [user_input] * num_agents
+        
+        # Pad sub_problems if needed
+        while len(sub_problems) < num_agents:
+            sub_problems.append(user_input)
+        
+        # Generate QNN agent personas
+        input_spanner = get_input_spanner_chain(llm, prompt_alignment=1.0, density=1.0)
+        mbti_types = ["INTJ", "ENFP", "ISTP", "INFJ", "ENTP", "ISFJ", "ESTP", "INFP"]
+        emojis = ["🧠", "💡", "🔧", "🎭", "❤️", "🔬", "📊", "🎯", "🌟", "⚡"]
+        
+        generated_agents = []
+        for i in range(num_agents):
+            mbti = random.choice(mbti_types)
+            sub_problem = sub_problems[i]
+            guiding_words = f"analytical critical creative problem-solving {sub_problem[:50]}"
+            
+            await log_stream.put(f"--- [BRAINSTORM] Creating QNN neuron {i+1}/{num_agents} for: {sub_problem[:60]}... ---")
+            
+            agent_prompt = await input_spanner.ainvoke({
+                "mbti_type": mbti,
+                "guiding_words": guiding_words,
+                "sub_problem": sub_problem,
+                "critique": "",
+                "name": names.get_full_name()
+            })
+            
+            # Extract agent metadata from the generated prompt
+            agent_name = names.get_full_name()
+            # Try to extract career from prompt
+            career_match = re.search(r"You are a \*\*(.+?)\*\*", agent_prompt)
+            specialty = career_match.group(1) if career_match else f"Expert in {sub_problem[:40]}"
+            
+            generated_agents.append({
+                "name": agent_name,
+                "specialty": specialty[:60],
+                "emoji": random.choice(emojis),
+                "system_prompt": agent_prompt,
+                "sub_problem": sub_problem
+            })
+            await log_stream.put(f"LOG: Created agent: {agent_name} - {specialty[:50]}")
+        
+        # Step 3: Run QNN agent reflections
+        await log_stream.put("--- [BRAINSTORM] Running QNN agent reflections ---")
         all_opinions = []
         expert_responses = []
         
-        for expert in BRAINSTORM_EXPERTS:
-            await log_stream.put(f"--- [BRAINSTORM] {expert['emoji']} {expert['name']} ({expert['specialty']}) is reflecting ---")
+        for agent in generated_agents:
+            await log_stream.put(f"--- [BRAINSTORM] {agent['emoji']} {agent['name']} ({agent['specialty'][:40]}) is reflecting ---")
             
             previous_opinions_str = "\n\n".join([
                 f"{e['emoji']} {e['name']}: {e['opinion']}" 
                 for e in expert_responses
             ]) if expert_responses else "No previous opinions yet."
             
+            # Use the agent's system prompt to generate reflection
             reflection_chain = get_expert_reflection_chain(
                 llm, 
-                expert["name"], 
-                expert["specialty"],
-                expert["emoji"]
+                agent["name"], 
+                agent["specialty"],
+                agent["emoji"]
             )
             
             opinion = await reflection_chain.ainvoke({
@@ -2636,16 +2702,16 @@ async def brainstorm(payload: dict = Body(...)):
             })
             
             expert_responses.append({
-                "name": expert["name"],
-                "specialty": expert["specialty"],
-                "emoji": expert["emoji"],
+                "name": agent["name"],
+                "specialty": agent["specialty"],
+                "emoji": agent["emoji"],
                 "opinion": opinion
             })
-            all_opinions.append(f"{expert['emoji']} {expert['name']} ({expert['specialty']}): {opinion}")
-            await log_stream.put(f"LOG: {expert['name']} responded: {opinion[:100]}...")
+            all_opinions.append(f"{agent['emoji']} {agent['name']} ({agent['specialty']}): {opinion}")
+            await log_stream.put(f"LOG: {agent['name']} responded: {opinion[:100]}...")
         
-        # Step 3: Synthesize all opinions
-        await log_stream.put("--- [BRAINSTORM] Synthesizing expert opinions ---")
+        # Step 4: Synthesize all opinions
+        await log_stream.put("--- [BRAINSTORM] Synthesizing QNN agent opinions ---")
         synthesizer_chain = get_opinion_synthesizer_chain(llm)
         synthesized_response = await synthesizer_chain.ainvoke({
             "user_input": user_input,
@@ -2659,7 +2725,7 @@ async def brainstorm(payload: dict = Body(...)):
             "success": True,
             "complexity": {
                 "score": complexity_score,
-                "layers": recommended_layers,
+                "agents": num_agents,
                 "epochs": recommended_epochs
             },
             "experts": expert_responses,
