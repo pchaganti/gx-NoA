@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Free Deep Think</title>
     <script src="js/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="css/prism-okaidia.min.css">
     <link rel="stylesheet" href="css/prism-toolbar.min.css">
     <style>
@@ -1182,7 +1183,7 @@
                     if (done) break;
                     const chunk = decoder.decode(value, { stream: true });
                     aiResponseText += chunk;
-                    aiMsgDiv.textContent = aiResponseText;
+                    aiMsgDiv.innerHTML = marked.parse(aiResponseText);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             } catch (error) {
@@ -1235,7 +1236,7 @@
                     if (done) break;
                     const chunk = decoder.decode(value, { stream: true });
                     aiResponseText += chunk;
-                    aiMsgDiv.textContent = aiResponseText;
+                    aiMsgDiv.innerHTML = marked.parse(aiResponseText);
                     diagnosticChatMessages.scrollTop = diagnosticChatMessages.scrollHeight;
                 }
             } catch (error) {
@@ -1564,9 +1565,13 @@
                 allLbelsData.push(data.epoch);
                 renderPerplexityChart();
 
-            } else if (rawMessage.startsWith('TOKEN_USAGE: ')) {
+            } else if (rawMessage.includes('TOKEN_USAGE:')) {
                 try {
-                    const parts = rawMessage.substring(13);
+                    const token = 'TOKEN_USAGE:';
+                    let parts = rawMessage.substring(rawMessage.indexOf(token) + token.length).trim();
+                    if (parts.startsWith('"') && parts.endsWith('"') && parts.includes('\\"')) {
+                        try { parts = JSON.parse(parts); } catch (e) { }
+                    }
                     const usage = JSON.parse(parts);
                     document.getElementById('tokens-total').innerText = usage.total;
                     document.getElementById('tokens-prompt').innerText = usage.prompt;
@@ -1607,8 +1612,16 @@
                             displayText = String(answer);
                         }
 
+
                         // Format formatting
-                        displayText = displayText.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        // Use marked.parse for markdown rendering
+                        try {
+                            displayText = marked.parse(displayText);
+                        } catch (e) {
+                            console.error("Error parsing markdown:", e);
+                            // Fallback to basic replacement if marked fails
+                            displayText = displayText.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        }
 
                         synthesisMsgDiv.innerHTML = `<div style="color: #28a745; font-weight: bold; margin-bottom: 0.5rem;">🧠 Synthesis</div>${displayText}`;
                         chatDiv.appendChild(synthesisMsgDiv);

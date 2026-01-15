@@ -61,10 +61,10 @@ from deepthink.chains import (
     get_brainstorming_spanner_chain
 )
 
-from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler, AsyncCallbackHandler
 from langchain_core.outputs import LLMResult
 
-class TokenUsageTracker(BaseCallbackHandler):
+class TokenUsageTracker(AsyncCallbackHandler):
     def __init__(self, log_stream):
         self.log_stream = log_stream
         self.total_tokens = 0

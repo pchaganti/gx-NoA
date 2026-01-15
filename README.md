@@ -18,13 +18,30 @@ Your feedback is invaluable. If you run into a crash or have ideas, please **ope
 
 Essentially, you can think of this project as a way to **max out a model's performance on complex algorithmic tasks by trading response time for quality**. The best part is that you don't need a supercomputer. local-deepthink is designed to turn even a modest 32gb RAM CPU-only laptop into a powerful "thought mining" rig. 💻⛏️ By leveraging efficient local models, you can leave the network running for hours or even days, allowing it to "mine" a sophisticated solution to a hard algorithmic problem. It's a fundamental shift: trading brute-force, instantaneous computation for the power of time, iteration, and distributed collaboration.
 
+## Key Features: Two Distinct Modes
+
+**local-deepthink** now offers two powerful ways to interact with the QNN engine:
+
+### 1. 🧬 Algorithm Design Mode
+The original QNN functionality. Ideal for users who want to:
+*   Build custom agent architectures.
+*   Fine-tune hyperparameters (learning rate, density, etc.).
+*   Run deep, multi-epoch simulations for code generation or complex problem-solving.
+*   Export and import trained QNN states.
+
+### 2. 🧠 Brainstorming Mode (New!)
+A streamlined, chat-based interface designed for deep concept exploration and ideation.
+*   **Dynamic Expert Panel**: The system automatically generates a panel of expert personas (e.g., "Quantum Physicist", "Market Strategist") tailored to your specific query.
+*   **Collaborative Reflection**: These experts debate, critique, and refine ideas over multiple epochs (cycles of thought).
+*   **Synthesis**: The final output is a comprehensive, synthesized answer that represents the collective intelligence of the agent panel.
+*   **Chat Interface**: Interact with the collective mind in a natural, chat-like environment.
+
 ## Use Case: Advanced Algorithm Generation
 The **Qualitative Neural Network (QNN)** algorithm that powers this system is great for complex problems where the only clue you have is a vague question or a high-level conceptual goal. With the system now refocused exclusively on code and algorithm generation, its primary use case is to tackle difficult programming challenges.
 
-*   **For Researchers & Thinkers: Brainstorming (Analogue to Grok Heavy)**: A specialized mode for deep concept exploration. The system dynamically generates a panel of expert personas (e.g., "Principles of Physics", "Market Strategist") tailored to your specific query. These experts debate, reflect, and refine their ideas over multiple epochs. The final output is equivalent to weeks of human research, synthesized into a comprehensive answer, making it a powerful "thought mining" tool for complex, open-ended questions.
-
 ## Changelog
 
+*  **Markdown Support**: Chat interfaces now support rich markdown rendering for better readability of code and formatted text.
 *  **Brainstorming Mode**: A specialized mode for exploring ideas and concepts. It utilizes the full QNN engine to dynamically generate a panel of expert personas (e.g., "Dr. Logic", "Creative Visionary") based on your prompt. These agents collaborate and reflect over multiple epochs, providing a depth of insight that a single prompt cannot match. Features a dedicated chat-like interface that displays expert reflections and a final synthesized answer directly in the chat.
 *  **Parallel QNN Topology**: Layer 0 agents now execute in parallel, correcting previous bottlenecks and ensuring a truly distributed initial analysis.
 *  **Gemini Backend Integration**: Added support for Google's Gemini 3 Flash Preview model as the backend for brainstorming mode. API key stored securely in localStorage.
