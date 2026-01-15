@@ -969,6 +969,29 @@
             brainstormInput.disabled = true;
             document.getElementById('brainstorm-send-btn').disabled = true;
 
+            // Clear input and show message
+            brainstormInput.value = '';
+            logContainer.innerHTML = ''; // Start fresh
+            fullLogContent = '';
+
+            // Add to Brainstorm Chat
+            const chatDiv = document.getElementById('brainstorm-chat');
+            // Remove placeholder if exists
+            if (chatDiv.children[0] && chatDiv.children[0].innerText.includes('Ask a question')) {
+                chatDiv.innerHTML = '';
+            }
+
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.style.cssText = "background: #334; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid #a0a0ff;";
+            userMsgDiv.innerHTML = `<strong>User:</strong> ${message}`;
+            chatDiv.appendChild(userMsgDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+
+            // Hide Graph for Brainstorm
+            graphContainer.parentElement.style.display = 'none';
+
+            addLogMessage(`<strong>User:</strong> ${message}`, { isHTML: true, color: '#a0a0ff' });
+
             // Prepare params for build_and_run_graph
             // We map 'message' to 'prompt'
             const params = {
@@ -991,7 +1014,7 @@
                 await runGraph({
                     params: params,
                     mode: 'brainstorm'
-                }, '/build_and_run_graph');
+                }, '/build_and_run_graph', false); // Do not clear logs again
 
             } catch (error) {
                 addLogMessage(`Error initiating brainstorming: ${error.message}`, { color: 'red' });
@@ -1263,12 +1286,14 @@
             }
         }
 
-        async function runGraph(payload, endpointUrl) {
+        async function runGraph(payload, endpointUrl, clearLogs = true) {
             runButton.disabled = true;
             runButton.textContent = 'Processing...';
             downloadLogButton.disabled = true;
-            logContainer.innerHTML = '';
-            fullLogContent = '';
+            if (clearLogs) {
+                logContainer.innerHTML = '';
+                fullLogContent = '';
+            }
             graphContainer.innerHTML = '<p>ASCII graph will be displayed here after the process starts...</p>';
 
             reportContainer.classList.add('hidden');
@@ -1376,6 +1401,9 @@
 
         graphParamsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            // Ensure graph is visible
+            graphContainer.parentElement.style.display = 'block';
+
             const formData = new FormData(graphParamsForm);
             const params = {};
             formData.forEach((value, key) => {

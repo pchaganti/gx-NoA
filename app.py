@@ -10,7 +10,7 @@ from langchain_community.chat_models import ChatOllama
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
 from dotenv import load_dotenv
 import json
 from typing import TypedDict, Annotated, List, Optional
@@ -56,7 +56,9 @@ from deepthink.chains import (
     get_expert_reflection_chain,
     get_brainstorming_agent_chain,
     get_brainstorming_mirror_descent_chain,
-    get_brainstorming_synthesis_chain
+    get_brainstorming_synthesis_chain,
+    get_brainstorming_seed_chain,
+    get_brainstorming_spanner_chain
 )
 
 
@@ -68,7 +70,7 @@ load_dotenv()
 app = FastAPI(title="DeepThink Local")
 app.mount("/js", StaticFiles(directory="js"), name="js")
 app.mount("/css", StaticFiles(directory="css"), name="css")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 log_stream = asyncio.Queue()
 
@@ -958,7 +960,12 @@ def create_synthesis_node(llm):
         for i in range(num_agents_last_layer):
             node_id = f"agent_{last_agent_layer_idx}_{i}"
             if node_id in state["agent_outputs"]:
-                last_layer_outputs.append(state["agent_outputs"][node_id])
+                out = state["agent_outputs"][node_id]
+                if isinstance(out, list):
+                    if not out: continue
+                    out = out[-1]
+                if isinstance(out, dict):
+                    last_layer_outputs.append(out)
 
         await log_stream.put(f"LOG: Synthesizing {len(last_layer_outputs)} outputs from the final agent layer (Layer {last_agent_layer_idx}).")
 
@@ -1042,6 +1049,10 @@ def create_code_execution_node(llm):
 
 def create_archive_epoch_outputs_node():
     async def archive_epoch_outputs_node(state: GraphState):
+        if state.get("mode") == "brainstorm":
+             # await log_stream.put("LOG: [BRAINSTORM] Skipping RAG archival pass.") # Optional: Reduce noise
+             return {}
+
         await log_stream.put("--- [ARCHIVAL PASS] Archiving agent outputs for RAG ---")
         
         current_epoch_outputs = state.get("agent_outputs", {})
@@ -1056,6 +1067,16 @@ def create_archive_epoch_outputs_node():
 
         for agent_id, output in current_epoch_outputs.items():
             try:
+                # Robustness check: if output is a list (due to merge_dicts or multiple runs), take the last one
+                if isinstance(output, list):
+                    if not output:
+                         continue # empty list
+                    output = output[-1]
+                
+                if not isinstance(output, dict):
+                     await log_stream.put(f"WARNING: Output for {agent_id} is not a dict or list of dicts. Skipping. Type: {type(output)}")
+                     continue
+
                 layer_idx, agent_idx = map(int, agent_id.split('_')[1:])
                 system_prompt = all_prompts[layer_idx][agent_idx]
                 
@@ -1119,10 +1140,18 @@ def create_metrics_node(llm):
             await log_stream.put("LOG: No agent outputs to analyze. Skipping perplexity calculation.")
             return {}
 
-        combined_text = "\n\n---\n\n".join(
-            f"Agent {agent_id}:\nSolution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
-            for agent_id, output in all_outputs.items()
-        )
+        combined_text_parts = []
+        for agent_id, output in all_outputs.items():
+            if isinstance(output, list):
+                if not output: continue
+                output = output[-1]
+            if not isinstance(output, dict): continue
+            
+            combined_text_parts.append(
+                f"Agent {agent_id}:\nSolution: {output.get('proposed_solution', '')}\nReasoning: {output.get('reasoning', '')}"
+            )
+
+        combined_text = "\n\n---\n\n".join(combined_text_parts)
 
         perplexity_chain = get_perplexity_heuristic_chain(llm)
         
@@ -1206,6 +1235,10 @@ def create_update_agent_prompts_node(llm):
     """Creates the mirror descent node that updates agent prompts based on reflection."""
     async def update_agent_prompts_node(state: GraphState):
         await log_stream.put("--- [MIRROR DESCENT] Entering Agent Prompt Update Node ---")
+        
+        params = state.get("params", {})
+        all_prompts_copy = [layer[:] for layer in state.get("all_layers_prompts", [])]
+
         if state.get("mode") == "brainstorm":
              mirror_chain = get_brainstorming_mirror_descent_chain(llm, params.get('learning_rate', 0.5))
              
@@ -1559,51 +1592,94 @@ async def build_and_run_graph(payload: dict = Body(...)):
     
     try:
         if mode == "brainstorm":
-            # BRAINSTORM MODE SETUP
-            await log_stream.put("--- [BRAINSTORM] Analyzing Complexity & Generating Expert Panel ---")
+            # BRAINSTORM MODE SETUP (Dynamic Spanning)
+            await log_stream.put("--- [BRAINSTORM] Analyzing Complexity & Spanning Concept Space ---")
+            
+            # 1. Complexity Estimation
             complexity_chain = get_complexity_estimator_chain(llm)
             complexity_result_str = await complexity_chain.ainvoke({"user_input": user_prompt})
+            
+            width = 3 # Default
+            
             try:
                 complexity_data = clean_and_parse_json(complexity_result_str)
-                experts = complexity_data.get("experts", [])
                 params['num_epochs'] = int(complexity_data.get("recommended_epochs", 2))
-                # Set depth logic (e.g. 2 layers for reflection)
                 cot_trace_depth = int(complexity_data.get("recommended_layers", 2))
+                width = int(complexity_data.get("recommended_width", 3))
                 
-                await log_stream.put(f"LOG: Generated {len(experts)} experts. Running for {params['num_epochs']} epochs, width {len(experts)}, depth {cot_trace_depth}.")
+                await log_stream.put(f"LOG: Topology: {cot_trace_depth} Layers x {width} Width x {params['num_epochs']} Epochs.")
             except Exception as e:
                 await log_stream.put(f"WARNING: Complexity estimation failed. Using defaults. Error: {e}")
-                experts = [{"name": "General Expert", "specialty": "Problem Solving", "emoji": "🧠"}]
                 params['num_epochs'] = 1
                 cot_trace_depth = 2
+                width = 3
 
-            # Build all_layers_prompts using the experts
-            # Repeating experts across layers to simulate depth of thought on same topic
+            # 2. Seed Generation (Guiding Concepts)
+            # Generate distinct concepts to span the problem space
+            seed_chain = get_brainstorming_seed_chain(llm)
+            concepts_str = await seed_chain.ainvoke({"problem": user_prompt, "num_concepts": width})
+            guiding_concepts = [c.strip() for c in concepts_str.split() if c.strip()]
             
-            # Setup decomposed problems (Topic focus)
+            # Ensure we have enough concepts
+            while len(guiding_concepts) < width:
+                guiding_concepts.append("General_Analysis")
+            guiding_concepts = guiding_concepts[:width]
+            
+            await log_stream.put(f"LOG: Guiding Concepts: {', '.join(guiding_concepts)}")
+
+            # 3. Dynamic Spanning (Persona Generation)
+            spanner_chain = get_brainstorming_spanner_chain(llm)
+            
             for i in range(cot_trace_depth):
                 layer_prompts = []
-                for j, expert in enumerate(experts):
+                for j in range(width):
                     agent_id = f"agent_{i}_{j}"
+                    concept = guiding_concepts[j % len(guiding_concepts)]
+                    
+                    # Generate Unique Node Persona
+                    # await log_stream.put(f"LOG: Generating Persona for Layer {i}, Node {j} (Focus: {concept})...") 
+                    # Commented out verbose logging to reduce noise, but process is happening
+                    
+                    persona_str = await spanner_chain.ainvoke({
+                        "problem": user_prompt,
+                        "guiding_concept": concept,
+                        "layer_index": i, 
+                        "node_index": j
+                    })
+                    
+                    try:
+                        persona = clean_and_parse_json(persona_str)
+                    except:
+                        # Fallback
+                        persona = {
+                            "name": f"Expert {i}-{j}", 
+                            "specialty": f"{concept} Specialist" if concept != "General_Analysis" else "Analyst", 
+                            "emoji": "🧠",
+                            "system_prompt": f"You are an expert in {concept}. Analyze the topic: {user_prompt}."
+                        }
                     
                     system_prompt = f"""
-You are {expert['name']} {expert.get('emoji', '🧠')}.
-Your Specialty is: {expert['specialty']}.
+You are {persona.get('name', 'Expert')} {persona.get('emoji', '🧠')}.
+Your Specialty is: {persona.get('specialty', 'Analysis')}.
 
-Your Goal: Brainstorm, critique, and reflect on the concept provided.
-Provide deep insights based on your specialty.
+<Role>
+{persona.get('system_prompt', 'Analyze the input.')}
+</Role>
 """
                     layer_prompts.append(system_prompt)
                     
                     # Persist metadata
                     agent_personas[agent_id] = {
-                        "name": expert['name'],
-                        "mbti_type": "Expert", # placeholder
-                        "specialty": expert['specialty']
+                        "name": persona.get('name', f"Agent {i}-{j}"),
+                        "mbti_type": "Expert", 
+                        "specialty": persona.get('specialty', 'Analysis')
                     }
-                    decomposed_problems_map[agent_id] = user_prompt # All focus on main topic, or we could specialize
+                    decomposed_problems_map[agent_id] = user_prompt 
                 
                 all_layers_prompts.append(layer_prompts)
+            
+            await log_stream.put(f"LOG: Successfully generated {len(all_layers_prompts) * width} unique expert personas.")
+
                 
         else:
              # ALGORITHM MODE SETUP (Existing Logic)
@@ -1692,9 +1768,12 @@ Provide deep insights based on your specialty.
     # Layer 0 -> Layer 1 ... -> Synthesis
     
     first_layer_nodes = [f"agent_0_{j}" for j in range(len(all_layers_prompts[0]))]
-    workflow.set_entry_point(first_layer_nodes[0])
-    for n in first_layer_nodes[1:]:
-        workflow.add_edge(first_layer_nodes[0], n)
+    first_layer_nodes = [f"agent_0_{j}" for j in range(len(all_layers_prompts[0]))]
+    
+    # Parallel Entry: Connect START to ALL Layer 0 nodes
+    for n in first_layer_nodes:
+        workflow.add_edge(START, n)
+
     
     for i in range(len(all_layers_prompts) - 1):
         current_layer_nodes = [f"agent_{i}_{j}" for j in range(len(all_layers_prompts[i]))]

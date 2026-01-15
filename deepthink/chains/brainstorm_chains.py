@@ -8,9 +8,10 @@ from langchain_core.output_parsers import StrOutputParser
 
 def get_complexity_estimator_chain(llm):
     """Estimates QNN size and generates dynamic expert personas based on problem complexity."""
+    # REFACTORED: Now focuses on Topological Parameters, not just returning a static list of experts.
     prompt = ChatPromptTemplate.from_template("""
 Analyze the complexity of the following user input/question for a brainstorming session.
-Based on the complexity and nature of the problem, recommend an appropriate QNN size AND generate a custom panel of expert personas that would be most relevant to address this specific problem.
+Based on the complexity and nature of the problem, recommend an appropriate QNN topology (layers, epochs, and width).
 
 User Input:
 ---
@@ -23,22 +24,13 @@ Consider these factors for complexity:
 3. Potential for conflicting perspectives
 4. Technical vs conceptual nature
 
-For the experts, create personas that:
-1. Cover different relevant perspectives for THIS specific problem
-2. Have complementary but distinct areas of focus
-3. Can provide meaningful debate and synthesis
-4. The number of experts should match the complexity (2-5 experts)
-
 Respond with a JSON object:
 {{
     "complexity_score": <1-10 integer>,
-    "recommended_layers": <2-5 integer>,
-    "recommended_epochs": <1-3 integer>,
-    "reasoning": "<brief explanation>",
-    "experts": [
-        {{"name": "<Creative expert name>", "specialty": "<Specific expertise relevant to problem>", "emoji": "<relevant emoji>"}},
-        ...
-    ]
+    "recommended_layers": <2-5 integer, depth of thought>,
+    "recommended_epochs": <1-3 integer, iterative refinement>,
+    "recommended_width": <2-5 integer, number of parallel perspectives per layer>,
+    "reasoning": "<brief explanation>"
 }}
 """)
     return prompt | llm | StrOutputParser()
@@ -97,6 +89,62 @@ Synthesized Response:
 
 
 # ==================== QNN BRAINSTORMING CHAINS ====================
+
+def get_brainstorming_seed_chain(llm):
+    """
+    Generates a diverse set of Guiding Concepts (Seeds) to span the problem space.
+    Analogous to verb generation in Algorithm Mode but for high-level concepts.
+    """
+    prompt = ChatPromptTemplate.from_template("""
+You are a Concept Spanner.
+Your goal is to generate a diverse set of "Guiding Concepts" or "Lenses" that can be used to analyze a specific problem from multiple angles.
+
+Problem/Topic:
+---
+{problem}
+---
+
+Generate exactly {num_concepts} distinct, single-word or short-phrase "Guiding Concepts".
+These concepts should:
+1. Span the entire conceptual space of the problem (e.g. Technical, Ethical, Practical, Theoretical).
+2. Be distinct from each other.
+3. Serve as seeds for generating specific expert personas.
+
+Output ONLY the concepts, separated by spaces.
+Example Output: Efficiency Ethics Scalability User-Experience Security
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_brainstorming_spanner_chain(llm):
+    """
+    Dynamically generates a unique Expert Persona (Node) for a specific position in the QNN.
+    Ensures the persona is tailored to the guiding concept and the specific layer's role.
+    """
+    prompt = ChatPromptTemplate.from_template("""
+You are a QNN Node Generator.
+Your task is to create a highly specific Expert Persona for a brainstorming session.
+
+Topic: {problem}
+Guiding Concept (Seed): {guiding_concept}
+QNN Position: Layer {layer_index}, Node {node_index}
+
+Role based on Layer:
+- Layer 0: Divergent Thinker (Explores the 'What if' and breadth).
+- Layer 1+: Convergent/Critical Thinker (Critiques, Refines, or Synthesizes inputs from previous layers).
+
+Create a persona that embodies the "{guiding_concept}" perspective applied to the Topic.
+
+Respond with a JSON object:
+{{
+    "name": "<Creative Name>",
+    "specialty": "<Specific Niche Specialty related to {guiding_concept}>",
+    "emoji": "<Emoji>",
+    "system_prompt": "<A concise (2-3 sentences) instruction sets for this agent. Defining who they are, their specialty, and their specific goal for this layer (Diverge vs Converge)>"
+}}
+""")
+    return prompt | llm | StrOutputParser()
+
 
 def get_brainstorming_agent_chain(llm):
     """
