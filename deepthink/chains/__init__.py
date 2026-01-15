@@ -6,6 +6,7 @@ from .agent_chains import (
     get_input_spanner_chain,
     get_attribute_and_hard_request_generator_chain,
     get_seed_generation_chain,
+    get_dense_spanner_chain,
 )
 
 from .synthesis_chains import (
@@ -37,6 +38,7 @@ __all__ = [
     'get_input_spanner_chain',
     'get_attribute_and_hard_request_generator_chain',
     'get_seed_generation_chain',
+    'get_dense_spanner_chain',
     # Synthesis chains
     'get_synthesis_chain',
     'get_code_synthesis_chain',
