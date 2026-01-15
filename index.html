@@ -640,6 +640,12 @@
                 </div>
             </div>
 
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="brainstorm_debug_mode">
+                <label for="brainstorm_debug_mode" style="color: #aaa; cursor: pointer; font-size: 0.9rem;">🚀
+                    Simulation Mode (Mock LLM - No Cost)</label>
+            </div>
+
             <form class="brainstorm-input-form" id="brainstorm-form">
                 <textarea id="brainstorm-input" placeholder="What would you like to brainstorm?" required></textarea>
                 <button type="submit" id="brainstorm-send-btn">Send</button>
@@ -1005,7 +1011,7 @@
                 prompt_alignment: 1.0,
                 density: 1.0,
                 learning_rate: 0.1,
-                debug_mode: 'false'
+                debug_mode: document.getElementById('brainstorm_debug_mode').checked ? 'true' : 'false'
             };
 
             try {
@@ -1544,19 +1550,43 @@
                 allLbelsData.push(data.epoch);
                 renderPerplexityChart();
 
-            } else if (rawMessage.startsWith('FINAL_ANSWER: ')) {
+            } else if (rawMessage.includes('FINAL_ANSWER:')) {
+                console.log("Received FINAL_ANSWER event:", rawMessage);
                 try {
-                    const jsonStr = rawMessage.replace('FINAL_ANSWER: ', '');
-                    const answer = JSON.parse(jsonStr);
+                    // Extract payload regardless of prefix
+                    const token = 'FINAL_ANSWER:';
+                    let jsonStr = rawMessage.substring(rawMessage.indexOf(token) + token.length).trim();
+
+                    let answer = JSON.parse(jsonStr);
+
+                    // Handle double-encoding (common with MockLLM -> Backend -> Frontend flow)
+                    if (typeof answer === 'string') {
+                        try {
+                            const parsedSecond = JSON.parse(answer);
+                            answer = parsedSecond;
+                        } catch (e) {
+                            // It was just a string, keep as is
+                        }
+                    }
+
                     const chatDiv = document.getElementById('brainstorm-chat');
                     if (chatDiv) {
                         const synthesisMsgDiv = document.createElement('div');
-                        synthesisMsgDiv.style.cssText = "background: #1e3a29; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid #28a745; color: #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);";
+                        synthesisMsgDiv.style.cssText = "background: #1e3a29; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid #28a745; color: #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-family: 'Segoe UI', sans-serif;";
 
-                        // Parse markdown-like bolding if needed, or just replace newlines
-                        const formattedAnswer = answer.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        let displayText = '';
+                        if (typeof answer === 'object' && answer !== null) {
+                            // Prefer 'proposed_solution' if available
+                            if (answer.proposed_solution) displayText = answer.proposed_solution;
+                            else displayText = JSON.stringify(answer, null, 2);
+                        } else {
+                            displayText = String(answer);
+                        }
 
-                        synthesisMsgDiv.innerHTML = `<div style="color: #28a745; font-weight: bold; margin-bottom: 0.5rem;">🧠 Synthesis</div>${formattedAnswer}`;
+                        // Format formatting
+                        displayText = displayText.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+                        synthesisMsgDiv.innerHTML = `<div style="color: #28a745; font-weight: bold; margin-bottom: 0.5rem;">🧠 Synthesis</div>${displayText}`;
                         chatDiv.appendChild(synthesisMsgDiv);
                         chatDiv.scrollTop = chatDiv.scrollHeight;
                     }
@@ -1569,6 +1599,7 @@
 
                 } catch (e) {
                     console.error("Failed to parse FINAL_ANSWER", e);
+                    addLogMessage(`Error parsing final answer: ${e.message}`, { color: 'red' });
                 }
                 addLogMessage(rawMessage);
 

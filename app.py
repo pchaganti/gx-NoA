@@ -735,6 +735,24 @@ Answer with a single word: "true" if it contains code, and "false" otherwise."""
  
             return "false"
         
+        elif "Analyze the complexity of the following user input" in prompt:
+             return json.dumps({
+                 "complexity_score": 5,
+                 "recommended_layers": 2,
+                 "recommended_epochs": 1,
+                 "recommended_width": 2,
+                 "reasoning": "Mock mode: Moderate complexity."
+             })
+        elif "You are a QNN Node Generator" in prompt:
+             return json.dumps({
+                 "name": "Dr. Mock",
+                 "specialty": "Mocking Systems",
+                 "emoji": "🤖",
+                 "system_prompt": "You are a mock agent. Respond with placeholder text."
+             })
+        elif "You are a Concept Spanner" in prompt:
+            return "Efficiency Creativity Scalability"
+            
         else:
             return json.dumps({
                 "original_problem": "A sub-problem statement provided to an agent.",
@@ -742,6 +760,7 @@ Answer with a single word: "true" if it contains code, and "false" otherwise."""
                 "reasoning": "This response was generated instantly by the MockLLM in debug mode.",
                 "skills_used": ["mocking", "debugging", f"skill_{random.randint(1,10)}"]
             })
+
             
     async def astream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         prompt = str(input_data).lower()
@@ -777,6 +796,7 @@ class GraphState(TypedDict):
     is_code_request: bool
     session_id: str
     chat_history: List[dict]
+    mode: Optional[str] # "algorithm" or "brainstorm"
 
 def execute_code_in_sandbox(code: str) -> (bool, str):
     """
@@ -975,21 +995,47 @@ def create_synthesis_node(llm):
 
         if state.get("mode") == "brainstorm":
              # Brainstorm Synthesis
+             
+             # Optimization: Only synthesize on the final epoch
+             if state["epoch"] < state["max_epochs"] - 1:
+                  await log_stream.put(f"LOG: [BRAINSTORM] Skipping intermediate synthesis (Epoch {state['epoch']}) to save resources.")
+                  return {"final_solution": None}
+             
+             await log_stream.put("LOG: [BRAINSTORM] Final Epoch reached. Synthesizing full conversation history...")
+
              agent_reflections = ""
-             for out in last_layer_outputs:
-                  agent_reflections += f"Solution/Reflection: {out.get('proposed_solution', '')}\nReasoning: {out.get('reasoning', '')}\n\n"
+             memory = state.get("memory", {})
+             
+             # Iterate through layers and agents to get ordered history
+             for layer_idx, layer in enumerate(state.get('all_layers_prompts', [])):
+                 for agent_idx in range(len(layer)):
+                     node_id = f"agent_{layer_idx}_{agent_idx}"
+                     history = memory.get(node_id, [])
+                     
+                     for hist_idx, entry in enumerate(history):
+                         # Robust check to prevent crashes on non-dict entries
+                         if isinstance(entry, dict):
+                             sol = entry.get('proposed_solution')
+                             reas = entry.get('reasoning')
+                             if sol and not str(sol).startswith("Error"):
+                                  agent_reflections += f"Agent {node_id} (Epoch {hist_idx}):\nReflection: {sol}\nReasoning: {reas}\n\n"
+
              
              final_solution_str = await synthesis_chain.ainvoke({
                 "original_request": state["original_request"],
                 "agent_solutions": agent_reflections
              })
+             
              final_solution = {
                  "proposed_solution": final_solution_str,
                  "reasoning": "Brainstorm synthesis complete."
              }
+             await log_stream.put(f"LOG: [DEBUG] Emitting FINAL_ANSWER token to frontend. Solution length: {len(final_solution_str)}")
              await log_stream.put(f"SUCCESS: Brainstorm synthesis complete.")
              # Send special token for frontend to capture in Chat (JSON encoded for safety)
              await log_stream.put(f"FINAL_ANSWER: {json.dumps(final_solution_str)}")
+
+
 
 
         else:
@@ -1184,6 +1230,11 @@ def create_reframe_and_decompose_node(llm):
         
         final_solution = state.get("final_solution")
         original_request = state.get("original_request")
+
+        if state.get("mode") == "brainstorm":
+             await log_stream.put("LOG: [BRAINSTORM] Skipping Problem Reframing to maintain focus on original concept.")
+             return {}
+
 
         reframer_chain = get_problem_reframer_chain(llm)
         new_problem_str = await reframer_chain.ainvoke({
@@ -1545,32 +1596,34 @@ async def build_and_run_graph(payload: dict = Body(...)):
         provider = params.get("provider", "ollama")
         api_key = params.get("api_key", "")
         
-        if provider == "gemini":
-            if not api_key:
-                return JSONResponse(content={"message": "Gemini API Key required"}, status_code=400)
-            llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", google_api_key=api_key, temperature=0.7)
-            summarizer_llm = llm # Reuse for summary
-            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest") # Still use local embeddings or switch to Google?
-            # For simplicity using Ollama embeddings if available, else Mock? 
-            # Ideally use Google embeddings if Gemini is provider but for now keep mixed.
-            await log_stream.put(f"--- Initializing Main Agent LLM: Gemini (gemini-3-flash-preview) ---")
-            
-        elif params.get("coder_debug_mode") == 'true':
+        # Custom Debug Mode Logic (Prioritize Mock LLMs)
+        if params.get("coder_debug_mode") == 'true':
             await log_stream.put(f"--- 💻 CODER DEBUG MODE ENABLED 💻 ---")
             llm = CoderMockLLM()
             summarizer_llm = CoderMockLLM()
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
+            
         elif params.get("debug_mode") == 'true':
             await log_stream.put(f"--- 🚀 DEBUG MODE ENABLED 🚀 ---")
             llm = MockLLM()
             summarizer_llm = MockLLM()
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
+
+        elif provider == "gemini":
+            if not api_key:
+                return JSONResponse(content={"message": "Gemini API Key required"}, status_code=400)
+            llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", google_api_key=api_key, temperature=0.7)
+            summarizer_llm = llm # Reuse for summary
+            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest") 
+            await log_stream.put(f"--- Initializing Main Agent LLM: Gemini (gemini-3-flash-preview) ---")
+            
         else:
             # Default Ollama
             summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0)
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
             model_name = params.get("ollama_model", "dengcao/Qwen3-3B-A3B-Instruct-2507:latest")
             await log_stream.put(f"--- Initializing Main Agent LLM: Ollama ({model_name}) ---")
+
             llm = ChatOllama(model=model_name, temperature=0.4)
             await llm.ainvoke("Hi")
             await log_stream.put("--- Main Agent LLM Connection Successful ---")
