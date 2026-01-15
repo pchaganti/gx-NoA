@@ -7,8 +7,8 @@ from fastapi import FastAPI, Request, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from langchain_community.chat_models import ChatOllama
 from langchain_community.embeddings import OllamaEmbeddings
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema.output_parser import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 import json
