@@ -1078,6 +1078,18 @@ def create_synthesis_node(llm):
                                   agent_reflections += f"Agent {node_id} (Epoch {hist_idx}):\nReflection: {sol}\nReasoning: {reas}\n\n"
 
              
+             # DEBUG LOGGING FOR CONTEXT
+             doc_ctx = state.get("brainstorm_document_context", "")
+             prior_conv = state.get("brainstorm_prior_conversation", "")
+             mem_keys = list(memory.keys())
+             
+             await log_stream.put(f"LOG: [DEBUG SYNTHESIS] Doc Context Len: {len(doc_ctx)}")
+             await log_stream.put(f"LOG: [DEBUG SYNTHESIS] Prior Conv Len: {len(prior_conv)}")
+             await log_stream.put(f"LOG: [DEBUG SYNTHESIS] Memory Keys: {mem_keys}")
+             await log_stream.put(f"LOG: [DEBUG SYNTHESIS] Agent Reflections Len: {len(agent_reflections)}")
+             if len(agent_reflections) < 50:
+                  await log_stream.put(f"LOG: [DEBUG SYNTHESIS] Reflections Content (First 50): {agent_reflections[:50]}")
+
              # Use the summarized problem (which includes doc insights) if available, otherwise raw request
              synthesis_input_concept = state.get("brainstorm_problem_summary")
              if not synthesis_input_concept:
@@ -1086,8 +1098,8 @@ def create_synthesis_node(llm):
              final_solution_str = await synthesis_chain.ainvoke({
                 "original_request": synthesis_input_concept,
                 "agent_solutions": agent_reflections,
-                "prior_conversation": state.get("brainstorm_prior_conversation", "")[:15000],  # Limit to prevent token overflow
-                "document_context": state.get("brainstorm_document_context", "")[:50000] # Pass doc context to synthesis
+                "prior_conversation": prior_conv[:15000],  # Limit to prevent token overflow
+                "document_context": doc_ctx[:50000] # Pass doc context to synthesis
              })
              
              final_solution = {
@@ -1963,7 +1975,11 @@ Your Specialty is: {persona.get('specialty', 'Analysis')}.
     
     # Conditional Edge for Loops
     def epoch_gateway(state):
-        if state["epoch"] < state["max_epochs"]:
+        # We start at epoch 0. We want a total of 'max_epochs' passes.
+        # Pass 0 ends here. If max_epochs is 2, we want Pass 0 and Pass 1.
+        # So at Pass 0 (epoch=0), we check: 0 < 2-1 (0 < 1) -> True -> Loop.
+        # At Pass 1 (epoch=1), we check: 1 < 2-1 (1 < 1) -> False -> Stop.
+        if state["epoch"] < state["max_epochs"] - 1:
              return "reframe_and_decompose"
         return "harvest"
 
