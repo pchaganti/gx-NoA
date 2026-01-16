@@ -30,6 +30,9 @@ class GraphState(TypedDict):
     is_code_request: bool
     session_id: str
     chat_history: List[dict]
+    brainstorm_document_context: str
+    brainstorm_prior_conversation: str
+    brainstorm_problem_summary: str
 
 
 # Brainstorming mode expert definitions
