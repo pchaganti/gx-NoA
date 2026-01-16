@@ -960,15 +960,25 @@ def create_agent_node(llm, node_id):
         
         try:
             response_json = clean_and_parse_json(response_str)
+            
+            if response_json is None:
+                 raise ValueError("JSON parsing failed (returned None)")
+                 
             await log_stream.put(f"SUCCESS: Agent {node_id} produced output:\n{json.dumps(response_json, indent=2)}")
-        except (json.JSONDecodeError, AttributeError):
-            await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}")
+        except (json.JSONDecodeError, AttributeError, ValueError) as e:
+            await log_stream.put(f"ERROR: Agent {node_id} produced invalid JSON. Raw output: {response_str}. Error: {e}")
+            
+            # FALLBACK STRATEGY:
+            # If parsing fails, try to return a "safe" no-op response or the original request to keep graph alive
             agent_sub_problem = state.get("decomposed_problems", {}).get(node_id, state["original_request"])
+            
+            # Try to recover a previous valid state if possible, otherwise generic error
             response_json = {
                 "original_problem": agent_sub_problem,
-                "proposed_solution": "Error: Agent produced malformed JSON output.",
-                "reasoning": f"Invalid JSON: {response_str}",
-                "skills_used": []
+                "proposed_solution": f"System Fallback: The neuron {node_id} failed to format its response correctly. Raw output was captured.",
+                "reasoning": f"JSON Parsing Error. Raw Content: {response_str[:500]}...",
+                "skills_used": [],
+                "node_id": node_id
             }
         
         if state.get("is_code_request") and layer_index > 0:

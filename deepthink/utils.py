@@ -44,14 +44,22 @@ def clean_and_parse_json(llm_output_string):
 
     # Step 2: Remove trailing commas before } or ]
     json_string = re.sub(r',\s*([}\]])', r'\1', json_string)
-    
-    # Step 3: Attempt fast load
+
+    # Step 3: Fix invalid escapes (e.g., \alpha, C:\Users)
+    # Replaces \ followed by any char that is NOT in [ " \ / b f n r t u ]
+    # This prevents "Invalid \escape" errors.
+    try:
+        json_string = re.sub(r'\\(?![\\"/bfnrtu])', r'\\\\', json_string)
+    except Exception:
+        pass
+
+    # Step 4: Attempt fast load
     try:
         return json.loads(json_string)
     except json.JSONDecodeError:
         pass
         
-    # Step 4: Fix Unescaped Control Characters in Strings (Fallback)
+    # Step 5: Fix Unescaped Control Characters in Strings (Fallback)
     # This manually iterates to find strings and replace literal \n with \\n
     new_chars = []
     in_string = False
