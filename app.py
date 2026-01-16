@@ -1078,8 +1078,13 @@ def create_synthesis_node(llm):
                                   agent_reflections += f"Agent {node_id} (Epoch {hist_idx}):\nReflection: {sol}\nReasoning: {reas}\n\n"
 
              
+             # Use the summarized problem (which includes doc insights) if available, otherwise raw request
+             synthesis_input_concept = state.get("brainstorm_problem_summary")
+             if not synthesis_input_concept:
+                 synthesis_input_concept = state["original_request"]
+
              final_solution_str = await synthesis_chain.ainvoke({
-                "original_request": state["original_request"],
+                "original_request": synthesis_input_concept,
                 "agent_solutions": agent_reflections,
                 "prior_conversation": state.get("brainstorm_prior_conversation", "")[:15000],  # Limit to prevent token overflow
                 "document_context": state.get("brainstorm_document_context", "")[:50000] # Pass doc context to synthesis

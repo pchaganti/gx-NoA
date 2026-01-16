@@ -241,30 +241,36 @@ def get_brainstorming_synthesis_chain(llm):
     """
     prompt = ChatPromptTemplate.from_template("""
 You are a Master Synthesizer of Ideas.
-You have heard from a panel of experts who have reflected on a core concept.
+You have heard from a panel of experts who have reflected on a core concept over multiple iterations.
 
-Original Concept: {original_request}
+Core Concept & Context:
+---
+{original_request}
+---
 
 Prior Conversation Context:
 ---
 {prior_conversation}
 ---
 
-Document Context (Reference Material):
+Document / Reference Material:
 ---
 {document_context}
 ---
 
-Expert Reflections:
+Expert Reflections (History of Ideas):
+---
 {agent_solutions}
+---
 
 Your Task:
-Synthesize these perspectives into a rich, multi-faceted summary.
-Build upon any insights from the prior conversation to maintain continuity.
-Integrate relevant information from the document context.
-Highlight tensions, agreements, and novel insights.
-Do NOT just list what they said. Weave a narrative that advances the understanding of the concept.
-If this is part of an ongoing conversation, explicitly connect to previous discussion points.
+Synthesize these perspective into a single, comprehensive, and novel architecture or solution.
+CRITICAL INSTRUCTIONS:
+1. You MUST incorporate specific details from the "Document / Reference Material" if provided. Do not ignore them.
+2. You MUST build upon the specific "Expert Reflections". These contain the evolved ideas. Do not hallucinate a generic answer.
+3. If the experts proposed specific names, mechanisms, or theories, cite them and integrate them.
+4. Your goal is to produce the "Final Answer" that represents the culmination of this brainstorming session.
+5. If the user asked for a specific format (e.g. code, architecture), ensure you provide it.
 
 Synthesized Narrative:
 """)
