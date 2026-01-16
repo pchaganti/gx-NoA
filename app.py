@@ -34,6 +34,8 @@ from sklearn.cluster import KMeans
 from contextlib import redirect_stdout
 from fastapi.staticfiles import StaticFiles
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_xai import ChatXAI
+import fitz  # PyMuPDF for PDF text extraction
 from deepthink.chains import (
     get_input_spanner_chain,
     get_attribute_and_hard_request_generator_chain,
@@ -58,7 +60,8 @@ from deepthink.chains import (
     get_brainstorming_mirror_descent_chain,
     get_brainstorming_synthesis_chain,
     get_brainstorming_seed_chain,
-    get_brainstorming_spanner_chain
+    get_brainstorming_spanner_chain,
+    get_problem_summarizer_chain
 )
 
 from langchain_core.callbacks import BaseCallbackHandler, AsyncCallbackHandler
@@ -933,12 +936,43 @@ def create_agent_node(llm, node_id):
 
         memory_str = "\n".join([f"- {json.dumps(mem)}" for mem in agent_memory_history])
 
+        # Check if we're in brainstorm mode and add context
+        brainstorm_context = ""
+        if state.get("mode") == "brainstorm":
+            prior_conv = state.get("brainstorm_prior_conversation", "")
+            doc_context = state.get("brainstorm_document_context", "")
+            
+            if prior_conv:
+                brainstorm_context += f"""
+#Prior Conversation Context:
+---
+{prior_conv[:20000]}
+---
+"""
+            # NOTE: Document context is intentionally excluded from individual agent prompts ("inner neurons")
+            # to prevent clutter. It is only passed to the planner (complexity/decomposition) and synthesis agent.
+            # if doc_context:
+            #    brainstorm_context += f"""
+            # #Reference Documents:
+            # ---
+            # {doc_context[:30000]}
+            # ---
+            # """
+
+
+        input_data = state["original_request"]
+
+        # Use the summarized problem statement if available (for "inner neurons")
+        # avoiding raw document context overload
+        if state.get("brainstorm_problem_summary"):
+             input_data = state["brainstorm_problem_summary"] # Use the summary instead of just the original request if available
 
         full_prompt = f"""
 #System Prompt (Your Persona & Task):
 ---
 {agent_prompt}
 ---
+{brainstorm_context}
 #Your Memory (Your Past Actions from Previous Epochs):
 ---
 {memory_str if memory_str else "You have no past actions in memory."}
@@ -1000,6 +1034,7 @@ def create_synthesis_node(llm):
         if state.get("mode") == "brainstorm":
              await log_stream.put("LOG: [BRAINSTORM] Synthesizing expert reflections...")
              synthesis_chain = get_brainstorming_synthesis_chain(llm)
+             # Brainstorm synthesis context (will be populated below)
              synthesis_context = ""
         elif is_code:
             await log_stream.put("LOG: Original request detected as a code generation task. Using code synthesis prompt.")
@@ -1064,7 +1099,9 @@ def create_synthesis_node(llm):
              
              final_solution_str = await synthesis_chain.ainvoke({
                 "original_request": state["original_request"],
-                "agent_solutions": agent_reflections
+                "agent_solutions": agent_reflections,
+                "prior_conversation": state.get("brainstorm_prior_conversation", "")[:15000],  # Limit to prevent token overflow
+                "document_context": state.get("brainstorm_document_context", "")[:50000] # Pass doc context to synthesis
              })
              
              final_solution = {
@@ -1661,6 +1698,14 @@ async def build_and_run_graph(payload: dict = Body(...)):
             embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest") 
             await log_stream.put(f"--- Initializing Main Agent LLM: Gemini (gemini-3-flash-preview) ---")
             
+        elif provider == "grok":
+            if not api_key:
+                return JSONResponse(content={"message": "Grok API Key required"}, status_code=400)
+            llm = ChatXAI(model="grok-4-1-fast", xai_api_key=api_key, temperature=0.7, callbacks=[token_tracker])
+            summarizer_llm = llm
+            embeddings_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
+            await log_stream.put(f"--- Initializing Main Agent LLM: Grok (grok-4.1 fast) ---")
+
         else:
             # Default Ollama
             summarizer_llm = ChatOllama(model="qwen3:1.7b", temperature=0, callbacks=[token_tracker])
@@ -1696,9 +1741,51 @@ async def build_and_run_graph(payload: dict = Body(...)):
             # BRAINSTORM MODE SETUP (Dynamic Spanning)
             await log_stream.put("--- [BRAINSTORM] Analyzing Complexity & Spanning Concept Space ---")
             
+            # Extract chat history and document context from payload
+            chat_history = payload.get("chat_history", [])
+            document_context = payload.get("document_context", "")
+            
+            # Format chat history as string for context
+            chat_history_str = ""
+            if chat_history:
+                chat_history_str = "\n".join([
+                    f"{'User' if msg.get('role') == 'user' else 'Assistant'}: {msg.get('content', '')}"
+                    for msg in chat_history
+                ])
+                await log_stream.put(f"LOG: Chat history contains {len(chat_history)} messages.")
+            
+            if document_context:
+                await log_stream.put(f"LOG: Document context provided ({len(document_context)} characters).")
+            
             # 1. Complexity Estimation
             complexity_chain = get_complexity_estimator_chain(llm)
-            complexity_result_str = await complexity_chain.ainvoke({"user_input": user_prompt})
+            complexity_result_str = await complexity_chain.ainvoke({
+                "user_input": user_prompt,
+                "prior_conversation": chat_history_str,
+                "document_context": document_context[:10000] if document_context else ""  # Truncate for estimation
+            })
+
+            # --- Problem Summarization (if documents are present) ---
+            brainstorm_problem_summary = ""
+            if document_context:
+                await log_stream.put("LOG: [BRAINSTORM] Summarizing problem and documents for agent context...")
+                summarizer_chain = get_problem_summarizer_chain(llm) # Use main LLM for summarization
+                brainstorm_problem_summary = await summarizer_chain.ainvoke({
+                    "user_input": user_prompt,
+                    "document_context": document_context[:50000] # Limit for summarization context window
+                })
+                # await log_stream.put(f"LOG: [BRAINSTORM] Summary generated.")
+
+            # --- Problem Summarization (if documents are present) ---
+            brainstorm_problem_summary = ""
+            if document_context:
+                await log_stream.put("LOG: [BRAINSTORM] Summarizing problem and documents for agent context...")
+                summarizer_chain = get_problem_summarizer_chain(llm) # Use main LLM for summarization
+                brainstorm_problem_summary = await summarizer_chain.ainvoke({
+                    "user_input": user_prompt,
+                    "document_context": document_context[:50000] # Limit for summarization context window
+                })
+                # await log_stream.put(f"LOG: [BRAINSTORM] Summary generated.")
             
             width = 3 # Default
             
@@ -1751,7 +1838,8 @@ async def build_and_run_graph(payload: dict = Body(...)):
                         "problem": user_prompt,
                         "guiding_concept": concept,
                         "layer_index": i, 
-                        "node_index": j
+                        "node_index": j,
+                        "document_context": document_context[:5000] if document_context else ""  # Truncate for persona generation
                     })
                     
                     try:
@@ -1933,6 +2021,14 @@ Your Specialty is: {persona.get('specialty', 'Analysis')}.
     await log_stream.put(ascii_art)
     
     session_id = str(uuid.uuid4())
+    
+    # Prepare brainstorm context (only relevant in brainstorm mode, but always include empty defaults)
+    brainstorm_chat_history_str = ""
+    brainstorm_document_context = ""
+    if mode == "brainstorm":
+        brainstorm_chat_history_str = chat_history_str
+        brainstorm_document_context = document_context
+    
     initial_state = {
         "session_id": session_id,
         "mode": mode,
@@ -1960,7 +2056,10 @@ Your Specialty is: {persona.get('specialty', 'Analysis')}.
         "embeddings_model": embeddings_model, 
         "modules": [],
         "synthesis_context_queue": [],
-        "synthesis_execution_success": True 
+        "synthesis_execution_success": True,
+        # Brainstorm mode context
+        "brainstorm_prior_conversation": brainstorm_chat_history_str,
+        "brainstorm_document_context": brainstorm_document_context
     }
     initial_state["llm"] = llm
     sessions[session_id] = initial_state
@@ -2048,6 +2147,78 @@ async def import_qnn(file: UploadFile = File(...)):
         })
     except Exception as e:
         error_message = f"Failed to import QNN file: {e}"
+        await log_stream.put(error_message)
+        return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
+
+
+@app.post("/upload_documents")
+async def upload_documents(files: List[UploadFile] = File(...)):
+    """
+    Uploads PDF documents and extracts their text content.
+    Returns extracted text to be used as context in brainstorm mode.
+    """
+    MAX_TOTAL_CHARS = 50000  # Limit to prevent token overflow
+    
+    extracted_texts = []
+    total_chars = 0
+    
+    try:
+        for file in files:
+            if not file.filename.lower().endswith('.pdf'):
+                await log_stream.put(f"WARNING: Skipping non-PDF file: {file.filename}")
+                continue
+            
+            content = await file.read()
+            
+            # Use PyMuPDF to extract text
+            try:
+                pdf_document = fitz.open(stream=content, filetype="pdf")
+                file_text = ""
+                
+                for page_num in range(len(pdf_document)):
+                    page = pdf_document[page_num]
+                    file_text += page.get_text()
+                
+                pdf_document.close()
+                
+                # Truncate if needed
+                remaining_chars = MAX_TOTAL_CHARS - total_chars
+                if remaining_chars <= 0:
+                    await log_stream.put(f"WARNING: Character limit reached. Skipping remaining files.")
+                    break
+                
+                if len(file_text) > remaining_chars:
+                    file_text = file_text[:remaining_chars]
+                    await log_stream.put(f"WARNING: Truncated {file.filename} to fit character limit.")
+                
+                total_chars += len(file_text)
+                extracted_texts.append({
+                    "filename": file.filename,
+                    "text": file_text,
+                    "char_count": len(file_text)
+                })
+                
+                await log_stream.put(f"SUCCESS: Extracted {len(file_text)} characters from {file.filename}")
+                
+            except Exception as pdf_error:
+                await log_stream.put(f"ERROR: Failed to extract text from {file.filename}: {pdf_error}")
+                continue
+        
+        # Combine all extracted texts
+        combined_text = "\n\n---\n\n".join([
+            f"[Document: {doc['filename']}]\n{doc['text']}" 
+            for doc in extracted_texts
+        ])
+        
+        return JSONResponse(content={
+            "message": f"Successfully extracted text from {len(extracted_texts)} document(s).",
+            "documents": extracted_texts,
+            "combined_text": combined_text,
+            "total_chars": total_chars
+        })
+        
+    except Exception as e:
+        error_message = f"Failed to process documents: {e}"
         await log_stream.put(error_message)
         return JSONResponse(content={"message": error_message, "traceback": traceback.format_exc()}, status_code=500)
 

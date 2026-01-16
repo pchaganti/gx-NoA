@@ -37,6 +37,7 @@ from .brainstorm_chains import (
     get_brainstorming_synthesis_chain,
     get_brainstorming_seed_chain,
     get_brainstorming_spanner_chain,
+    get_problem_summarizer_chain,
 )
 
 __all__ = [
@@ -68,5 +69,6 @@ __all__ = [
     'get_brainstorming_synthesis_chain',
     'get_brainstorming_seed_chain',
     'get_brainstorming_spanner_chain',
+    'get_problem_summarizer_chain',
 ]
 

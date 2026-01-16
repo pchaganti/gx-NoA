@@ -602,12 +602,18 @@
             <select id="llm-provider"
                 style="padding: 0.5rem; border-radius: 4px; background: #1a1d24; color: #fff; border: 1px solid #333;">
                 <option value="gemini">Gemini (Cloud)</option>
+                <option value="grok">Grok (xAI)</option>
                 <option value="ollama">Ollama (Local)</option>
             </select>
 
             <div id="gemini-config" style="display: flex; gap: 0.5rem; align-items: center;">
                 <label for="gemini-api-key">🔑 API Key:</label>
                 <input type="password" id="gemini-api-key" placeholder="Gemini API key..." style="min-width: 180px;">
+            </div>
+
+            <div id="grok-config" style="display: none; gap: 0.5rem; align-items: center;">
+                <label for="grok-api-key">🌌 API Key:</label>
+                <input type="password" id="grok-api-key" placeholder="Grok API key..." style="min-width: 180px;">
             </div>
 
             <div id="ollama-config" style="display: none; gap: 0.5rem; align-items: center;">
@@ -641,7 +647,7 @@
                 </div>
             </div>
 
-            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <label for="brainstorm_epochs" style="color: #aaa; font-size: 0.9rem;">Epochs:</label>
                     <input type="number" id="brainstorm_epochs" value="2" min="1" max="10"
@@ -651,6 +657,26 @@
                     <input type="checkbox" id="brainstorm_debug_mode">
                     <label for="brainstorm_debug_mode" style="color: #aaa; cursor: pointer; font-size: 0.9rem;">🚀
                         Simulation Mode (Mock LLM - No Cost)</label>
+                </div>
+            </div>
+
+            <!-- PDF Upload Section -->
+            <div id="pdf-upload-section"
+                style="margin-bottom: 15px; padding: 1rem; background: #1a1d24; border-radius: 8px; border: 1px dashed #444;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <label for="pdf-file-input"
+                        style="cursor: pointer; background: #262730; padding: 8px 16px; border-radius: 6px; display: flex; align-items: center; gap: 6px; font-size: 0.9rem;">
+                        📄 Attach PDFs
+                    </label>
+                    <input type="file" id="pdf-file-input" accept=".pdf" multiple style="display: none;">
+                    <span id="pdf-upload-status" style="color: #888; font-size: 0.85rem;"></span>
+                    <button type="button" id="clear-pdfs-btn"
+                        style="display: none; background: #444; padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; width: auto;">Clear
+                        All</button>
+                </div>
+                <div id="attached-documents-list" style="margin-top: 10px; display: none;">
+                    <div style="font-size: 0.85rem; color: #888; margin-bottom: 6px;">Attached Documents:</div>
+                    <div id="documents-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                 </div>
             </div>
 
@@ -694,11 +720,7 @@
                             <label for="coder_debug_mode">💻 Enable Coder Debug (Code)</label>
                         </div>
                     </div>
-                    <div id="ollama-model-section">
-                        <label for="ollama_model">Ollama Model Name:</label>
-                        <input type="text" id="ollama_model" name="ollama_model"
-                            value="dengcao/Qwen3-30B-A3B-Instruct-2507:latest">
-                    </div>
+
                     <label for="cot_trace_depth">CoT trace depth (max 32):</label>
                     <input type="number" id="cot_trace_depth" name="cot_trace_depth" value="2" max="32" min="2"
                         required>
@@ -898,6 +920,99 @@
         let importedSessionId = null;
         let importedStateContent = null;
 
+        // Brainstorm mode state - chat history and document context
+        let brainstormChatHistory = [];  // Array of {role: 'user'|'assistant', content: string}
+        let brainstormDocumentContext = '';  // Combined extracted text from PDFs
+        let attachedDocuments = [];  // Array of {filename: string, charCount: number}
+
+        // PDF upload elements
+        const pdfFileInput = document.getElementById('pdf-file-input');
+        const pdfUploadStatus = document.getElementById('pdf-upload-status');
+        const clearPdfsBtn = document.getElementById('clear-pdfs-btn');
+        const attachedDocumentsList = document.getElementById('attached-documents-list');
+        const documentsList = document.getElementById('documents-list');
+
+        // PDF Upload Handler
+        pdfFileInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            pdfUploadStatus.textContent = 'Uploading...';
+            pdfUploadStatus.style.color = '#888';
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            try {
+                const response = await fetch('/upload_documents', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const newDocs = result.documents || [];
+                    let addedCount = 0;
+
+                    // Append new unique documents
+                    newDocs.forEach(doc => {
+                        if (!attachedDocuments.some(existing => existing.filename === doc.filename)) {
+                            attachedDocuments.push(doc);
+                            addedCount++;
+                        }
+                    });
+
+                    // Re-build context from all attached documents
+                    brainstormDocumentContext = attachedDocuments.map(d => `[Document: ${d.filename}]\n${d.text}`).join('\n\n---\n\n');
+
+                    const totalChars = attachedDocuments.reduce((sum, doc) => sum + doc.char_count, 0);
+
+                    if (addedCount > 0) {
+                        pdfUploadStatus.textContent = `✓ Added ${addedCount} new document(s). Total: ${attachedDocuments.length} (${totalChars} chars)`;
+                        pdfUploadStatus.style.color = '#28a745';
+                    } else {
+                        pdfUploadStatus.textContent = `⚠ Documents already attached. Total: ${attachedDocuments.length}`;
+                        pdfUploadStatus.style.color = '#e0a800';
+                    }
+
+                    // Update documents list display
+                    documentsList.innerHTML = '';
+                    attachedDocuments.forEach(doc => {
+                        const badge = document.createElement('span');
+                        badge.style.cssText = 'background: #262730; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;';
+                        badge.innerHTML = `📄 ${doc.filename} <span style="color: #666;">(${doc.char_count} chars)</span>`;
+                        documentsList.appendChild(badge);
+                    });
+
+                    attachedDocumentsList.style.display = 'block';
+                    clearPdfsBtn.style.display = 'inline-block';
+
+                } else {
+                    pdfUploadStatus.textContent = `Error: ${result.message}`;
+                    pdfUploadStatus.style.color = '#ff4b4b';
+                }
+            } catch (error) {
+                pdfUploadStatus.textContent = `Error: ${error.message}`;
+                pdfUploadStatus.style.color = '#ff4b4b';
+            }
+
+            // Clear the input for re-selection
+            pdfFileInput.value = '';
+        });
+
+        // Clear PDFs button handler
+        clearPdfsBtn.addEventListener('click', () => {
+            brainstormDocumentContext = '';
+            attachedDocuments = [];
+            documentsList.innerHTML = '';
+            attachedDocumentsList.style.display = 'none';
+            clearPdfsBtn.style.display = 'none';
+            pdfUploadStatus.textContent = '';
+        });
+
         // Mode switching and API key elements
         const modeTabs = document.querySelectorAll('.mode-tab');
         const algorithmMode = document.getElementById('algorithm-mode');
@@ -910,25 +1025,34 @@
         const brainstormInput = document.getElementById('brainstorm-input');
         const llmProviderSelect = document.getElementById('llm-provider');
         const geminiConfig = document.getElementById('gemini-config');
+        const grokConfig = document.getElementById('grok-config');
         const ollamaConfig = document.getElementById('ollama-config');
         const ollamaModelGlobal = document.getElementById('ollama-model-global');
 
         // Load settings from localStorage on page load
         const savedProvider = localStorage.getItem('llm_provider') || 'gemini';
         const savedApiKey = localStorage.getItem('gemini_api_key');
+        const savedGrokApiKey = localStorage.getItem('grok_api_key');
         const savedOllamaModel = localStorage.getItem('ollama_model');
 
         llmProviderSelect.value = savedProvider;
         if (savedApiKey) geminiApiKeyInput.value = savedApiKey;
+        if (savedGrokApiKey) document.getElementById('grok-api-key').value = savedGrokApiKey;
         if (savedOllamaModel) ollamaModelGlobal.value = savedOllamaModel;
 
         // Show/hide config based on provider
         const updateProviderConfig = () => {
             if (llmProviderSelect.value === 'gemini') {
                 geminiConfig.style.display = 'flex';
+                grokConfig.style.display = 'none';
+                ollamaConfig.style.display = 'none';
+            } else if (llmProviderSelect.value === 'grok') {
+                geminiConfig.style.display = 'none';
+                grokConfig.style.display = 'flex';
                 ollamaConfig.style.display = 'none';
             } else {
                 geminiConfig.style.display = 'none';
+                grokConfig.style.display = 'none';
                 ollamaConfig.style.display = 'flex';
             }
         };
@@ -945,10 +1069,12 @@
         saveApiKeyBtn.addEventListener('click', () => {
             const provider = llmProviderSelect.value;
             const apiKey = geminiApiKeyInput.value.trim();
+            const grokApiKey = document.getElementById('grok-api-key').value.trim();
             const ollamaModel = ollamaModelGlobal.value.trim();
 
             localStorage.setItem('llm_provider', provider);
             if (apiKey) localStorage.setItem('gemini_api_key', apiKey);
+            if (grokApiKey) localStorage.setItem('grok_api_key', grokApiKey);
             if (ollamaModel) localStorage.setItem('ollama_model', ollamaModel);
 
             apiKeyStatus.textContent = '✓ Saved';
@@ -977,6 +1103,7 @@
             const message = brainstormInput.value.trim();
             const provider = localStorage.getItem('llm_provider') || 'gemini';
             const apiKey = localStorage.getItem('gemini_api_key');
+            const grokApiKey = localStorage.getItem('grok_api_key');
             const ollamaModel = localStorage.getItem('ollama_model') || 'dengcao/Qwen3-30B-A3B-Instruct-2507:latest';
 
             if (!message) return;
@@ -984,10 +1111,20 @@
                 alert('Please save your Gemini API key in the settings panel first.');
                 return;
             }
+            if (provider === 'grok' && !grokApiKey) {
+                alert('Please save your Grok API key in the settings panel first.');
+                return;
+            }
 
             // Lock UI
             brainstormInput.disabled = true;
             document.getElementById('brainstorm-send-btn').disabled = true;
+
+            // Add user message to chat history BEFORE sending
+            brainstormChatHistory.push({
+                role: 'user',
+                content: message
+            });
 
             // Clear input and show message
             brainstormInput.value = '';
@@ -1017,7 +1154,7 @@
             const params = {
                 prompt: message,
                 provider: provider,
-                api_key: apiKey,
+                api_key: provider === 'grok' ? grokApiKey : apiKey, // Send the correct key
                 ollama_model: ollamaModel,
                 // Defaults for Brainstorm mode (backend determines complexities, but we can pass explicit overrides if we had UI for them)
                 // Passing reasonable defaults just in case backend needs them for fallback
@@ -1030,11 +1167,13 @@
             };
 
             try {
-                // Call runGraph with mode='brainstorm'
+                // Call runGraph with mode='brainstorm', including chat history and document context
                 // runGraph handles log clearing, SSE connection, etc.
                 await runGraph({
                     params: params,
-                    mode: 'brainstorm'
+                    mode: 'brainstorm',
+                    chat_history: brainstormChatHistory,
+                    document_context: brainstormDocumentContext
                 }, '/build_and_run_graph', false); // Do not clear logs again
 
             } catch (error) {
@@ -1441,6 +1580,18 @@
                 alert('Please select at least 2 MBTI archetypes.');
                 return;
             }
+
+            // Include Global Provider Settings
+            const provider = document.getElementById('llm-provider').value;
+            const geminiKey = document.getElementById('gemini-api-key').value.trim();
+            const grokKey = document.getElementById('grok-api-key').value.trim();
+            const ollamaGlobal = document.getElementById('ollama-model-global').value.trim();
+
+            params.provider = provider;
+            if (provider === 'gemini') params.api_key = geminiKey;
+            if (provider === 'grok') params.api_key = grokKey;
+            params.ollama_model = ollamaGlobal;
+
             runGraph({ params }, '/build_and_run_graph');
         });
 
@@ -1626,6 +1777,18 @@
                         synthesisMsgDiv.innerHTML = `<div style="color: #28a745; font-weight: bold; margin-bottom: 0.5rem;">🧠 Synthesis</div>${displayText}`;
                         chatDiv.appendChild(synthesisMsgDiv);
                         chatDiv.scrollTop = chatDiv.scrollHeight;
+
+                        // Add assistant response to chat history for continuity
+                        let rawAnswerText = '';
+                        if (typeof answer === 'object' && answer !== null) {
+                            rawAnswerText = answer.proposed_solution || JSON.stringify(answer);
+                        } else {
+                            rawAnswerText = String(answer);
+                        }
+                        brainstormChatHistory.push({
+                            role: 'assistant',
+                            content: rawAnswerText
+                        });
                     }
 
                     // Re-enable input

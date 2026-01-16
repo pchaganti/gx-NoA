@@ -9,6 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 def get_complexity_estimator_chain(llm):
     """Estimates QNN size and generates dynamic expert personas based on problem complexity."""
     # REFACTORED: Now focuses on Topological Parameters, not just returning a static list of experts.
+    # Also considers prior conversation and document context for continuity.
     prompt = ChatPromptTemplate.from_template("""
 Analyze the complexity of the following user input/question for a brainstorming session.
 Based on the complexity and nature of the problem, recommend an appropriate QNN topology (layers, epochs, and width).
@@ -18,11 +19,23 @@ User Input:
 {user_input}
 ---
 
+Prior Conversation (if any):
+---
+{prior_conversation}
+---
+
+Document Context (if any):
+---
+{document_context}
+---
+
 Consider these factors for complexity:
 1. Number of distinct concepts or domains involved
 2. Depth of analysis required
 3. Potential for conflicting perspectives
 4. Technical vs conceptual nature
+5. Continuation from prior conversation context
+6. Complexity of attached documents
 
 Respond with a JSON object:
 {{
@@ -120,6 +133,7 @@ def get_brainstorming_spanner_chain(llm):
     """
     Dynamically generates a unique Expert Persona (Node) for a specific position in the QNN.
     Ensures the persona is tailored to the guiding concept and the specific layer's role.
+    Now includes document context for domain-aware persona generation.
     """
     prompt = ChatPromptTemplate.from_template("""
 You are a QNN Node Generator.
@@ -129,11 +143,17 @@ Topic: {problem}
 Guiding Concept (Seed): {guiding_concept}
 QNN Position: Layer {layer_index}, Node {node_index}
 
+Document Context (Reference Material):
+---
+{document_context}
+---
+
 Role based on Layer:
 - Layer 0: Divergent Thinker (Explores the 'What if' and breadth).
 - Layer 1+: Convergent/Critical Thinker (Critiques, Refines, or Synthesizes inputs from previous layers).
 
 Create a persona that embodies the "{guiding_concept}" perspective applied to the Topic.
+If document context is provided, ensure the persona has relevant expertise to analyze it.
 
 Respond with a JSON object:
 {{
@@ -150,6 +170,7 @@ def get_brainstorming_agent_chain(llm):
     """
     Standard agent chain for brainstorming QNN node.
     Reflects on the input concept from the persona's perspective.
+    Now includes prior conversation and document context for continuity.
     """
     prompt = ChatPromptTemplate.from_template("""
 <System>
@@ -161,8 +182,20 @@ Concept to Explore / User Input:
 {input}
 ---
 
+Prior Conversation Context:
+---
+{prior_conversation}
+---
+
+Document Context (Reference Material):
+---
+{document_context}
+---
+
 Your Task:
 Reflect on the input from your specific persona and expertise defined in the system prompt.
+Consider the prior conversation context to maintain continuity with previous discussions.
+Reference the document context when relevant to ground your analysis in the provided materials.
 Provide a unique insight, a critical question, or a creative expansion.
 Do NOT try to solve it algorithmically.
 Explore the "why" and "what if".
@@ -204,6 +237,7 @@ Output ONLY the new system prompt. Do not add any explanation.
 def get_brainstorming_synthesis_chain(llm):
     """
     Synthesizes multiple agent reflections into a cohesive narrative for the epoch.
+    Now includes prior conversation context for continuity across turns.
     """
     prompt = ChatPromptTemplate.from_template("""
 You are a Master Synthesizer of Ideas.
@@ -211,14 +245,58 @@ You have heard from a panel of experts who have reflected on a core concept.
 
 Original Concept: {original_request}
 
+Prior Conversation Context:
+---
+{prior_conversation}
+---
+
+Document Context (Reference Material):
+---
+{document_context}
+---
+
 Expert Reflections:
 {agent_solutions}
 
 Your Task:
 Synthesize these perspectives into a rich, multi-faceted summary.
+Build upon any insights from the prior conversation to maintain continuity.
+Integrate relevant information from the document context.
 Highlight tensions, agreements, and novel insights.
 Do NOT just list what they said. Weave a narrative that advances the understanding of the concept.
+If this is part of an ongoing conversation, explicitly connect to previous discussion points.
 
 Synthesized Narrative:
+""")
+    return prompt | llm | StrOutputParser()
+
+
+def get_problem_summarizer_chain(llm):
+    """
+    Summarizes the user's input and document context into a concise briefing for experts.
+    Prevents overwhelming agents with full document text.
+    """
+    prompt = ChatPromptTemplate.from_template("""
+You are a Research Director.
+Your goal is to brief a team of expert agents on a problem they need to solve.
+They need to know the core of the user's request AND the key constraints or information provided in the reference documents.
+They do NOT need the full text of the documents, just the essential context.
+
+User's Request:
+---
+{user_input}
+---
+
+Reference Documents (Full Text):
+---
+{document_context}
+---
+
+Create a concise "Problem Usage Summary" (1-2 paragraphs).
+1. Clearly state the user's goal.
+2. Summarize the most relevant facts/constraints from the documents that apply to this goal.
+3. Keep it high-level but specific enough for an expert to understand the context.
+
+Problem Usage Summary:
 """)
     return prompt | llm | StrOutputParser()

@@ -4,9 +4,12 @@ uvicorn
 python-dotenv
 sse-starlette
 langchain
+langchain-xai
 langchain-community
 langchain-google-genai
 langchain-text-splitters
 langgraph
 scikit-learn
 faiss-cpu
+pymupdf>=1.24.0
+python-multipart

@@ -30,6 +30,9 @@ def clean_and_parse_json(llm_output_string):
             print("Error: No JSON object found in the string.")
             return None
 
+    # Remove trailing commas before } or ] (common LLM JSON generation error)
+    json_string = re.sub(r',\s*([}\]])', r'\1', json_string)
+    
     try:
         return json.loads(json_string)
     except json.JSONDecodeError as e:
