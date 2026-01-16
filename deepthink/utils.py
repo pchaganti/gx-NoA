@@ -11,12 +11,11 @@ from contextlib import redirect_stdout, redirect_stderr
 def clean_and_parse_json(llm_output_string):
     """
     Finds and parses the first valid JSON object within a string.
-
-    Args:
-        llm_output_string: The raw string output from the language model.
-
-    Returns:
-        A Python dictionary representing the JSON data, or None if parsing fails.
+    Robustly handles:
+    - Markdown code blocks
+    - Trailing commas
+    - C-style comments (// and /* */)
+    - Unescaped newlines/tabs inside strings (common LLM error)
     """
     match = re.search(r"```json\s*([\s\S]*?)\s*```", llm_output_string)
     if match:
@@ -27,17 +26,65 @@ def clean_and_parse_json(llm_output_string):
             end_index = llm_output_string.rindex('}') + 1
             json_string = llm_output_string[start_index:end_index]
         except ValueError:
-            print("Error: No JSON object found in the string.")
+            # print("Error: No JSON object found in the string.")
             return None
 
-    # Remove trailing commas before } or ] (common LLM JSON generation error)
-    json_string = re.sub(r',\s*([}\]])', r'\1', json_string)
+    # Step 1: Remove Comments (C-style) while preserving strings
+    # Pattern captures: "string" OR //comment OR /*comment*/
+    pattern = r'("(?:\\.|[^"\\])*")|//.*?$|/\*.*?\*/'
+    def replace_comments(match):
+        if match.group(1): # It's a string, keep it
+            return match.group(1)
+        return "" # It's a comment, remove it
     
     try:
+        json_string = re.sub(pattern, replace_comments, json_string, flags=re.MULTILINE | re.DOTALL)
+    except Exception:
+        pass # Fallback if regex fails (rare)
+
+    # Step 2: Remove trailing commas before } or ]
+    json_string = re.sub(r',\s*([}\]])', r'\1', json_string)
+    
+    # Step 3: Attempt fast load
+    try:
         return json.loads(json_string)
+    except json.JSONDecodeError:
+        pass
+        
+    # Step 4: Fix Unescaped Control Characters in Strings (Fallback)
+    # This manually iterates to find strings and replace literal \n with \\n
+    new_chars = []
+    in_string = False
+    escaped = False
+    for char in json_string:
+        if char == '"' and not escaped:
+            in_string = not in_string
+            new_chars.append(char)
+            escaped = False
+        elif in_string:
+            if char == '\n':
+                new_chars.append('\\n')
+            elif char == '\t':
+                new_chars.append('\\t')
+            elif char == '\r':
+                pass # Skip CR
+            elif char == '\\':
+                escaped = not escaped
+                new_chars.append(char)
+            else:
+                escaped = False
+                new_chars.append(char)
+        else:
+            new_chars.append(char)
+            escaped = False
+            
+    repaired_string = "".join(new_chars)
+    
+    try:
+        return json.loads(repaired_string)
     except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
-        print(f"Problematic string: {json_string}")
+        print(f"Error decoding JSON even after repair: {e}")
+        # print(f"Problematic string start: {json_string[:200]}")
         return None
 
 
