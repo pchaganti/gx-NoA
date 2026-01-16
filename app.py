@@ -1000,7 +1000,7 @@ def create_agent_node(llm, node_id):
 
         return {
             "agent_outputs": {node_id: response_json},
-            "memory": current_memory
+            "memory": {node_id: agent_memory_history} # RETURN DELTA ONLY to avoid race conditions
         }
 
     return agent_node
@@ -1762,17 +1762,7 @@ async def build_and_run_graph(payload: dict = Body(...)):
                 })
                 # await log_stream.put(f"LOG: [BRAINSTORM] Summary generated.")
 
-            # --- Problem Summarization (if documents are present) ---
-            brainstorm_problem_summary = ""
-            if document_context:
-                await log_stream.put("LOG: [BRAINSTORM] Summarizing problem and documents for agent context...")
-                summarizer_chain = get_problem_summarizer_chain(llm) # Use main LLM for summarization
-                brainstorm_problem_summary = await summarizer_chain.ainvoke({
-                    "user_input": user_prompt,
-                    "document_context": document_context[:50000] # Limit for summarization context window
-                })
-                # await log_stream.put(f"LOG: [BRAINSTORM] Summary generated.")
-            
+
             width = 3 # Default
             
             try:
